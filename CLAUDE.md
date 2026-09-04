@@ -6,9 +6,13 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 `PLAN.md` is the authoritative spec; build in its phase order and folder layout, one phase per session, with a git commit as a checkpoint after each phase.
 
-**Done:** Phase 0 (skeleton: venv, `requirements.txt`, `config.yaml`, `.env.example`, `src/config.py`) and Phase 1 (`src/data/exchange.py`, `src/data/cache.py`, `scripts/download_data.py`). **Next:** Phase 2 (indicators & candlestick patterns in `src/indicators/features.py`).
+**Done:** Phase 0 (skeleton), Phase 1 (`src/data/`), Phase 2 (`src/indicators/features.py`), Phase 3 (`src/structure/swings.py`, `scripts/show_swings.py`). **Next:** Phase 4 (structure on top of swings: `support_resistance.py`, `trendlines.py`, `trend.py`).
+
+Phase 3 conventions: swings via `scipy.argrelextrema` on `high`/`low` (not close), filtered to fully-confirmed interior positions `[sensitivity, n-1-sensitivity]` — argrelextrema's default `mode='clip'` otherwise flags spurious unconfirmed pivots on the newest bars. `find_swings` returns a tidy frame keyed by integer `bar` (not timestamp — an outside bar can be both high and low). Build Phase 4 on `bar`.
 
 Env note: developed on Python 3.14; all deps (incl. the `pandas-ta-classic` git build) install cleanly. `fetch_ohlcv` pages with a `since` cursor because exchanges cap ~1000 candles/call. `normalize_ohlcv` is kept network-free and unit-tested; the real fetch is a `@pytest.mark.network` test (skip offline with `pytest -m "not network"`).
+
+Phase 2 conventions: TA-Lib is **not** installed, so candlestick patterns are hand-rolled boolean columns in `features.py` (not `cdl_pattern`). Indicator/pattern column names are exported as `COL_*` constants + `INDICATOR_COLUMNS`/`PATTERN_COLUMNS` — import those downstream, don't hardcode strings. `add_features` keeps warmup NaNs (never drops rows). MAs are SMA; RSI/MACD use pandas-ta defaults (match TradingView against the last *closed* bar).
 
 ## What this project is
 
