@@ -1,0 +1,20 @@
+# Layer 1 — data & deterministic analysis
+ccxt              # fetch OHLCV candle data (public/read-only use here)
+pandas            # core data structure for all price data
+numpy             # numeric helpers (line fitting, clustering levels)
+scipy             # peak/valley detection -> swing points
+mplfinance        # annotated candlestick charts
+
+# pandas-ta-classic fork (NOT the discontinued original pandas-ta)
+pandas-ta-classic @ git+https://github.com/xgboosted/pandas-ta-classic
+
+# Layer 2 — reasoning/voice
+anthropic         # official SDK to call Claude
+
+# Config & plumbing
+python-dotenv     # load ANTHROPIC_API_KEY from .env
+pydantic>=2       # validate config so a typo can't silently break things
+PyYAML            # parse config.yaml
+
+# Tests
+pytest            # tests, especially for detector logic

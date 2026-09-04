@@ -1,0 +1,23 @@
+market:
+  exchange: binance
+  symbol: BTC/USDT
+  timeframe: 1h              # switch to 4h later by changing this one line
+  history_candles: 4320      # ~6 months of 1h candles
+
+structure:
+  swing_sensitivity: 5       # bars on each side that define a pivot (higher = only major swings)
+  sr_cluster_tolerance_pct: 0.5  # how close levels must be to merge into one S/R zone
+
+indicators:
+  rsi_period: 14
+  rsi_oversold: 30
+  rsi_overbought: 70
+  fast_ma: 20
+  slow_ma: 50
+
+confluence:
+  min_agreeing_signals: 2    # flag a setup only when at least this many detectors agree
+
+advisor:
+  model: claude-sonnet-4-6   # see docs.claude.com for current model names; used in Phase 7
+  explanation_style: teaching

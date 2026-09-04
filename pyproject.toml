@@ -1,0 +1,5 @@
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+markers = [
+    "network: test performs a real network request (skip offline with -m 'not network')",
+]
