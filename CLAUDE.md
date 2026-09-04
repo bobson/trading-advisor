@@ -6,9 +6,13 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 `PLAN.md` is the authoritative spec; build in its phase order and folder layout, one phase per session, with a git commit as a checkpoint after each phase.
 
-**Done:** Phase 0 (skeleton), Phase 1 (`src/data/`), Phase 2 (`src/indicators/features.py`), Phase 3 (`src/structure/swings.py`, `scripts/show_swings.py`). **Next:** Phase 4 (structure on top of swings: `support_resistance.py`, `trendlines.py`, `trend.py`).
+**Done:** Phase 0 (skeleton), Phase 1 (`src/data/`), Phase 2 (`src/indicators/features.py`), Phase 3 (`src/structure/swings.py`), Phase 4 (`support_resistance.py`, `trendlines.py`, `trend.py`), Phase 5 (`src/structure/fibonacci.py`, `scripts/show_fibonacci.py`). **Next:** Phase 6 (confluence engine in `src/signals/confluence.py`).
 
-Phase 3 conventions: swings via `scipy.argrelextrema` on `high`/`low` (not close), filtered to fully-confirmed interior positions `[sensitivity, n-1-sensitivity]` — argrelextrema's default `mode='clip'` otherwise flags spurious unconfirmed pivots on the newest bars. `find_swings` returns a tidy frame keyed by integer `bar` (not timestamp — an outside bar can be both high and low). Build Phase 4 on `bar`.
+Phase 3 conventions: swings via `scipy.argrelextrema` on `high`/`low` (not close), filtered to fully-confirmed interior positions `[sensitivity, n-1-sensitivity]` — argrelextrema's default `mode='clip'` otherwise flags spurious unconfirmed pivots on the newest bars. `find_swings` returns a tidy frame keyed by integer `bar` (not timestamp — an outside bar can be both high and low). Structure detectors build on `bar`.
+
+Phase 4 conventions: S/R `tolerance_pct` is a PERCENT (÷100 to a fraction — a 0.4%-merge/0.6%-no-merge test guards this). Detectors return ALL levels; capping/proximity selection lives in the display script, not the detector. Trendlines are least-squares fits (`numpy.polyfit`) through the last 3 swings with an `r2` quality gate; draw them from the first anchor bar forward (never extend a short local fit backward across the window). `classify_trend` reads `COL_SMA_SLOW` and requires the featured frame to be row-aligned with the swings' candles; `sideways` is the neutral fallback, and an unconfirmed HH/HL (MA not rising) downgrades to sideways.
+
+Phase 5 conventions: `fib_retracement` auto-picks the latest leg (last swing + most recent opposite swing before it). Invariant: `levels[0.0]` is the most-recent swing's price (impulse end), `levels[1.0]` the older anchor's — this pins the up/down branch (the 0.5 midpoint can't). Returns `None` on a degenerate `high <= low` leg (from non-alternating swings). Returns `FibRetracement` (dataclass), not columns on the frame.
 
 Env note: developed on Python 3.14; all deps (incl. the `pandas-ta-classic` git build) install cleanly. `fetch_ohlcv` pages with a `since` cursor because exchanges cap ~1000 candles/call. `normalize_ohlcv` is kept network-free and unit-tested; the real fetch is a `@pytest.mark.network` test (skip offline with `pytest -m "not network"`).
 
