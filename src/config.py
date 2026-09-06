@@ -50,6 +50,9 @@ class IndicatorsConfig(_Strict):
 
 class ConfluenceConfig(_Strict):
     min_agreeing_signals: int = 2
+    # How close (percent) the last price must sit to a level/fib for it to vote. This is
+    # "is price at a level right now", distinct from S/R's swing-merge tolerance.
+    proximity_pct: float = 0.5
 
 
 class AdvisorConfig(_Strict):

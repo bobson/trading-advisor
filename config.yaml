@@ -17,6 +17,7 @@ indicators:
 
 confluence:
   min_agreeing_signals: 2    # flag a setup only when at least this many detectors agree
+  proximity_pct: 0.5         # how close (%) price must be to a level/fib for it to vote
 
 advisor:
   model: claude-sonnet-4-6   # see docs.claude.com for current model names; used in Phase 7
