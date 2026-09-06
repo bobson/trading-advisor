@@ -124,6 +124,13 @@ def test_facts_to_prompt_renders(cfg, uptrend_frame, uptrend_swings):
     assert "BULLISH setup FLAGGED" in text
 
 
+def test_chart_patterns_field_present(cfg, uptrend_frame, uptrend_swings):
+    facts = build_facts(uptrend_frame, uptrend_swings, cfg)
+    assert isinstance(facts["chart_patterns"], list)  # additive Phase 9 field, may be empty
+    text = facts_to_prompt(facts)
+    assert "CHART PATTERNS (best-effort" in text  # labeled approximate for the model
+
+
 # --- explain() plumbing (mocked client, no network) ----------------------------
 
 class _Block:

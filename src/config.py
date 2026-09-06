@@ -16,7 +16,7 @@ from typing import Optional
 
 import yaml
 from dotenv import load_dotenv
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, Field
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 DEFAULT_CONFIG_PATH = PROJECT_ROOT / "config.yaml"
@@ -55,6 +55,18 @@ class ConfluenceConfig(_Strict):
     proximity_pct: float = 0.5
 
 
+class PatternsConfig(_Strict):
+    # Chart-pattern geometry is looser than S/R clustering — two peaks this close (percent)
+    # count as "equal" for double tops / head-and-shoulders shoulders.
+    price_tolerance_pct: float = 2.0
+    # Minimum depth (percent) of the trough between two peaks (or peak between two troughs)
+    # for it to be a real reversal rather than noise — the anti-over-call guard.
+    min_trough_pct: float = 3.0
+    # A fitted trendline whose price change across its own span is smaller than this
+    # (percent) counts as "flat" when classifying triangles.
+    flat_slope_pct: float = 1.0
+
+
 class AdvisorConfig(_Strict):
     model: str = "claude-sonnet-4-6"
     explanation_style: str = "teaching"
@@ -66,6 +78,8 @@ class Config(_Strict):
     indicators: IndicatorsConfig
     confluence: ConfluenceConfig
     advisor: AdvisorConfig
+    # Optional (Phase 9): defaults apply if config.yaml omits the `patterns:` block.
+    patterns: PatternsConfig = Field(default_factory=PatternsConfig)
 
     # Injected from .env, not from config.yaml. Optional so the deterministic
     # Layer 1 pipeline (data + detectors) runs without an API key.

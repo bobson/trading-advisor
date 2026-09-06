@@ -24,6 +24,7 @@ from src.indicators.features import (
     COL_MACD_SIGNAL,
     COL_RSI,
 )
+from src.patterns.chart_patterns import find_chart_patterns
 from src.signals.confluence import (
     evaluate_confluence,
     signal_from_fibonacci,
@@ -109,6 +110,18 @@ def build_facts(featured_df: pd.DataFrame, swings: pd.DataFrame, cfg: Config) ->
     macd_val = None if pd.isna(macd) else round(float(macd), 2)
     macd_sig_val = None if pd.isna(macd_signal) else round(float(macd_signal), 2)
 
+    # Chart patterns are best-effort geometry (Phase 9) — additive context, not a vote.
+    chart_patterns = [
+        {
+            "name": p.name,
+            "direction": p.direction,
+            "reason": p.reason,
+            "neckline": p.neckline,
+            "target": p.target,
+        }
+        for p in find_chart_patterns(swings, cfg)
+    ]
+
     fib_facts = None
     if fib is not None:
         fib_facts = {
@@ -141,6 +154,7 @@ def build_facts(featured_df: pd.DataFrame, swings: pd.DataFrame, cfg: Config) ->
             else "unknown",
         },
         "support_resistance": _nearest_levels(levels, last_close),
+        "chart_patterns": chart_patterns,
         "fibonacci": fib_facts,
         "confluence": {
             "bias": confluence.bias,
@@ -184,6 +198,16 @@ def facts_to_prompt(facts: dict) -> str:
     lines.append(
         f"  - Resistance: {res['price']} ({res['touches']} touches)" if res else "  - Resistance: none detected above price"
     )
+    lines.append("")
+
+    patterns = facts.get("chart_patterns", [])
+    lines.append("CHART PATTERNS (best-effort geometry — approximate, may over-call):")
+    if patterns:
+        for p in patterns:
+            extra = f" [neckline {p['neckline']}, target {p['target']}]" if p.get("neckline") is not None else ""
+            lines.append(f"  [{p['direction'].upper()}] {p['name']}: {p['reason']}{extra}")
+    else:
+        lines.append("  - none detected in the recent structure")
     lines.append("")
 
     fib = facts["fibonacci"]

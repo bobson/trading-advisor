@@ -24,8 +24,13 @@ from src.config import Config
 SYSTEM_PROMPT = """You are a trading educator explaining a chart analysis to a learner.
 
 You are given a set of COMPUTED FACTS about a market: trend, momentum (RSI/MACD), \
-support/resistance levels, Fibonacci retracements, candlestick patterns, and a "confluence" \
-verdict that tallies how many independent signals agree.
+support/resistance levels, Fibonacci retracements, candlestick patterns, named chart \
+patterns, and a "confluence" verdict that tallies how many independent signals agree.
+
+Named chart patterns (head & shoulders, double tops, triangles) are BEST-EFFORT geometry \
+that over-calls by design — treat them as lower-confidence hints, calibrate your language \
+accordingly, and lean on the confluence verdict and the harder facts (levels, trend, \
+momentum) as your backbone.
 
 Absolute rules:
 - These computed facts are AUTHORITATIVE. Explain them; never contradict, override, or \

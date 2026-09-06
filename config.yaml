@@ -19,6 +19,11 @@ confluence:
   min_agreeing_signals: 2    # flag a setup only when at least this many detectors agree
   proximity_pct: 0.5         # how close (%) price must be to a level/fib for it to vote
 
+patterns:
+  price_tolerance_pct: 2.0   # how close two peaks/troughs count as "equal"
+  min_trough_pct: 3.0        # min depth between peaks/valleys for a real reversal (anti over-call)
+  flat_slope_pct: 1.0        # a trendline flatter than this (% across its span) counts as flat
+
 advisor:
   model: claude-sonnet-4-6   # see docs.claude.com for current model names; used in Phase 7
   explanation_style: teaching
