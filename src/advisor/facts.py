@@ -38,6 +38,7 @@ from src.signals.confluence import (
     signal_from_volume,
 )
 from src.structure.fibonacci import fib_retracement
+from src.structure.mtf import resolve_mtf
 from src.structure.support_resistance import (
     RESISTANCE,
     SUPPORT,
@@ -104,7 +105,9 @@ def build_facts(featured_df: pd.DataFrame, swings: pd.DataFrame, cfg: Config) ->
         signal_from_fibonacci(fib, last_close, prox),
         signal_from_volume(featured_df, cfg),
     ]
-    confluence = evaluate_confluence(signals, cfg.confluence.min_agreeing_signals)
+    confluence = evaluate_confluence(signals, cfg)
+    # Phase 16: gate the setup against the higher-timeframe trend (context flows down only).
+    confluence = resolve_mtf(confluence, featured_df, cfg)
 
     # --- momentum readings (for display; the votes above already encode direction) ---
     rsi = featured_df[COL_RSI].iloc[-1]
@@ -177,12 +180,16 @@ def build_facts(featured_df: pd.DataFrame, swings: pd.DataFrame, cfg: Config) ->
         "confluence": {
             "bias": confluence.bias,
             "triggered": confluence.triggered,
-            "agreeing": confluence.agreeing,
-            "min_agreeing": cfg.confluence.min_agreeing_signals,
+            "confidence": confluence.confidence,
+            "agreeing_categories": confluence.agreeing_categories,
+            "require_categories": cfg.confluence.require_categories,
+            "categories": confluence.categories,
             "signals": [
                 {"name": s.name, "direction": s.direction, "reason": s.reason}
                 for s in confluence.signals
             ],
+            "mtf_alignment": confluence.mtf_alignment,
+            "mtf_trends": confluence.mtf_trends,
         },
     }
 
@@ -247,12 +254,28 @@ def facts_to_prompt(facts: dict) -> str:
     lines.append("")
 
     c = facts["confluence"]
+    conf_pct = f"{c['confidence'] * 100:.0f}%"
     verdict = (
-        f"{c['bias'].upper()} setup FLAGGED ({c['agreeing']} of {c['min_agreeing']} needed agree)"
+        f"{c['bias'].upper()} setup FLAGGED — confidence {conf_pct} "
+        f"({c['agreeing_categories']} independent categories agree, need {c['require_categories']})"
         if c["triggered"]
-        else f"no setup flagged (bias {c['bias']}, {c['agreeing']} agree, need {c['min_agreeing']})"
+        else f"no setup flagged (bias {c['bias']}, confidence {conf_pct}, "
+        f"{c['agreeing_categories']} of {c['require_categories']} categories agree)"
     )
     lines.append(f"CONFLUENCE VERDICT: {verdict}")
+    cats = c.get("categories") or {}
+    if cats:
+        lines.append("Category reads (correlated signals collapsed): "
+                     + ", ".join(f"{cat}={d}" for cat, d in cats.items()))
+
+    mtf_trends = c.get("mtf_trends")
+    if mtf_trends:
+        tf_str = ", ".join(f"{tf} {label}" for tf, label in mtf_trends.items())
+        align = c.get("mtf_alignment")
+        lines.append(f"HIGHER TIMEFRAMES: {tf_str} — the setup is {align} with the bigger picture")
+        if align == "conflict":
+            lines.append("  (downgraded: this base-timeframe setup fights the higher-timeframe trend)")
+
     lines.append("Every detector's vote:")
     for s in c["signals"]:
         lines.append(f"  [{s['direction'].upper()}] {s['name']}: {s['reason']}")

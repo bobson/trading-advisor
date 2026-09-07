@@ -32,7 +32,7 @@ def main() -> None:
     p.add_argument("--symbol", default=cfg.market.symbol)
     p.add_argument("--timeframe", default=cfg.market.timeframe)
     p.add_argument("--horizon", type=int, default=24, help="bars ahead to measure the return over")
-    p.add_argument("--min-agreeing", type=int, default=None, help="override confluence.min_agreeing_signals")
+    p.add_argument("--require-categories", type=int, default=None, help="override confluence.require_categories")
     p.add_argument("--warmup", type=int, default=None, help="bars to skip before the first setup")
     p.add_argument("--step", type=int, default=1, help="scan every Nth bar (larger = faster, fewer/less-overlapping setups)")
     p.add_argument("--save", action="store_true", help="also write the report to outputs/")
@@ -48,7 +48,7 @@ def main() -> None:
         rcfg,
         horizon=args.horizon,
         warmup=args.warmup,
-        min_agreeing=args.min_agreeing,
+        require_categories=args.require_categories,
         step=args.step,
     )
     print(report.summary())

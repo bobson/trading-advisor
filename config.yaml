@@ -17,14 +17,25 @@ indicators:
   volume_ma: 20              # SMA period for "average volume" (Phase 15)
 
 confluence:
-  min_agreeing_signals: 2    # flag a setup only when at least this many detectors agree
+  min_agreeing_signals: 2    # LEGACY (Phase 6) — superseded by require_categories below
   proximity_pct: 0.5         # how close (%) price must be to a level/fib for it to vote
   volume_confirm_factor: 1.2 # bar must trade >= this x its avg volume to confirm the candle (Phase 15)
+  require_categories: 2      # a setup must span >= this many independent categories (Phase 17)
+  category_weights:          # per-category weight in the 0-1 confidence score (NOT tuned to the backtest)
+    trend: 1.0
+    momentum: 1.0
+    structure: 1.2
+    volume: 0.8
+    volatility: 0.8
 
 patterns:
   price_tolerance_pct: 2.0   # how close two peaks/troughs count as "equal"
   min_trough_pct: 3.0        # min depth between peaks/valleys for a real reversal (anti over-call)
   flat_slope_pct: 1.0        # a trendline flatter than this (% across its span) counts as flat
+
+mtf:
+  enabled: true
+  context_from: [4h, 1d]     # higher timeframes that gate the base-timeframe setup (Phase 16)
 
 advisor:
   model: claude-sonnet-4-6   # see docs.claude.com for current model names; used in Phase 7

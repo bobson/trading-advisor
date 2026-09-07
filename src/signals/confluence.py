@@ -1,27 +1,32 @@
-"""Phase 6 — confluence engine: turn each detector into a vote, then flag a setup only
-when enough of them agree.
+"""Confluence engine — Phase 6 (tally) rebuilt in Phase 17 as a category-aware confidence.
 
-The core rule of this project is that Layer 1 states facts; the confluence engine is still
-Layer 1 — it does not reason, it *tallies*. Each detector emits a `Signal` (a direction —
-bullish / bearish / neutral — plus a plain-language reason). `evaluate_confluence` counts
-the directional votes: the side with strictly more votes wins, and a setup is flagged only
-if that winning side reaches `min_agreeing_signals`. A tie (equal bullish and bearish votes)
-never fires — genuine disagreement is not a setup.
+Still Layer 1: it does not reason, it scores. Each detector emits a `Signal` (bullish /
+bearish / neutral + a reason). But raw votes double-count correlated signals (rsi & macd are
+both momentum; S/R & fib & a candle at a level are all "structure"), so Phase 17 groups
+signals into INDEPENDENT categories (see `SIGNAL_CATEGORY`), collapses each to one net vote,
+and scores by category weight:
 
-The engine is split in two on purpose:
-  - `evaluate_confluence(signals, min_agreeing)` is pure and knows nothing about candles;
-    you can hand it a list of `Signal`s built by hand and assert the flag. This is what the
-    phase's "done when" check exercises.
+  - `evaluate_confluence(signals, cfg)` is pure over a `Signal` list: each category nets a
+    direction (majority of its own signals), the heavier-weighted side wins (a weight tie nets
+    neutral), and `confidence` is the winning weight as a fraction of the ACTIVE category
+    weight — a genuine 0–1 that rewards breadth across categories. A setup is flagged only when
+    at least `require_categories` categories agree. This confidence is PRE-MTF.
   - `gather_signals(featured_df, swings, cfg)` wires the real detectors into that list.
+  - `analyze_confluence(...)` runs both AND `resolve_mtf`, so every one-call consumer sees the
+    FINAL confidence/verdict (the multi-timeframe gate can veto a flag and grade the score).
 
-Neutral votes are recorded (they explain what the engine looked at) but never push the
-count toward a setup. NaN indicator values on very short frames vote NEUTRAL rather than
-letting a NaN comparison silently decide.
+Neutral votes are recorded but never push a category toward a side. NaN indicator values on
+short frames vote NEUTRAL rather than letting a NaN comparison silently decide.
+
+Backtest verdict (BTC/USDT 1h): the category COLLAPSE improved selectivity (overall win-rate
+best of any phase); the category WEIGHTS added ~nothing over uniform and are kept as untuned
+neutral priors — deliberately not fitted to the backtest.
 """
 
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+from typing import Optional
 
 import numpy as np
 import pandas as pd
@@ -60,6 +65,21 @@ NEUTRAL = "neutral"
 # and the full 0.0/1.0 endpoints are not "price holding a level").
 KEY_FIB_RATIOS = [0.382, 0.5, 0.618, 0.786]
 
+# Phase 17: which INDEPENDENT category each detector belongs to. Signals inside one category
+# are correlated (rsi & macd are both momentum; S/R & fib & a candle at a level are all
+# "structure"), so they collapse to a single category vote instead of double-counting. This is
+# the fix for the S/R+fib overlap the plan calls out (the same reason the trendline vote was
+# dropped in Phase 6). Volatility has no detector until Phase 18.
+SIGNAL_CATEGORY = {
+    "trend": "trend",
+    "rsi": "momentum",
+    "macd": "momentum",
+    "candlestick": "structure",
+    "support_resistance": "structure",
+    "fibonacci": "structure",
+    "volume": "volume",
+}
+
 
 @dataclass
 class Signal:
@@ -71,9 +91,15 @@ class Signal:
 @dataclass
 class ConfluenceResult:
     bias: str                 # bullish | bearish | neutral (of the winning side)
-    triggered: bool           # did the winning side reach min_agreeing?
-    agreeing: int             # votes on the winning side
+    triggered: bool           # did the winning side span >= require_categories (and survive MTF)?
+    confidence: float         # 0–1 score (pre-MTF out of evaluate_confluence; FINAL after resolve_mtf)
+    agreeing_categories: int  # how many independent categories net the winning bias
     signals: list[Signal] = field(default_factory=list)  # every vote, in order
+    categories: dict = field(default_factory=dict)       # category -> net direction (collapsed)
+    # Phase 16 multi-timeframe context (set by structure.mtf.resolve_mtf; None = no MTF applied).
+    mtf_alignment: Optional[str] = None      # "aligned" | "conflict" | "neutral" | None
+    mtf_trends: Optional[dict] = None        # {higher_timeframe: trend_label}
+    mtf_downgraded: bool = False             # True when the MTF gate flipped triggered off
 
     @property
     def bullish(self) -> list[Signal]:
@@ -85,16 +111,23 @@ class ConfluenceResult:
 
     @property
     def contributing(self) -> list[Signal]:
-        """The signals on the winning side — the ones that justify the flag."""
-        if self.bias == BULLISH:
-            return self.bullish
-        if self.bias == BEARISH:
-            return self.bearish
-        return []
+        """Signals that drive the WINNING CATEGORIES — category-consistent with the score.
+
+        A signal only contributes if it points the winning way AND its category netted that
+        way; a lone bullish candle inside a structure category that netted bearish is not
+        listed, so the reasons never contradict the category breakdown.
+        """
+        if self.bias not in (BULLISH, BEARISH):
+            return []
+        winning = {cat for cat, direction in self.categories.items() if direction == self.bias}
+        return [
+            s for s in self.signals
+            if s.direction == self.bias and SIGNAL_CATEGORY.get(s.name) in winning
+        ]
 
     @property
     def reasons(self) -> list[str]:
-        """The winning side's reasons — what to show when a setup is flagged."""
+        """The winning categories' reasons — what to show when a setup is flagged."""
         return [s.reason for s in self.contributing]
 
 
@@ -233,22 +266,65 @@ def signal_from_fibonacci(
 
 # --- aggregation ---------------------------------------------------------------
 
-def evaluate_confluence(signals: list[Signal], min_agreeing: int) -> ConfluenceResult:
-    """Tally votes. The side with strictly more votes wins; a setup is flagged only if the
-    winning side has at least `min_agreeing` votes. A tie never fires.
+def _category_net(signals: list[Signal], category: str) -> str:
+    """A category's single net direction: the majority of its own signals (a tie or
+    all-neutral nets NEUTRAL). This is where correlated signals collapse to one vote.
     """
-    bull = sum(1 for s in signals if s.direction == BULLISH)
-    bear = sum(1 for s in signals if s.direction == BEARISH)
-
+    members = [s for s in signals if SIGNAL_CATEGORY.get(s.name) == category]
+    bull = sum(1 for s in members if s.direction == BULLISH)
+    bear = sum(1 for s in members if s.direction == BEARISH)
     if bull > bear:
-        bias, agreeing = BULLISH, bull
-    elif bear > bull:
-        bias, agreeing = BEARISH, bear
-    else:
-        return ConfluenceResult(NEUTRAL, False, bull, list(signals))
+        return BULLISH
+    if bear > bull:
+        return BEARISH
+    return NEUTRAL
 
-    triggered = agreeing >= min_agreeing
-    return ConfluenceResult(bias, triggered, agreeing, list(signals))
+
+def evaluate_confluence(
+    signals: list[Signal], cfg: Config, *, require_categories: Optional[int] = None
+) -> ConfluenceResult:
+    """Category-aware confluence with a 0–1 confidence (Phase 17).
+
+    Each independent category (trend / momentum / structure / volume / …) contributes ONE net
+    vote — correlated signals inside a category collapse instead of double-counting. The side
+    with the greater summed category WEIGHT wins (a weight tie nets neutral). Confidence is the
+    winning weight as a fraction of the weight of all ACTIVE categories (those with a signal),
+    so it is a genuine 0–1 that rewards breadth across categories. A setup is flagged only when
+    at least `require_categories` categories net the winning bias.
+
+    This confidence is PRE-MTF; `structure.mtf.resolve_mtf` produces the final value and may
+    veto the flag. Weights come from config and are deliberately not tuned to the backtest.
+    """
+    if require_categories is None:
+        require_categories = cfg.confluence.require_categories
+    weights = cfg.confluence.category_weights
+
+    active = sorted({SIGNAL_CATEGORY[s.name] for s in signals if s.name in SIGNAL_CATEGORY})
+    categories = {cat: _category_net(signals, cat) for cat in active}
+
+    bull_w = sum(weights.get(cat, 1.0) for cat, d in categories.items() if d == BULLISH)
+    bear_w = sum(weights.get(cat, 1.0) for cat, d in categories.items() if d == BEARISH)
+    total_w = sum(weights.get(cat, 1.0) for cat in active)
+
+    if bull_w > bear_w:
+        bias, win_w = BULLISH, bull_w
+    elif bear_w > bull_w:
+        bias, win_w = BEARISH, bear_w
+    else:
+        bias, win_w = NEUTRAL, 0.0
+
+    agreeing = sum(1 for d in categories.values() if d == bias) if bias != NEUTRAL else 0
+    confidence = round(win_w / total_w, 3) if total_w > 0 else 0.0
+    triggered = bias != NEUTRAL and agreeing >= require_categories
+
+    return ConfluenceResult(
+        bias=bias,
+        triggered=triggered,
+        confidence=confidence,
+        agreeing_categories=agreeing,
+        signals=list(signals),
+        categories=categories,
+    )
 
 
 def gather_signals(featured_df: pd.DataFrame, swings: pd.DataFrame, cfg: Config) -> list[Signal]:
@@ -273,6 +349,12 @@ def gather_signals(featured_df: pd.DataFrame, swings: pd.DataFrame, cfg: Config)
 
 
 def analyze_confluence(featured_df: pd.DataFrame, swings: pd.DataFrame, cfg: Config) -> ConfluenceResult:
-    """Convenience: gather every detector's vote and evaluate it in one call."""
+    """Convenience: gather votes, score them, AND apply the multi-timeframe gate — so every
+    consumer of this one-call path sees the same FINAL confidence/verdict as facts and the
+    backtest (never a pre-MTF number). `resolve_mtf` is imported lazily to avoid a cycle.
+    """
+    from src.structure.mtf import resolve_mtf
+
     signals = gather_signals(featured_df, swings, cfg)
-    return evaluate_confluence(signals, cfg.confluence.min_agreeing_signals)
+    result = evaluate_confluence(signals, cfg)
+    return resolve_mtf(result, featured_df, cfg)

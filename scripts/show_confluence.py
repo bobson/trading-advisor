@@ -16,11 +16,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from src.config import load_config  # noqa: E402
 from src.data.cache import load_candles  # noqa: E402
 from src.indicators.features import add_features  # noqa: E402
-from src.signals.confluence import (  # noqa: E402
-    NEUTRAL,
-    evaluate_confluence,
-    gather_signals,
-)
+from src.signals.confluence import analyze_confluence, gather_signals  # noqa: E402
 from src.structure.swings import find_swings  # noqa: E402
 
 
@@ -28,7 +24,7 @@ def main() -> None:
     cfg = load_config()
     m = cfg.market
     sens = cfg.structure.swing_sensitivity
-    min_agree = cfg.confluence.min_agreeing_signals
+    need = cfg.confluence.require_categories
 
     df = load_candles(m.symbol, m.timeframe, m.exchange)
     featured = add_features(df, cfg)
@@ -36,7 +32,7 @@ def main() -> None:
 
     swings = find_swings(df, sens)
     signals = gather_signals(featured, swings, cfg)
-    result = evaluate_confluence(signals, min_agree)
+    result = analyze_confluence(featured, swings, cfg)  # includes the multi-timeframe gate
 
     last_close = float(df["close"].iloc[-1])
     print(f"{m.symbol} {m.timeframe} on {m.exchange} — confluence")
@@ -46,18 +42,23 @@ def main() -> None:
     for s in signals:
         print(f"  [{s.direction.upper():>7}] {s.name}: {s.reason}")
 
+    print("\nCategory reads (correlated signals collapsed):")
+    for cat, direction in result.categories.items():
+        print(f"  {cat:10} {direction}")
+    if result.mtf_trends:
+        print(f"Higher timeframes: {result.mtf_trends} -> {result.mtf_alignment}")
+
     print()
+    conf = f"{result.confidence * 100:.0f}%"
     if result.triggered:
-        print(f"SETUP FLAGGED: {result.bias.upper()} "
-              f"({result.agreeing} signals agree, need {min_agree})")
+        print(f"SETUP FLAGGED: {result.bias.upper()} — confidence {conf} "
+              f"({result.agreeing_categories} categories agree, need {need})")
         print("Why:")
         for r in result.reasons:
             print(f"  - {r}")
-    elif result.bias == NEUTRAL:
-        print(f"No setup: votes are tied / neutral (need {min_agree} to agree).")
     else:
-        print(f"No setup: {result.bias} leads with {result.agreeing} "
-              f"but needs {min_agree} to flag.")
+        print(f"No setup: bias {result.bias}, confidence {conf}, "
+              f"{result.agreeing_categories} of {need} categories agree.")
 
 
 if __name__ == "__main__":

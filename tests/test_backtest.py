@@ -16,6 +16,8 @@ import pytest
 from src.backtest.evaluate import BacktestReport, evaluate, signal_at
 from src.config import load_config
 from src.indicators.features import add_features
+from src.signals.confluence import BEARISH, BULLISH
+from src.structure.mtf import build_mtf_context
 
 
 @pytest.fixture(scope="module")
@@ -37,7 +39,7 @@ def wave_df():
 
 
 def _verdict(res):
-    return (res.bias, res.triggered, res.agreeing)
+    return (res.bias, res.triggered, res.agreeing_categories)
 
 
 def test_look_ahead_guard_mirrors_evaluate_path(cfg, wave_df):
@@ -57,6 +59,34 @@ def test_look_ahead_guard_mirrors_evaluate_path(cfg, wave_df):
     assert _verdict(sig_a) == _verdict(sig_b)
 
 
+def test_look_ahead_guard_with_active_mtf_context(cfg):
+    """The Phase-16 twin of the guard above: the higher-timeframe gate must be look-ahead-safe
+    too. Uses a ~480-bar rising series so the 4h context is genuinely DIRECTIONAL at i, then
+    proves mutating bars after i changes neither the base verdict nor the MTF alignment."""
+    n = 480
+    t = np.arange(n)
+    close = 100 + 6 * np.sin(t / 6.0) + t * 0.12
+    idx = pd.date_range("2025-01-01", periods=n, freq="h", tz="UTC", name="timestamp")
+    df = pd.DataFrame(
+        {"open": close, "high": close + 1.0, "low": close - 1.0, "close": close, "volume": 10.0},
+        index=idx,
+    )
+    i = 400
+
+    # Non-vacuous: prove the MTF context is actually active (directional) at bar i.
+    ctx = build_mtf_context(add_features(df, cfg).iloc[: i + 1], cfg)
+    assert ctx.aggregate_bias in (BULLISH, BEARISH)
+
+    sig_a = signal_at(df, i, cfg, featured=add_features(df, cfg))
+    df2 = df.copy()
+    df2.iloc[i + 1:] *= 10  # finite garbage in the future
+    sig_b = signal_at(df2, i, cfg, featured=add_features(df2, cfg))
+
+    assert (sig_a.bias, sig_a.triggered, sig_a.mtf_alignment) == (
+        sig_b.bias, sig_b.triggered, sig_b.mtf_alignment,
+    )
+
+
 def test_slice_path_matches_featured_full(cfg, wave_df):
     """The self-contained slice path equals the featured-full path — justifies compute-once."""
     i = int(len(wave_df) * 0.6)
@@ -67,9 +97,9 @@ def test_slice_path_matches_featured_full(cfg, wave_df):
 
 
 def test_evaluate_reports_sample_sizes_and_is_consistent(cfg, wave_df):
-    report = evaluate(wave_df, cfg, horizon=12, min_agreeing=1, step=1)
+    report = evaluate(wave_df, cfg, horizon=12, require_categories=1, step=1)
     assert isinstance(report, BacktestReport)
-    assert report.overall.n >= 1  # min_agreeing=1 guarantees setups on a trending wave
+    assert report.overall.n >= 1  # require_categories=1 guarantees setups on a trending wave
     assert report.overall.n == report.by_bias["bullish"].n + report.by_bias["bearish"].n
     for s in (report.overall, *report.by_bias.values()):
         if s.n:

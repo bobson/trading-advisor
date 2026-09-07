@@ -104,7 +104,10 @@ def test_confluence_flags_bullish(cfg, uptrend_frame, uptrend_swings):
     c = facts["confluence"]
     assert c["bias"] == BULLISH
     assert c["triggered"] is True
-    assert c["agreeing"] == 3          # trend + rsi + macd (volume is neutral: no volume col here)
+    # Old tally saw 3 bullish votes (trend, rsi, macd); the category model correctly collapses
+    # rsi+macd into ONE momentum category, so 2 independent categories agree (trend + momentum).
+    assert c["agreeing_categories"] == 2
+    assert c["confidence"] == 0.5      # winning weight 2.0 / active weight 4.0
     assert len(c["signals"]) == 7      # + volume vote (Phase 15)
 
 

@@ -37,6 +37,7 @@ from src.signals.confluence import (
     evaluate_confluence,
     gather_signals,
 )
+from src.structure.mtf import resolve_mtf
 from src.structure.swings import find_swings
 
 
@@ -47,7 +48,8 @@ class SetupOutcome:
     bar: int
     time: str
     bias: str
-    agreeing: int
+    confidence: float           # final 0–1 confidence (Phase 17)
+    agreeing_categories: int    # how many categories agreed (Phase 17)
     entry: float
     exit: float
     forward_return: float  # raw (exit - entry) / entry
@@ -78,33 +80,38 @@ class BacktestReport:
     timeframe: str
     horizon: int
     warmup: int
-    min_agreeing: int
+    require_categories: int
     step: int
     bars_scanned: int
     overall: Stats
     by_bias: dict[str, Stats]
+    by_agreeing: dict[str, Stats] = field(default_factory=dict)  # "2 cats" vs "3+ cats"
+    downgraded: int = 0  # setups the multi-timeframe gate vetoed (Phase 16)
     outcomes: list[SetupOutcome] = field(default_factory=list)
 
     def summary(self) -> str:
         lines = [
             f"BACKTEST {self.symbol} {self.timeframe} — forward-return evaluator",
-            f"horizon={self.horizon} bars, min_agreeing={self.min_agreeing}, "
+            f"horizon={self.horizon} bars, require_categories={self.require_categories}, "
             f"warmup={self.warmup}, step={self.step}, bars scanned={self.bars_scanned}",
             "",
-            f"Setups flagged: {self.overall.n}",
+            f"Setups flagged: {self.overall.n}   (multi-timeframe gate vetoed {self.downgraded})",
         ]
 
         def fmt(label: str, s: Stats) -> str:
             if s.n == 0:
-                return f"  {label:8} n=0   (no setups)"
+                return f"  {label:10} n=0   (no setups)"
             return (
-                f"  {label:8} n={s.n:<4} win-rate={s.win_rate * 100:5.1f}%  "
+                f"  {label:10} n={s.n:<4} win-rate={s.win_rate * 100:5.1f}%  "
                 f"avg={s.avg_return * 100:+6.2f}%  median={s.median_return * 100:+6.2f}%"
             )
 
         lines.append(fmt("overall", self.overall))
         for bias in (BULLISH, BEARISH):
             lines.append(fmt(bias, self.by_bias.get(bias, Stats(0, None, None, None))))
+        lines += ["", "By confluence breadth (does more agreement win more?):"]
+        for label in ("2 cats", "3+ cats"):
+            lines.append(fmt(label, self.by_agreeing.get(label, Stats(0, None, None, None))))
         lines += [
             "",
             "Returns are aligned to each setup's bias (positive = price moved the way the "
@@ -121,7 +128,7 @@ def signal_at(
     cfg: Config,
     *,
     featured: Optional[pd.DataFrame] = None,
-    min_agreeing: Optional[int] = None,
+    require_categories: Optional[int] = None,
 ) -> ConfluenceResult:
     """The confluence verdict AS OF bar ``i``, using only data at or before ``i``.
 
@@ -133,7 +140,9 @@ def signal_at(
     feat = featured.iloc[: i + 1] if featured is not None else add_features(sub, cfg)
     swings = find_swings(sub, cfg.structure.swing_sensitivity)
     signals = gather_signals(feat, swings, cfg)
-    return evaluate_confluence(signals, min_agreeing or cfg.confluence.min_agreeing_signals)
+    result = evaluate_confluence(signals, cfg, require_categories=require_categories)
+    # Phase 16: gate against the higher timeframes, resampled from THIS slice (look-ahead-safe).
+    return resolve_mtf(result, feat, cfg)
 
 
 def evaluate(
@@ -142,7 +151,7 @@ def evaluate(
     *,
     horizon: int = 24,
     warmup: Optional[int] = None,
-    min_agreeing: Optional[int] = None,
+    require_categories: Optional[int] = None,
     step: int = 1,
 ) -> BacktestReport:
     """Walk `df`, flag setups with the confluence engine, and measure forward returns.
@@ -154,7 +163,7 @@ def evaluate(
         raise ValueError("horizon must be >= 1 bar")
     if step < 1:
         raise ValueError("step must be >= 1")
-    min_agreeing = min_agreeing or cfg.confluence.min_agreeing_signals
+    require_categories = require_categories or cfg.confluence.require_categories
     if warmup is None:
         # Enough history for the slow MA to exist and a few swings to have formed.
         warmup = cfg.indicators.slow_ma + cfg.structure.swing_sensitivity * 3
@@ -172,9 +181,12 @@ def evaluate(
 
     outcomes: list[SetupOutcome] = []
     scanned = 0
+    downgraded = 0
     for i in range(warmup, last_exclusive, step):
         scanned += 1
-        res = signal_at(df, i, cfg, featured=featured_full, min_agreeing=min_agreeing)
+        res = signal_at(df, i, cfg, featured=featured_full, require_categories=require_categories)
+        if res.mtf_downgraded:
+            downgraded += 1
         if not res.triggered or res.bias not in (BULLISH, BEARISH):
             continue
         entry = float(close.iloc[i])
@@ -186,7 +198,8 @@ def evaluate(
                 bar=i,
                 time=str(df.index[i]),
                 bias=res.bias,
-                agreeing=res.agreeing,
+                confidence=res.confidence,
+                agreeing_categories=res.agreeing_categories,
                 entry=entry,
                 exit=exit_,
                 forward_return=fwd,
@@ -199,15 +212,21 @@ def evaluate(
         BULLISH: Stats.from_outcomes([o for o in outcomes if o.bias == BULLISH]),
         BEARISH: Stats.from_outcomes([o for o in outcomes if o.bias == BEARISH]),
     }
+    by_agreeing = {
+        "2 cats": Stats.from_outcomes([o for o in outcomes if o.agreeing_categories == 2]),
+        "3+ cats": Stats.from_outcomes([o for o in outcomes if o.agreeing_categories >= 3]),
+    }
     return BacktestReport(
         symbol=cfg.market.symbol,
         timeframe=cfg.market.timeframe,
         horizon=horizon,
         warmup=warmup,
-        min_agreeing=min_agreeing,
+        require_categories=require_categories,
         step=step,
         bars_scanned=scanned,
         overall=Stats.from_outcomes(outcomes),
         by_bias=by_bias,
+        by_agreeing=by_agreeing,
+        downgraded=downgraded,
         outcomes=outcomes,
     )

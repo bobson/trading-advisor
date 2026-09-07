@@ -46,56 +46,63 @@ def cfg():
     return load_config()
 
 
-def _sig(direction, name="x"):
+def _sig(name, direction):
+    """A signal with a REAL detector name so it maps to a category (Phase 17)."""
     return Signal(name, direction, f"{name}:{direction}")
 
 
-# --- evaluate_confluence (the pure tally rule) ---------------------------------
+# --- evaluate_confluence (category-aware, 0–1 confidence) ----------------------
 
-def test_fires_when_enough_agree():
-    result = evaluate_confluence([_sig(BULLISH, "a"), _sig(BULLISH, "b")], min_agreeing=2)
-    assert result.bias == BULLISH
-    assert result.triggered
-    assert result.agreeing == 2
-
-
-def test_does_not_fire_below_threshold():
-    result = evaluate_confluence([_sig(BULLISH), _sig(NEUTRAL)], min_agreeing=2)
-    assert result.bias == BULLISH  # bullish still leads
-    assert not result.triggered
-    assert result.agreeing == 1
+def test_flags_when_enough_categories_agree(cfg):
+    # trend + momentum = two independent categories -> reaches require_categories (2)
+    r = evaluate_confluence([_sig("trend", BULLISH), _sig("rsi", BULLISH)], cfg)
+    assert r.bias == BULLISH and r.triggered
+    assert r.agreeing_categories == 2
+    assert 0.0 < r.confidence <= 1.0
 
 
-def test_neutral_votes_do_not_count():
-    signals = [_sig(BULLISH, "a"), _sig(NEUTRAL, "b"), _sig(NEUTRAL, "c")]
-    result = evaluate_confluence(signals, min_agreeing=2)
-    assert not result.triggered
-    assert result.agreeing == 1
+def test_does_not_fire_below_required_categories(cfg):
+    r = evaluate_confluence([_sig("trend", BULLISH)], cfg)  # one category only
+    assert r.bias == BULLISH and not r.triggered
+    assert r.agreeing_categories == 1
 
 
-def test_tie_never_fires():
-    # 2 bullish / 2 bearish: genuine disagreement is not a setup.
-    signals = [_sig(BULLISH, "a"), _sig(BULLISH, "b"), _sig(BEARISH, "c"), _sig(BEARISH, "d")]
-    result = evaluate_confluence(signals, min_agreeing=2)
-    assert result.bias == NEUTRAL
-    assert not result.triggered
+def test_correlated_signals_collapse_into_one_category(cfg):
+    # S/R and fib are both "structure" — the double-count the plan calls out is gone.
+    r = evaluate_confluence([_sig("support_resistance", BULLISH), _sig("fibonacci", BULLISH)], cfg)
+    assert r.categories["structure"] == BULLISH
+    assert r.agreeing_categories == 1     # collapsed to ONE category
+    assert not r.triggered                # 1 < require_categories (2)
 
 
-def test_strictly_greater_side_wins_despite_conflict():
-    # 3 bullish / 2 bearish, min 2: bullish wins even though bearish also reaches the count.
-    signals = [_sig(BULLISH, "a"), _sig(BULLISH, "b"), _sig(BULLISH, "c"),
-               _sig(BEARISH, "d"), _sig(BEARISH, "e")]
-    result = evaluate_confluence(signals, min_agreeing=2)
-    assert result.bias == BULLISH
-    assert result.triggered
-    assert result.agreeing == 3
+def test_category_internal_conflict_nets_neutral(cfg):
+    r = evaluate_confluence([_sig("rsi", BULLISH), _sig("macd", BEARISH)], cfg)
+    assert r.categories["momentum"] == NEUTRAL
+    assert r.bias == NEUTRAL and not r.triggered
 
 
-def test_contributing_reasons_are_the_winning_side():
-    signals = [_sig(BULLISH, "a"), _sig(BULLISH, "b"), _sig(BEARISH, "c")]
-    result = evaluate_confluence(signals, min_agreeing=2)
-    assert result.reasons == ["a:bullish", "b:bullish"]
-    assert all(s.direction == BULLISH for s in result.contributing)
+def test_weight_tie_never_fires(cfg):
+    # trend bull (1.0) vs momentum bear (1.0): equal weight -> neutral, no setup.
+    sigs = [_sig("trend", BULLISH), _sig("rsi", BEARISH), _sig("macd", BEARISH)]
+    r = evaluate_confluence(sigs, cfg)
+    assert r.bias == NEUTRAL and not r.triggered
+
+
+def test_heavier_category_wins(cfg):
+    # structure (1.2) outweighs trend (1.0), so bearish wins despite trend being bullish.
+    sigs = [_sig("trend", BULLISH), _sig("support_resistance", BEARISH), _sig("fibonacci", BEARISH)]
+    r = evaluate_confluence(sigs, cfg)
+    assert r.bias == BEARISH
+
+
+def test_contributing_is_category_consistent(cfg):
+    # trend+momentum (2.0) beat structure (1.2) -> bullish; structure signals must NOT show as
+    # contributing even though this is a mixed set.
+    sigs = [_sig("trend", BULLISH), _sig("rsi", BULLISH),
+            _sig("support_resistance", BEARISH), _sig("fibonacci", BEARISH)]
+    r = evaluate_confluence(sigs, cfg)
+    assert r.bias == BULLISH and r.triggered
+    assert {s.name for s in r.contributing} == {"trend", "rsi"}
 
 
 # --- per-detector votes --------------------------------------------------------
