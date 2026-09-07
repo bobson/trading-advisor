@@ -1,11 +1,12 @@
 #!/usr/bin/env python3
-"""Phase 8 — the full pipeline in one command: data → structure → confluence → facts →
-explanation → annotated chart. Saves two artifacts side by side in outputs/: the annotated
-chart PNG and a markdown file with the computed facts + Claude's explanation.
+"""CLI front door — a thin wrapper over the service core (Phase 12).
 
-The chart (Layer 1) is always saved. The explanation (Layer 2) needs ANTHROPIC_API_KEY; if
-it's missing, the markdown still gets the computed facts plus a note, so the command stays
-useful offline.
+The analysis itself lives in `src/service/analyze.py::advise`, which returns a
+JSON-serializable result. This script is presentation only: it calls `advise()` for the
+config's default market and saves the two CLI artifacts in `outputs/` — the annotated chart
+PNG (Layer 1) and a markdown file with the computed facts + Claude's explanation (Layer 2),
+side by side. The chart is always saved; the explanation is key-gated and falls back to a
+facts-only note when `ANTHROPIC_API_KEY` is absent.
 
 Usage (from repo root, venv active; run download_data.py first):
     python scripts/analyze.py
@@ -23,66 +24,42 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 import pandas as pd  # noqa: E402
 
-from src.advisor.explain import explain  # noqa: E402
-from src.advisor.facts import build_facts, facts_to_prompt  # noqa: E402
 from src.config import PROJECT_ROOT, Config, load_config  # noqa: E402
-from src.data.cache import load_candles  # noqa: E402
-from src.indicators.features import add_features  # noqa: E402
-from src.structure.fibonacci import fib_retracement  # noqa: E402
-from src.structure.support_resistance import find_support_resistance  # noqa: E402
-from src.structure.swings import find_swings  # noqa: E402
-from src.structure.trendlines import find_trendlines  # noqa: E402
+from src.service.analyze import AnalysisResult, advise  # noqa: E402
 from src.viz.chart import render_chart  # noqa: E402
 
 OUTPUTS_DIR = PROJECT_ROOT / "outputs"
 
 
 @dataclass
-class AnalysisResult:
+class SavedAnalysis:
+    """The two artifacts this CLI writes (paths), plus the facts/explanation behind them."""
+
     chart_path: Path
     text_path: Path
     facts: dict
     explanation: Optional[str]  # None when the API key is absent
 
 
-def run_analysis(df: pd.DataFrame, cfg: Config, outputs_dir: Path) -> AnalysisResult:
-    """Run the pipeline on `df` and save the chart + markdown to `outputs_dir`.
+def _write_outputs(result: AnalysisResult, outputs_dir: Path) -> SavedAnalysis:
+    """Render the annotated chart + write the markdown from an already-computed result.
 
-    `swings` is computed once and drives both the facts (via build_facts) and the drawn
-    geometry, so the chart and the explanation describe the same numbers. The chart is saved
-    unconditionally; the explanation is attempted and falls back to facts-only without a key.
+    Uses the result's carried detector objects (compute-once), so the drawn geometry is the
+    same numbers the facts/explanation quote.
     """
-    m = cfg.market
-    featured = add_features(df, cfg)
-    assert len(featured) == len(df), "featured frame desynced from candles"
-    swings = find_swings(df, cfg.structure.swing_sensitivity)
-
-    facts = build_facts(featured, swings, cfg)
-    facts_text = facts_to_prompt(facts)
-
-    # Same swings + config params as build_facts used internally -> identical geometry.
-    levels = find_support_resistance(swings, cfg.structure.sr_cluster_tolerance_pct)
-    trendlines = find_trendlines(swings)
-    fib = fib_retracement(swings)
-
+    m = result.cfg.market
     slug = m.symbol.replace("/", "-")
     outputs_dir = Path(outputs_dir)
     chart_path = outputs_dir / f"analysis_{slug}_{m.timeframe}.png"
     text_path = outputs_dir / f"analysis_{slug}_{m.timeframe}.md"
 
     render_chart(
-        df, swings, levels, trendlines, fib,
-        bias=facts["confluence"]["bias"],
-        triggered=facts["confluence"]["triggered"],
-        cfg=cfg,
+        result.df, result.swings, result.levels, result.trendlines, result.fib,
+        bias=result.facts["confluence"]["bias"],
+        triggered=result.facts["confluence"]["triggered"],
+        cfg=result.cfg,
         out_path=chart_path,
     )
-
-    explanation: Optional[str]
-    try:
-        explanation = explain(facts_text, cfg)
-    except RuntimeError:
-        explanation = None
 
     generated = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M UTC")
     body = [
@@ -93,13 +70,13 @@ def run_analysis(df: pd.DataFrame, cfg: Config, outputs_dir: Path) -> AnalysisRe
         "",
         "## Computed facts (Layer 1)",
         "```",
-        facts_text,
+        result.facts_text,
         "```",
         "",
         "## Explanation (Layer 2)",
     ]
-    if explanation:
-        body.append(explanation)
+    if result.explanation:
+        body.append(result.explanation)
     else:
         body.append(
             "_No explanation generated — ANTHROPIC_API_KEY is not set. "
@@ -109,22 +86,34 @@ def run_analysis(df: pd.DataFrame, cfg: Config, outputs_dir: Path) -> AnalysisRe
     outputs_dir.mkdir(parents=True, exist_ok=True)
     text_path.write_text("\n".join(body) + "\n")
 
-    return AnalysisResult(chart_path, text_path, facts, explanation)
+    return SavedAnalysis(chart_path, text_path, result.facts, result.explanation)
+
+
+def run_analysis(df: pd.DataFrame, cfg: Config, outputs_dir: Path) -> SavedAnalysis:
+    """Analyze `df` for the config's market and save both CLI artifacts.
+
+    Thin wrapper kept for callers/tests: it runs the service core on the given candles (the
+    config's symbol/timeframe) and writes the chart + markdown.
+    """
+    m = cfg.market
+    result = advise(m.symbol, m.timeframe, cfg, df=df)
+    return _write_outputs(result, outputs_dir)
 
 
 def main() -> None:
     cfg = load_config()
     m = cfg.market
-    df = load_candles(m.symbol, m.timeframe, m.exchange)
-    result = run_analysis(df, cfg, OUTPUTS_DIR)
+    result = advise(m.symbol, m.timeframe, cfg)
+    saved = _write_outputs(result, OUTPUTS_DIR)
 
-    print(f"Saved annotated chart: {result.chart_path}")
-    print(f"Saved analysis text:   {result.text_path}")
-    if result.explanation is None:
+    print(f"Saved annotated chart: {saved.chart_path}")
+    print(f"Saved analysis text:   {saved.text_path}")
+    if saved.explanation is None:
         print("\nNote: no ANTHROPIC_API_KEY set — wrote computed facts only (no explanation).")
     else:
-        print(f"\nConfluence: {result.facts['confluence']['bias'].upper()} "
-              f"({'setup flagged' if result.facts['confluence']['triggered'] else 'no setup'})")
+        c = saved.facts["confluence"]
+        print(f"\nConfluence: {c['bias'].upper()} "
+              f"({'setup flagged' if c['triggered'] else 'no setup'})")
 
 
 if __name__ == "__main__":
