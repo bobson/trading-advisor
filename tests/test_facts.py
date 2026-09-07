@@ -127,6 +127,16 @@ def test_facts_to_prompt_renders(cfg, uptrend_frame, uptrend_swings):
     assert "BULLISH setup FLAGGED" in text
 
 
+def test_toolkit_facts_present_and_degrade_gracefully(cfg, uptrend_frame, uptrend_swings):
+    """Phase 18 facts exist; on a hand-built frame lacking toolkit columns they are None, not
+    a crash (build_facts must tolerate a frame that isn't a full add_features output)."""
+    facts = build_facts(uptrend_frame, uptrend_swings, cfg)
+    assert "volatility" in facts and "divergence" in facts and "round_number" in facts
+    assert facts["round_number"]["nearest"] == 130.0   # last_close 128 -> step 10 -> 130
+    assert facts["volatility"]["atr"] is None           # no ATR column in the fixture
+    assert "ROUND NUMBER:" in facts_to_prompt(facts)    # renders cleanly with the None fields
+
+
 def test_volume_fact_absent_without_volume(cfg, uptrend_frame, uptrend_swings):
     """The fixture carries no volume column, so the volume fact is None and renders a note."""
     facts = build_facts(uptrend_frame, uptrend_swings, cfg)

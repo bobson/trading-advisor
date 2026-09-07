@@ -38,6 +38,16 @@ COL_MACD_SIGNAL = "macd_signal"
 COL_MACD_HIST = "macd_hist"
 COL_VOLUME = "volume"        # raw input column (present for crypto; may be absent on some frames)
 COL_VOLUME_MA = "volume_ma"  # SMA of volume (Phase 15)
+# Phase 18 toolkit columns (facts/context).
+COL_ATR = "atr"
+COL_ADX = "adx"              # trend strength (non-directional)
+COL_STOCH_K = "stoch_k"
+COL_STOCH_D = "stoch_d"
+COL_BB_UPPER = "bb_upper"
+COL_BB_MID = "bb_mid"
+COL_BB_LOWER = "bb_lower"
+COL_BB_PCT = "bb_pct"        # %B: where close sits across the bands (0=lower, 1=upper)
+COL_OBV = "obv"
 
 COL_DOJI = "doji"
 COL_HAMMER = "hammer"
@@ -52,6 +62,15 @@ INDICATOR_COLUMNS = [
     COL_MACD_SIGNAL,
     COL_MACD_HIST,
     COL_VOLUME_MA,
+    COL_ATR,
+    COL_ADX,
+    COL_STOCH_K,
+    COL_STOCH_D,
+    COL_BB_UPPER,
+    COL_BB_MID,
+    COL_BB_LOWER,
+    COL_BB_PCT,
+    COL_OBV,
 ]
 PATTERN_COLUMNS = [
     COL_DOJI,
@@ -90,7 +109,44 @@ def add_indicators(df: pd.DataFrame, cfg: Config) -> pd.DataFrame:
         if COL_VOLUME in out.columns
         else float("nan")
     )
+
+    # Phase 18 toolkit — ATR (volatility), ADX (trend strength), Stochastic (momentum),
+    # Bollinger Bands (volatility envelope), OBV (volume-momentum). All FACTS for now, no
+    # vote. pandas-ta returns None on frames too short for a given length, so `_col` guards
+    # that (the same NoneType-subscript shape that bit MACD once).
+    atr = ta.atr(out["high"], out["low"], out["close"], length=ind.atr_period)
+    out[COL_ATR] = atr if atr is not None else float("nan")
+
+    adx = ta.adx(out["high"], out["low"], out["close"], length=ind.adx_period)
+    out[COL_ADX] = _col(adx, "ADX_")
+
+    stoch = ta.stoch(out["high"], out["low"], out["close"], k=ind.stoch_k, d=ind.stoch_d)
+    out[COL_STOCH_K] = _col(stoch, "STOCHk_")
+    out[COL_STOCH_D] = _col(stoch, "STOCHd_")
+
+    bb = ta.bbands(out["close"], length=ind.bb_period, std=ind.bb_stddev)
+    out[COL_BB_LOWER] = _col(bb, "BBL_")
+    out[COL_BB_MID] = _col(bb, "BBM_")
+    out[COL_BB_UPPER] = _col(bb, "BBU_")
+    out[COL_BB_PCT] = _col(bb, "BBP_")
+
+    out[COL_OBV] = (
+        ta.obv(out["close"], out[COL_VOLUME]) if COL_VOLUME in out.columns else float("nan")
+    )
     return out
+
+
+def _col(frame, prefix: str):
+    """Pick the column starting with `prefix` from a pandas-ta result, or NaN if the result is
+    None (frame too short) or the column is missing. Matches by prefix so the exact param
+    suffix (e.g. ADX_14, BBL_20_2.0) never has to be hardcoded.
+    """
+    if frame is None:
+        return float("nan")
+    for c in frame.columns:
+        if c.startswith(prefix):
+            return frame[c]
+    return float("nan")
 
 
 def add_candlestick_patterns(df: pd.DataFrame) -> pd.DataFrame:

@@ -7,6 +7,7 @@ market:
 structure:
   swing_sensitivity: 5       # bars on each side that define a pivot (higher = only major swings)
   sr_cluster_tolerance_pct: 0.5  # how close levels must be to merge into one S/R zone
+  round_number_pct: 0.5      # how close (%) price must be to a round number to be "at" it (Phase 18)
 
 indicators:
   rsi_period: 14
@@ -15,6 +16,16 @@ indicators:
   fast_ma: 20
   slow_ma: 50
   volume_ma: 20              # SMA period for "average volume" (Phase 15)
+  # Phase 18 toolkit (facts/context, not votes yet)
+  atr_period: 14
+  adx_period: 14
+  adx_trend_threshold: 25    # ADX above this = trending
+  stoch_k: 14
+  stoch_d: 3
+  stoch_oversold: 20
+  stoch_overbought: 80
+  bb_period: 20
+  bb_stddev: 2.0
 
 confluence:
   min_agreeing_signals: 2    # LEGACY (Phase 6) — superseded by require_categories below

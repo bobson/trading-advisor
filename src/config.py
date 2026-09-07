@@ -38,6 +38,8 @@ class MarketConfig(_Strict):
 class StructureConfig(_Strict):
     swing_sensitivity: int = 5
     sr_cluster_tolerance_pct: float = 0.5
+    # Phase 18: how close (percent) price must be to a psychological round number to be "at" it.
+    round_number_pct: float = 0.5
 
 
 class IndicatorsConfig(_Strict):
@@ -49,6 +51,16 @@ class IndicatorsConfig(_Strict):
     # Period of the simple moving average of volume (Phase 15). "Above/below average volume"
     # is measured against this.
     volume_ma: int = 20
+    # Phase 18 toolkit (added as FACTS/context; not promoted to votes yet).
+    atr_period: int = 14
+    adx_period: int = 14
+    adx_trend_threshold: int = 25   # ADX above this = trending (below = ranging)
+    stoch_k: int = 14
+    stoch_d: int = 3
+    stoch_oversold: int = 20
+    stoch_overbought: int = 80
+    bb_period: int = 20
+    bb_stddev: float = 2.0
 
 
 class ConfluenceConfig(_Strict):

@@ -24,8 +24,14 @@ from src.indicators.features import (
     COL_MACD_HIST,
     COL_MACD_SIGNAL,
     COL_RSI,
+    COL_ADX,
+    COL_ATR,
+    COL_BB_LOWER,
+    COL_BB_UPPER,
+    COL_OBV,
     COL_SMA_FAST,
     COL_SMA_SLOW,
+    COL_STOCH_K,
     COL_VOLUME_MA,
     INDICATOR_COLUMNS,
     PATTERN_COLUMNS,
@@ -82,6 +88,17 @@ def test_volume_ma_equals_rolling_mean(cfg):
     feat = add_features(df, cfg)
     expected = df["volume"].rolling(cfg.indicators.volume_ma).mean()
     pd.testing.assert_series_equal(feat[COL_VOLUME_MA], expected, check_names=False)
+
+
+def test_toolkit_indicators_are_sane(cfg):
+    df = _synthetic_ohlcv()
+    feat = add_features(df, cfg)
+    assert (feat[COL_ATR].dropna() > 0).all()
+    assert feat[COL_ADX].dropna().between(0, 100).all()
+    assert feat[COL_STOCH_K].dropna().between(0, 100).all()
+    bb = feat[[COL_BB_LOWER, COL_BB_UPPER]].dropna()
+    assert (bb[COL_BB_LOWER] <= bb[COL_BB_UPPER]).all()
+    assert feat[COL_OBV].notna().any()  # volume present -> OBV computed
 
 
 def test_volume_ma_all_nan_when_no_volume_column(cfg):
