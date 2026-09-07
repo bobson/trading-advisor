@@ -26,6 +26,7 @@ from src.indicators.features import (
     COL_RSI,
     COL_SMA_FAST,
     COL_SMA_SLOW,
+    COL_VOLUME_MA,
     INDICATOR_COLUMNS,
     PATTERN_COLUMNS,
     add_candlestick_patterns,
@@ -74,6 +75,21 @@ def test_sma_equals_rolling_mean(cfg):
     pd.testing.assert_series_equal(
         feat[COL_SMA_FAST], expected_fast, check_names=False
     )
+
+
+def test_volume_ma_equals_rolling_mean(cfg):
+    df = _synthetic_ohlcv()
+    feat = add_features(df, cfg)
+    expected = df["volume"].rolling(cfg.indicators.volume_ma).mean()
+    pd.testing.assert_series_equal(feat[COL_VOLUME_MA], expected, check_names=False)
+
+
+def test_volume_ma_all_nan_when_no_volume_column(cfg):
+    """No volume column -> the contract column still exists, all-NaN, and nothing crashes."""
+    df = _synthetic_ohlcv().drop(columns=["volume"])
+    feat = add_features(df, cfg)
+    assert COL_VOLUME_MA in feat.columns
+    assert feat[COL_VOLUME_MA].isna().all()
 
 
 def test_macd_histogram_is_line_minus_signal(cfg):

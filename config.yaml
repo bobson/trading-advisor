@@ -14,10 +14,12 @@ indicators:
   rsi_overbought: 70
   fast_ma: 20
   slow_ma: 50
+  volume_ma: 20              # SMA period for "average volume" (Phase 15)
 
 confluence:
   min_agreeing_signals: 2    # flag a setup only when at least this many detectors agree
   proximity_pct: 0.5         # how close (%) price must be to a level/fib for it to vote
+  volume_confirm_factor: 1.2 # bar must trade >= this x its avg volume to confirm the candle (Phase 15)
 
 patterns:
   price_tolerance_pct: 2.0   # how close two peaks/troughs count as "equal"

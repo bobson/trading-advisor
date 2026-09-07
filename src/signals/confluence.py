@@ -35,6 +35,8 @@ from src.indicators.features import (
     COL_MACD,
     COL_MACD_SIGNAL,
     COL_RSI,
+    COL_VOLUME,
+    COL_VOLUME_MA,
 )
 from src.structure.fibonacci import UP, FibRetracement, fib_retracement
 from src.structure.support_resistance import (
@@ -148,6 +150,41 @@ def signal_from_patterns(featured_df: pd.DataFrame) -> Signal:
     return Signal("candlestick", NEUTRAL, "No notable candlestick pattern on the last candle.")
 
 
+def signal_from_volume(featured_df: pd.DataFrame, cfg: Config) -> Signal:
+    """Volume CONFIRMS the last candle's direction — it doesn't have a direction of its own.
+
+    A move on above-average volume (>= `confluence.volume_confirm_factor` x the volume MA) is
+    backed by participation, so it votes in the candle's direction (up candle -> bullish,
+    down candle -> bearish). Below that bar — or with no volume data at all — it votes NEUTRAL:
+    a move on thin volume is not confirmed, so it must not add weight to a setup. (Phase 17
+    replaces this vote with a proper strength multiplier once confluence carries a confidence.)
+    """
+    if COL_VOLUME not in featured_df.columns or COL_VOLUME_MA not in featured_df.columns:
+        return Signal("volume", NEUTRAL, "No volume data to confirm the move.")
+
+    vol = featured_df[COL_VOLUME].iloc[-1]
+    vol_ma = featured_df[COL_VOLUME_MA].iloc[-1]
+    if pd.isna(vol) or pd.isna(vol_ma) or vol_ma <= 0:
+        return Signal("volume", NEUTRAL, "Not enough history yet to gauge average volume.")
+
+    ratio = float(vol) / float(vol_ma)
+    factor = cfg.confluence.volume_confirm_factor
+    if ratio < factor:
+        return Signal(
+            "volume", NEUTRAL,
+            f"Volume is {ratio:.1f}x its average — below the {factor:g}x bar, so the move is "
+            "not confirmed by participation.",
+        )
+
+    open_ = float(featured_df["open"].iloc[-1])
+    close = float(featured_df["close"].iloc[-1])
+    if close > open_:
+        return Signal("volume", BULLISH, f"Above-average volume ({ratio:.1f}x) confirms the up candle.")
+    if close < open_:
+        return Signal("volume", BEARISH, f"Above-average volume ({ratio:.1f}x) confirms the down candle.")
+    return Signal("volume", NEUTRAL, f"Above-average volume ({ratio:.1f}x) but the candle is flat.")
+
+
 def signal_from_support_resistance(
     levels: pd.DataFrame, last_close: float, proximity_pct: float
 ) -> Signal:
@@ -231,6 +268,7 @@ def gather_signals(featured_df: pd.DataFrame, swings: pd.DataFrame, cfg: Config)
         signal_from_patterns(featured_df),
         signal_from_support_resistance(levels, last_close, prox),
         signal_from_fibonacci(fib, last_close, prox),
+        signal_from_volume(featured_df, cfg),
     ]
 
 

@@ -46,6 +46,9 @@ class IndicatorsConfig(_Strict):
     rsi_overbought: int = 70
     fast_ma: int = 20
     slow_ma: int = 50
+    # Period of the simple moving average of volume (Phase 15). "Above/below average volume"
+    # is measured against this.
+    volume_ma: int = 20
 
 
 class ConfluenceConfig(_Strict):
@@ -53,6 +56,10 @@ class ConfluenceConfig(_Strict):
     # How close (percent) the last price must sit to a level/fib for it to vote. This is
     # "is price at a level right now", distinct from S/R's swing-merge tolerance.
     proximity_pct: float = 0.5
+    # How many times its average volume the last bar must trade for the volume detector to
+    # CONFIRM the candle's direction (Phase 15). Below this, volume votes neutral — a move on
+    # thin volume is not confirmed by participation.
+    volume_confirm_factor: float = 1.2
 
 
 class PatternsConfig(_Strict):

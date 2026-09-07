@@ -104,8 +104,8 @@ def test_confluence_flags_bullish(cfg, uptrend_frame, uptrend_swings):
     c = facts["confluence"]
     assert c["bias"] == BULLISH
     assert c["triggered"] is True
-    assert c["agreeing"] == 3          # trend + rsi + macd
-    assert len(c["signals"]) == 6
+    assert c["agreeing"] == 3          # trend + rsi + macd (volume is neutral: no volume col here)
+    assert len(c["signals"]) == 7      # + volume vote (Phase 15)
 
 
 def test_displayed_trend_cannot_contradict_vote(cfg, uptrend_frame, uptrend_swings):
@@ -122,6 +122,14 @@ def test_facts_to_prompt_renders(cfg, uptrend_frame, uptrend_swings):
     assert "TREND: uptrend" in text
     assert "CONFLUENCE VERDICT:" in text
     assert "BULLISH setup FLAGGED" in text
+
+
+def test_volume_fact_absent_without_volume(cfg, uptrend_frame, uptrend_swings):
+    """The fixture carries no volume column, so the volume fact is None and renders a note."""
+    facts = build_facts(uptrend_frame, uptrend_swings, cfg)
+    assert facts["volume"] is None
+    text = facts_to_prompt(facts)
+    assert "VOLUME:" in text and "no volume data" in text
 
 
 def test_chart_patterns_field_present(cfg, uptrend_frame, uptrend_swings):

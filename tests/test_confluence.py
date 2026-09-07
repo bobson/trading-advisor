@@ -20,6 +20,8 @@ from src.indicators.features import (
     COL_MACD,
     COL_MACD_SIGNAL,
     COL_RSI,
+    COL_VOLUME,
+    COL_VOLUME_MA,
 )
 from src.signals.confluence import (
     BEARISH,
@@ -33,6 +35,7 @@ from src.signals.confluence import (
     signal_from_rsi,
     signal_from_support_resistance,
     signal_from_trend,
+    signal_from_volume,
 )
 from src.structure.fibonacci import FibRetracement
 from src.structure.trend import DOWNTREND, SIDEWAYS, UPTREND, TrendResult
@@ -183,3 +186,20 @@ def test_fib_bearish_on_down_leg():
 
 def test_fib_neutral_when_none():
     assert signal_from_fibonacci(None, last_close=100.0, proximity_pct=0.5).direction == NEUTRAL
+
+
+def test_volume_confirms_candle_direction(cfg):
+    # above-average volume (3x, >= 1.2 factor) confirms whichever way the candle closed
+    up = _one_row(**{COL_VOLUME: 300.0, COL_VOLUME_MA: 100.0, "open": 100.0, "close": 101.0})
+    assert signal_from_volume(up, cfg).direction == BULLISH
+    down = _one_row(**{COL_VOLUME: 300.0, COL_VOLUME_MA: 100.0, "open": 101.0, "close": 100.0})
+    assert signal_from_volume(down, cfg).direction == BEARISH
+
+
+def test_volume_neutral_when_thin_missing_or_nan(cfg):
+    thin = _one_row(**{COL_VOLUME: 90.0, COL_VOLUME_MA: 100.0, "open": 100.0, "close": 101.0})
+    assert signal_from_volume(thin, cfg).direction == NEUTRAL      # 0.9x < 1.2x bar
+    missing = _one_row(**{COL_RSI: 50.0})                          # no volume columns at all
+    assert signal_from_volume(missing, cfg).direction == NEUTRAL
+    nan = _one_row(**{COL_VOLUME: np.nan, COL_VOLUME_MA: 100.0, "open": 100.0, "close": 101.0})
+    assert signal_from_volume(nan, cfg).direction == NEUTRAL

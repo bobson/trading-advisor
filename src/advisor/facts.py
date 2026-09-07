@@ -23,6 +23,8 @@ from src.indicators.features import (
     COL_MACD,
     COL_MACD_SIGNAL,
     COL_RSI,
+    COL_VOLUME,
+    COL_VOLUME_MA,
 )
 from src.patterns.chart_patterns import find_chart_patterns
 from src.signals.confluence import (
@@ -33,6 +35,7 @@ from src.signals.confluence import (
     signal_from_rsi,
     signal_from_support_resistance,
     signal_from_trend,
+    signal_from_volume,
 )
 from src.structure.fibonacci import fib_retracement
 from src.structure.support_resistance import (
@@ -99,6 +102,7 @@ def build_facts(featured_df: pd.DataFrame, swings: pd.DataFrame, cfg: Config) ->
         signal_from_patterns(featured_df),
         signal_from_support_resistance(levels, last_close, prox),
         signal_from_fibonacci(fib, last_close, prox),
+        signal_from_volume(featured_df, cfg),
     ]
     confluence = evaluate_confluence(signals, cfg.confluence.min_agreeing_signals)
 
@@ -109,6 +113,19 @@ def build_facts(featured_df: pd.DataFrame, swings: pd.DataFrame, cfg: Config) ->
     rsi_val = None if pd.isna(rsi) else round(float(rsi), 1)
     macd_val = None if pd.isna(macd) else round(float(macd), 2)
     macd_sig_val = None if pd.isna(macd_signal) else round(float(macd_signal), 2)
+
+    # Volume vs its average (Phase 15). None when the frame carries no usable volume.
+    vol = featured_df[COL_VOLUME].iloc[-1] if COL_VOLUME in featured_df.columns else float("nan")
+    vol_ma = featured_df[COL_VOLUME_MA].iloc[-1] if COL_VOLUME_MA in featured_df.columns else float("nan")
+    volume_facts = None
+    if not (pd.isna(vol) or pd.isna(vol_ma)) and float(vol_ma) > 0:
+        ratio = float(vol) / float(vol_ma)
+        volume_facts = {
+            "last": round(float(vol), 2),
+            "average": round(float(vol_ma), 2),
+            "ratio": round(ratio, 2),
+            "confirmed": ratio >= cfg.confluence.volume_confirm_factor,
+        }
 
     # Chart patterns are best-effort geometry (Phase 9) — additive context, not a vote.
     chart_patterns = [
@@ -153,6 +170,7 @@ def build_facts(featured_df: pd.DataFrame, swings: pd.DataFrame, cfg: Config) ->
             else "bearish" if (macd_val is not None and macd_sig_val is not None and macd_val < macd_sig_val)
             else "unknown",
         },
+        "volume": volume_facts,
         "support_resistance": _nearest_levels(levels, last_close),
         "chart_patterns": chart_patterns,
         "fibonacci": fib_facts,
@@ -187,6 +205,15 @@ def facts_to_prompt(facts: dict) -> str:
     lines.append("MOMENTUM:")
     lines.append(f"  - RSI: {mo['rsi']} ({mo['rsi_zone']})")
     lines.append(f"  - MACD: {mo['macd']} vs signal {mo['macd_signal']} ({mo['macd_state']})")
+    lines.append("")
+
+    vol = facts.get("volume")
+    lines.append("VOLUME:")
+    if vol:
+        state = "above average (confirming the move)" if vol["confirmed"] else "below the confirmation bar (thin)"
+        lines.append(f"  - Last bar {vol['last']} vs {vol['average']} average = {vol['ratio']}x — {state}")
+    else:
+        lines.append("  - no volume data available")
     lines.append("")
 
     sr = facts["support_resistance"]

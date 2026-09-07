@@ -36,6 +36,8 @@ COL_RSI = "rsi"
 COL_MACD = "macd"
 COL_MACD_SIGNAL = "macd_signal"
 COL_MACD_HIST = "macd_hist"
+COL_VOLUME = "volume"        # raw input column (present for crypto; may be absent on some frames)
+COL_VOLUME_MA = "volume_ma"  # SMA of volume (Phase 15)
 
 COL_DOJI = "doji"
 COL_HAMMER = "hammer"
@@ -49,6 +51,7 @@ INDICATOR_COLUMNS = [
     COL_MACD,
     COL_MACD_SIGNAL,
     COL_MACD_HIST,
+    COL_VOLUME_MA,
 ]
 PATTERN_COLUMNS = [
     COL_DOJI,
@@ -78,6 +81,15 @@ def add_indicators(df: pd.DataFrame, cfg: Config) -> pd.DataFrame:
     out[COL_MACD] = macd[f"MACD_{suffix}"]
     out[COL_MACD_SIGNAL] = macd[f"MACDs_{suffix}"]
     out[COL_MACD_HIST] = macd[f"MACDh_{suffix}"]
+
+    # Volume MA (Phase 15). The column is ALWAYS added to honour the INDICATOR_COLUMNS
+    # contract; when a frame carries no volume (some synthetic/forex frames) it is all-NaN,
+    # and the volume detector treats that as "no confirmation" rather than crashing.
+    out[COL_VOLUME_MA] = (
+        ta.sma(out[COL_VOLUME], length=ind.volume_ma)
+        if COL_VOLUME in out.columns
+        else float("nan")
+    )
     return out
 
 
