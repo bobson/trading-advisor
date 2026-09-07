@@ -9,6 +9,9 @@ __pycache__/
 *.py[cod]
 .pytest_cache/
 
-# App working directories (regenerated locally)
-data/
-outputs/
+# App working directories (regenerated locally).
+# Anchored to the repo root with a leading slash so they match ONLY the top-level
+# cache/output dirs — an unanchored `data/` also matches `src/data/` and would silently
+# ignore source files there.
+/data/
+/outputs/

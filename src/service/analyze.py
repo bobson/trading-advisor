@@ -26,7 +26,7 @@ import pandas as pd
 from src.advisor.explain import explain
 from src.advisor.facts import build_facts, facts_to_prompt
 from src.config import Config
-from src.data.cache import load_candles
+from src.data.registry import get_candles
 from src.indicators.features import add_features
 from src.structure.fibonacci import FibRetracement, fib_retracement
 from src.structure.support_resistance import find_support_resistance
@@ -82,8 +82,9 @@ def advise(
 ) -> AnalysisResult:
     """Run the full pipeline for one market/timeframe and return a JSON-able result.
 
-    `df` is injectable (tests pass synthetic candles; otherwise the local cache is read for
-    this symbol/timeframe). `client` is the injectable Anthropic client forwarded to
+    `df` is injectable (tests pass synthetic candles; otherwise candles are obtained via the
+    data facade `registry.get_candles`, which picks a provider by asset class and is
+    cache-first). `client` is the injectable Anthropic client forwarded to
     `explain` (tests run keyless). The explanation is attempted and falls back to `None` when
     no API key is available, so the deterministic result is always produced.
     """
@@ -91,7 +92,7 @@ def advise(
     m = req.market
 
     if df is None:
-        df = load_candles(m.symbol, m.timeframe, m.exchange)
+        df = get_candles(m.symbol, m.timeframe, req)
 
     featured = add_features(df, req)
     assert len(featured) == len(df), "featured frame desynced from candles"
