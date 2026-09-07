@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Status
 
-`PLAN.md` is the authoritative spec; build in its phase order and folder layout, one phase per session, with a git commit as a checkpoint after each phase.
+**`PLAN.md`** records the completed core build (Phases 0–10) and its folder layout. **`trading-advisor-plan.md`** is now the authoritative **forward roadmap** (Phases 11–26): one linear, de-duplicated, **validation-first** sequence — the backtest harness (Phase 14) is built early and is the instrument that validates every later analytical upgrade before it earns a vote. Build one phase per session; the working core is tagged `v1-core-advisor`; do each upgrade from Phase 12 onward on its own branch and merge only when that phase's "done when" passes. (The old `PLAN2.md` was merged into `trading-advisor-plan.md` and deleted.)
 
 **Done:** Phase 0 (skeleton), Phase 1 (`src/data/`), Phase 2 (`src/indicators/features.py`), Phase 3 (`src/structure/swings.py`), Phase 4 (`support_resistance.py`, `trendlines.py`, `trend.py`), Phase 5 (`src/structure/fibonacci.py`, `scripts/show_fibonacci.py`), Phase 6 (`src/signals/confluence.py`, `scripts/show_confluence.py`), Phase 7 (`src/advisor/facts.py`, `src/advisor/explain.py`, `scripts/show_explanation.py`), Phase 8 (`src/viz/chart.py`, `scripts/analyze.py`), Phase 9 (`src/patterns/chart_patterns.py`, `scripts/show_patterns.py`, wired into `facts.py`), Phase 10 (`src/advisor/vision.py`, `scripts/analyze_image.py`). **ALL PHASES 0–10 COMPLETE.**
 
