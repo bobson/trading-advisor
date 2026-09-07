@@ -1,0 +1,139 @@
+{
+  "chart_patterns": [
+    {
+      "direction": "bullish",
+      "name": "ascending triangle",
+      "neckline": null,
+      "reason": "Recent highs and lows form flat highs with rising lows (buyers pressing into resistance).",
+      "target": null
+    }
+  ],
+  "confluence": {
+    "agreeing_categories": 2,
+    "bias": "bearish",
+    "categories": {
+      "momentum": "bearish",
+      "structure": "bearish",
+      "trend": "neutral",
+      "volume": "neutral"
+    },
+    "confidence": 0.55,
+    "mtf_alignment": "neutral",
+    "mtf_trends": {
+      "4h": "sideways"
+    },
+    "require_categories": 2,
+    "signals": [
+      {
+        "direction": "neutral",
+        "name": "trend",
+        "reason": "Swing highs and lows are not consistently rising or falling."
+      },
+      {
+        "direction": "neutral",
+        "name": "rsi",
+        "reason": "RSI is 40, in the neutral zone."
+      },
+      {
+        "direction": "bearish",
+        "name": "macd",
+        "reason": "MACD line is below its signal line (bearish momentum)."
+      },
+      {
+        "direction": "neutral",
+        "name": "candlestick",
+        "reason": "No notable candlestick pattern on the last candle."
+      },
+      {
+        "direction": "bearish",
+        "name": "support_resistance",
+        "reason": "Price is testing resistance near 64166.59."
+      },
+      {
+        "direction": "neutral",
+        "name": "fibonacci",
+        "reason": "Price is not near a key Fibonacci level."
+      },
+      {
+        "direction": "neutral",
+        "name": "volume",
+        "reason": "Volume is 0.6x its average \u2014 below the 1.2x bar, so the move is not confirmed by participation."
+      }
+    ],
+    "triggered": true
+  },
+  "divergence": null,
+  "fibonacci": {
+    "direction": "up",
+    "impulse_high": 64664.0,
+    "impulse_low": 64214.0,
+    "key_levels": {
+      "0.382": 64492.1,
+      "0.5": 64439.0,
+      "0.618": 64385.9,
+      "0.786": 64310.3
+    }
+  },
+  "market": {
+    "exchange": "binance",
+    "last_close": 63942.63,
+    "last_time": "2026-06-14 16:00:00+00:00",
+    "symbol": "BTC/USDT",
+    "timeframe": "1h"
+  },
+  "market_adaptation": {
+    "active_session": null,
+    "asset_class": "crypto",
+    "is_24_7": true,
+    "significant_move_pct": 0.54,
+    "volume_type": "real",
+    "weekend_gap": null
+  },
+  "momentum": {
+    "macd": 9.32,
+    "macd_signal": 95.85,
+    "macd_state": "bearish",
+    "rsi": 39.7,
+    "rsi_zone": "neutral",
+    "stochastic_d": 17.3,
+    "stochastic_k": 14.4,
+    "stochastic_zone": "oversold"
+  },
+  "round_number": {
+    "distance_pct": 0.09,
+    "is_near": true,
+    "nearest": 64000.0
+  },
+  "support_resistance": {
+    "nearest_resistance": {
+      "price": 64166.59,
+      "touches": 7
+    },
+    "nearest_support": {
+      "price": 63400.47,
+      "touches": 4
+    }
+  },
+  "trend": {
+    "label": "sideways",
+    "reasons": [
+      "Swing highs and lows are not consistently rising or falling."
+    ]
+  },
+  "volatility": {
+    "adx": 30.1,
+    "atr": 230.36,
+    "atr_pct": 0.36,
+    "bollinger_pct_b": -0.077,
+    "bollinger_position": "below lower band",
+    "regime": "trending"
+  },
+  "volume": {
+    "average": 397.98,
+    "confirmed": false,
+    "last": 256.59,
+    "obv_rising": false,
+    "ratio": 0.64,
+    "type": "real"
+  }
+}

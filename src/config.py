@@ -104,6 +104,12 @@ class PatternsConfig(_Strict):
     flat_slope_pct: float = 1.0
 
 
+class MarketAdaptationConfig(_Strict):
+    # Phase 19: "a significant move" for a market = this multiple of its ATR (volatility-
+    # relative, so the same notion scales between a ~80k BTC and a ~1.10 EUR/USD).
+    significant_move_atr_mult: float = 1.5
+
+
 class MultiTimeframeConfig(_Strict):
     # Phase 16: higher timeframes whose trend gates the base-timeframe setup. Context flows
     # DOWN only (a higher TF informs the lower one, never the reverse). A base setup that
@@ -127,6 +133,8 @@ class Config(_Strict):
     patterns: PatternsConfig = Field(default_factory=PatternsConfig)
     # Optional (Phase 16): defaults apply if config.yaml omits the `mtf:` block.
     mtf: MultiTimeframeConfig = Field(default_factory=MultiTimeframeConfig)
+    # Optional (Phase 19): defaults apply if config.yaml omits the `market_adaptation:` block.
+    market_adaptation: MarketAdaptationConfig = Field(default_factory=MarketAdaptationConfig)
 
     # Injected from .env, not from config.yaml. Optional so the deterministic
     # Layer 1 pipeline (data + detectors) runs without an API key.

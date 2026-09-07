@@ -25,6 +25,7 @@ import pandas as pd
 
 from src.advisor.explain import explain
 from src.advisor.facts import build_facts, facts_to_prompt
+from src.advisor.verify import verify_explanation
 from src.config import Config
 from src.data.registry import get_candles
 from src.indicators.features import add_features
@@ -57,13 +58,16 @@ class AnalysisResult:
     fib: Optional[FibRetracement]
     cfg: Config
 
+    # Phase 20 — Layer-2 consistency check ({ok, issues}); None when there is no explanation.
+    verification: Optional[dict] = None
+
     def to_payload(self) -> dict:
         """The JSON-serializable result: the computed facts plus Claude's explanation.
 
         Provisional shape — Phase 24's `serialize.py` owns the real API contract; this is an
         internal convenience for the CLI and the "done when" check.
         """
-        return {**self.facts, "explanation": self.explanation}
+        return {**self.facts, "explanation": self.explanation, "verification": self.verification}
 
 
 def _request_config(cfg: Config, symbol: str, timeframe: str) -> Config:
@@ -111,6 +115,12 @@ def advise(
     except RuntimeError:
         explanation = None  # no ANTHROPIC_API_KEY — deterministic facts stand on their own
 
+    # Phase 20: enforce "Layer 2 never contradicts Layer 1" — check the explanation's numbers
+    # against the facts. Advisory (never blocks); only runs when there is an explanation.
+    verification: Optional[dict] = None
+    if explanation is not None:
+        verification = verify_explanation(explanation, facts).to_dict()
+
     return AnalysisResult(
         facts=facts,
         facts_text=facts_text,
@@ -122,4 +132,5 @@ def advise(
         trendlines=trendlines,
         fib=fib,
         cfg=req,
+        verification=verification,
     )

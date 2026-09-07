@@ -45,6 +45,7 @@ from src.signals.confluence import (
     signal_from_trend,
     signal_from_volume,
 )
+from src.market.adaptation import market_context
 from src.structure.divergence import find_rsi_divergence
 from src.structure.fibonacci import fib_retracement
 from src.structure.mtf import resolve_mtf
@@ -213,6 +214,11 @@ def build_facts(featured_df: pd.DataFrame, swings: pd.DataFrame, cfg: Config) ->
         else {"nearest": rn.nearest, "distance_pct": rn.distance_pct, "is_near": rn.is_near}
     )
 
+    # Market adaptation (Phase 19) — crypto vs forex context; tags volume as real/tick.
+    mc = market_context(m.symbol, featured_df, cfg)
+    if volume_facts is not None:
+        volume_facts["type"] = mc.volume_type
+
     # Chart patterns are best-effort geometry (Phase 9) — additive context, not a vote.
     chart_patterns = [
         {
@@ -262,6 +268,14 @@ def build_facts(featured_df: pd.DataFrame, swings: pd.DataFrame, cfg: Config) ->
         "volatility": volatility_facts,
         "divergence": divergence_facts,
         "round_number": round_number_facts,
+        "market_adaptation": {
+            "asset_class": mc.asset_class,
+            "volume_type": mc.volume_type,
+            "is_24_7": mc.is_24_7,
+            "active_session": mc.active_session,
+            "weekend_gap": mc.weekend_gap,
+            "significant_move_pct": mc.significant_move_pct,
+        },
         "volume": volume_facts,
         "support_resistance": _nearest_levels(levels, last_close),
         "chart_patterns": chart_patterns,
@@ -289,6 +303,16 @@ def facts_to_prompt(facts: dict) -> str:
     lines: list[str] = []
     lines.append(f"MARKET: {m['symbol']} on {m['exchange']}, {m['timeframe']} timeframe")
     lines.append(f"Last closed candle: {m['last_close']} at {m['last_time']}")
+    ma = facts.get("market_adaptation")
+    if ma:
+        if ma["is_24_7"]:
+            lines.append(f"  {ma['asset_class']}, 24/7 — volume is real exchange volume.")
+        else:
+            gap = " (WEEKEND GAP — Sunday opened away from Friday's close)" if ma["weekend_gap"] else ""
+            lines.append(f"  {ma['asset_class']} — active session: {ma['active_session']}{gap}.")
+            lines.append("  Volume is TICK volume (a proxy): treat volume signals as weaker than in crypto.")
+        if ma["significant_move_pct"] is not None:
+            lines.append(f"  A 'significant move' for this market is ~{ma['significant_move_pct']}% (ATR-based).")
     lines.append("")
 
     t = facts["trend"]

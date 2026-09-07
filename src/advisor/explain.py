@@ -64,6 +64,66 @@ def build_messages(facts_text: str) -> list[dict]:
     return [{"role": "user", "content": f"Here are the computed facts:\n\n{facts_text}"}]
 
 
+# Phase 20 — structured output. A forced tool call makes the model return the three fields as
+# data (usable by the dashboard/alerts, and it feeds the Phase-24 API directly) instead of a
+# prose blob. Tool use is broadly supported, so this stays model-agnostic like explain().
+ANALYSIS_TOOL = {
+    "name": "emit_analysis",
+    "description": "Return the chart analysis as three structured fields.",
+    "input_schema": {
+        "type": "object",
+        "properties": {
+            "setup": {"type": "string", "description": "What the chart is showing right now, in plain terms."},
+            "why": {"type": "string", "description": "Which signals agree or disagree and what that confluence means."},
+            "invalidation": {"type": "string", "description": "Specific, concrete conditions that would change the read."},
+        },
+        "required": ["setup", "why", "invalidation"],
+    },
+}
+
+_STRUCTURED_FIELDS = ("setup", "why", "invalidation")
+
+
+def explain_structured(facts_text: str, cfg: Config, client=None, max_tokens: int = 1024) -> dict:
+    """Like `explain`, but returns `{setup, why, invalidation}` via a forced tool call.
+
+    Same authoritative-facts rules as `explain` (the system prompt is shared). `client` is
+    injectable for tests; extraction is defensive so a malformed response raises a clear error
+    rather than a KeyError.
+    """
+    if client is None:
+        import anthropic
+
+        client = anthropic.Anthropic(api_key=cfg.require_api_key())
+
+    style = _STYLE_NOTE.get(cfg.advisor.explanation_style, _STYLE_NOTE["teaching"])
+    system = [
+        {
+            "type": "text",
+            "text": f"{SYSTEM_PROMPT}\n\nStyle: {style}",
+            "cache_control": {"type": "ephemeral"},
+        }
+    ]
+
+    response = client.messages.create(
+        model=cfg.advisor.model,
+        max_tokens=max_tokens,
+        system=system,
+        messages=build_messages(facts_text),
+        tools=[ANALYSIS_TOOL],
+        tool_choice={"type": "tool", "name": "emit_analysis"},
+    )
+
+    for block in response.content:
+        if getattr(block, "type", None) == "tool_use" and getattr(block, "name", None) == "emit_analysis":
+            data = dict(block.input)
+            missing = [f for f in _STRUCTURED_FIELDS if f not in data]
+            if missing:
+                raise RuntimeError(f"structured analysis is missing fields: {missing}")
+            return {f: data[f] for f in _STRUCTURED_FIELDS}
+    raise RuntimeError("model did not return an emit_analysis tool call")
+
+
 def explain(facts_text: str, cfg: Config, client=None, max_tokens: int = 2048) -> str:
     """Send the facts to Claude and return the plain-language explanation.
 

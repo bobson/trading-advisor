@@ -135,6 +135,9 @@ def test_toolkit_facts_present_and_degrade_gracefully(cfg, uptrend_frame, uptren
     assert facts["round_number"]["nearest"] == 130.0   # last_close 128 -> step 10 -> 130
     assert facts["volatility"]["atr"] is None           # no ATR column in the fixture
     assert "ROUND NUMBER:" in facts_to_prompt(facts)    # renders cleanly with the None fields
+    # Phase 19: default market (BTC/USDT) reads as crypto with real, 24/7 volume.
+    ma = facts["market_adaptation"]
+    assert ma["asset_class"] == "crypto" and ma["volume_type"] == "real" and ma["is_24_7"]
 
 
 def test_volume_fact_absent_without_volume(cfg, uptrend_frame, uptrend_swings):

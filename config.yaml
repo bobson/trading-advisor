@@ -48,6 +48,9 @@ mtf:
   enabled: true
   context_from: [4h, 1d]     # higher timeframes that gate the base-timeframe setup (Phase 16)
 
+market_adaptation:
+  significant_move_atr_mult: 1.5  # a "significant move" = this x ATR, volatility-relative (Phase 19)
+
 advisor:
   model: claude-sonnet-4-6   # see docs.claude.com for current model names; used in Phase 7
   explanation_style: teaching
