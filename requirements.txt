@@ -17,5 +17,10 @@ pydantic>=2       # validate config so a typo can't silently break things
 PyYAML            # parse config.yaml
 requests          # Phase 21 context sources (Fear & Greed / Finnhub)
 
+# Web API (Phase 24)
+fastapi           # JSON API the frontend consumes
+uvicorn[standard] # ASGI server to run the API
+httpx             # required by FastAPI's TestClient (also nice for API tests)
+
 # Tests
 pytest            # tests, especially for detector logic
