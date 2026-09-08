@@ -14,6 +14,7 @@ Usage (from repo root, venv active; run download_data.py first):
 
 from __future__ import annotations
 
+import argparse
 import sys
 from dataclasses import dataclass
 from datetime import datetime, timezone
@@ -24,6 +25,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 import pandas as pd  # noqa: E402
 
+from src.advisor.explain import synthesize  # noqa: E402
 from src.config import PROJECT_ROOT, Config, load_config  # noqa: E402
 from src.context import gather_context  # noqa: E402
 from src.derivatives import gather_derivatives  # noqa: E402
@@ -102,12 +104,11 @@ def run_analysis(df: pd.DataFrame, cfg: Config, outputs_dir: Path) -> SavedAnaly
     return _write_outputs(result, outputs_dir)
 
 
-def main() -> None:
-    cfg = load_config()
-    m = cfg.market
-    context = gather_context(m.symbol, cfg)  # live background facts (graceful; may be empty)
-    derivatives = gather_derivatives(m.symbol, cfg)  # crypto perp positioning (None for forex)
-    result = advise(m.symbol, m.timeframe, cfg, context=context, derivatives=derivatives)
+def _run_single(symbol: str, timeframe: str, cfg: Config) -> None:
+    """One timeframe: the full pipeline — annotated chart + explanation saved to outputs/."""
+    context = gather_context(symbol, cfg)          # live background facts (graceful)
+    derivatives = gather_derivatives(symbol, cfg)  # crypto perp positioning (None for forex)
+    result = advise(symbol, timeframe, cfg, context=context, derivatives=derivatives)
     saved = _write_outputs(result, OUTPUTS_DIR)
 
     print(f"Saved annotated chart: {saved.chart_path}")
@@ -118,6 +119,48 @@ def main() -> None:
         c = saved.facts["confluence"]
         print(f"\nConfluence: {c['bias'].upper()} "
               f"({'setup flagged' if c['triggered'] else 'no setup'})")
+
+
+def _run_multi(symbol: str, timeframes: list[str], cfg: Config) -> None:
+    """Several timeframes: per-TF verdicts (facts only, no per-TF Claude call) + ONE
+    cross-timeframe synthesis (a single key-gated Claude call over the raw per-TF facts)."""
+    weights = cfg.timeframes.weights
+    per_tf: list[tuple[str, str, float]] = []
+    print(f"{symbol} — cross-timeframe read ({', '.join(timeframes)})\n")
+    for tf in timeframes:
+        result = advise(symbol, tf, cfg, explain_enabled=False)  # Layer-1 facts only
+        c = result.facts["confluence"]
+        per_tf.append((tf, result.facts_text, weights.get(tf, 1.0)))
+        flagged = "FLAGGED" if c["triggered"] else "no setup"
+        print(f"  [{tf:>3}] bias {c['bias']:<8} confidence {c['confidence'] * 100:>3.0f}%  ({flagged})")
+
+    try:
+        synthesis = synthesize(per_tf, cfg)
+    except RuntimeError:
+        print("\nNote: no ANTHROPIC_API_KEY set — printed per-timeframe facts only (no synthesis).")
+        return
+    print("\n=== CROSS-TIMEFRAME SYNTHESIS ===\n" + synthesis)
+    OUTPUTS_DIR.mkdir(parents=True, exist_ok=True)
+    out = OUTPUTS_DIR / f"synthesis_{symbol.replace('/', '-')}_{'-'.join(timeframes)}.md"
+    out.write_text(f"# {symbol} cross-timeframe synthesis ({', '.join(timeframes)})\n\n{synthesis}\n")
+    print(f"\nSaved: {out}")
+
+
+def main() -> None:
+    cfg = load_config()
+    p = argparse.ArgumentParser(description="Analyze one market on one or several timeframes.")
+    p.add_argument("--symbol", default=cfg.market.symbol)
+    p.add_argument(
+        "--timeframes",
+        default=cfg.market.timeframe,
+        help="comma-separated; one = full chart+explanation, many = cross-timeframe synthesis (e.g. 1h,4h,1d)",
+    )
+    args = p.parse_args()
+    tfs = [t.strip() for t in args.timeframes.split(",") if t.strip()]
+    if len(tfs) == 1:
+        _run_single(args.symbol, tfs[0], cfg)
+    else:
+        _run_multi(args.symbol, tfs, cfg)
 
 
 if __name__ == "__main__":

@@ -53,6 +53,28 @@ flipping) that would change the read.
 Teach as you go: briefly define terms a learner might not know. Be concise and grounded — \
 every claim should trace back to a provided fact."""
 
+# Phase 23 — cross-timeframe synthesis. Reasons over the RAW per-timeframe facts (never a
+# summary of separate write-ups — that loses precision and can't catch real conflicts).
+SYNTHESIS_SYSTEM_PROMPT = """You are a trading educator giving ONE cross-timeframe read of a \
+single market.
+
+You are given the COMPUTED FACTS for the SAME market on several timeframes, each with an \
+authority weight (higher timeframe = more weight). The disciplined way to read multiple \
+timeframes:
+- HIGHER timeframes set the DIRECTION / bias.
+- LOWER timeframes are for TIMING and entry, and must never override a higher-timeframe read.
+
+Your job:
+1. State the higher-timeframe direction.
+2. Say EXPLICITLY whether the timeframes ALIGN (all pointing the same way — a stronger read) \
+or CONFLICT (e.g. daily up but 1h making lower highs — a mixed, lower-confidence picture).
+3. If they align, where the lower timeframe suggests timing; if they conflict, say to wait / \
+treat it as low-confidence.
+
+Absolute rules: the computed facts are AUTHORITATIVE — never invent or contradict numbers. \
+You do not predict the future and give no financial advice; this is clarity and education."""
+
+
 _STYLE_NOTE = {
     "teaching": "Explain like a patient mentor teaching a beginner; define jargon in a few words as it comes up.",
     "concise": "Be brief and direct; assume the reader knows basic trading terms.",
@@ -82,6 +104,39 @@ ANALYSIS_TOOL = {
 }
 
 _STRUCTURED_FIELDS = ("setup", "why", "invalidation")
+
+
+def build_synthesis_messages(per_tf: list[tuple[str, str, float]]) -> list[dict]:
+    """The user turn: each timeframe's raw facts text, labeled with its authority weight."""
+    blocks = [
+        f"=== TIMEFRAME {tf} (authority weight {weight}) ===\n{text}"
+        for tf, text, weight in per_tf
+    ]
+    return [{
+        "role": "user",
+        "content": "Computed facts for the same market on several timeframes:\n\n" + "\n\n".join(blocks),
+    }]
+
+
+def synthesize(per_tf: list[tuple[str, str, float]], cfg: Config, client=None, max_tokens: int = 1024) -> str:
+    """One cross-timeframe read from the per-timeframe facts.
+
+    `per_tf` is a list of `(timeframe, facts_text, weight)` — the RAW facts text per timeframe,
+    not summaries. `client` is injectable for tests.
+    """
+    if client is None:
+        import anthropic
+
+        client = anthropic.Anthropic(api_key=cfg.require_api_key())
+
+    system = [{"type": "text", "text": SYNTHESIS_SYSTEM_PROMPT, "cache_control": {"type": "ephemeral"}}]
+    response = client.messages.create(
+        model=cfg.advisor.model,
+        max_tokens=max_tokens,
+        system=system,
+        messages=build_synthesis_messages(per_tf),
+    )
+    return "".join(b.text for b in response.content if getattr(b, "type", None) == "text").strip()
 
 
 def explain_structured(facts_text: str, cfg: Config, client=None, max_tokens: int = 1024) -> dict:

@@ -104,6 +104,15 @@ class PatternsConfig(_Strict):
     flat_slope_pct: float = 1.0
 
 
+class TimeframesConfig(_Strict):
+    # Phase 23: timeframes the UI/CLI offers, and their authority weight in a cross-timeframe
+    # read (higher timeframe = more weight; 5m is deliberately excluded as mostly noise).
+    selectable: list[str] = Field(default_factory=lambda: ["15m", "30m", "1h", "4h", "1d"])
+    weights: dict[str, float] = Field(
+        default_factory=lambda: {"15m": 0.6, "30m": 0.7, "1h": 1.0, "4h": 1.2, "1d": 1.4}
+    )
+
+
 class MarketAdaptationConfig(_Strict):
     # Phase 19: "a significant move" for a market = this multiple of its ATR (volatility-
     # relative, so the same notion scales between a ~80k BTC and a ~1.10 EUR/USD).
@@ -153,6 +162,8 @@ class Config(_Strict):
     context: ContextConfig = Field(default_factory=ContextConfig)
     # Optional (Phase 22): defaults apply if config.yaml omits the `derivatives:` block.
     derivatives: DerivativesConfig = Field(default_factory=DerivativesConfig)
+    # Optional (Phase 23): defaults apply if config.yaml omits the `timeframes:` block.
+    timeframes: TimeframesConfig = Field(default_factory=TimeframesConfig)
 
     # Injected from .env, not from config.yaml. Optional so the deterministic
     # Layer 1 pipeline (data + detectors) runs without an API key.

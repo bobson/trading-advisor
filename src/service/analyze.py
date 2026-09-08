@@ -85,6 +85,7 @@ def advise(
     client: Any = None,
     context: Optional[dict] = None,
     derivatives: Optional[dict] = None,
+    explain_enabled: bool = True,
 ) -> AnalysisResult:
     """Run the full pipeline for one market/timeframe and return a JSON-able result.
 
@@ -119,10 +120,12 @@ def advise(
     trendlines = find_trendlines(swings)
     fib = fib_retracement(swings)
 
-    try:
-        explanation: Optional[str] = explain(facts_text, req, client=client)
-    except RuntimeError:
-        explanation = None  # no ANTHROPIC_API_KEY — deterministic facts stand on their own
+    explanation: Optional[str] = None
+    if explain_enabled:
+        try:
+            explanation = explain(facts_text, req, client=client)
+        except RuntimeError:
+            explanation = None  # no ANTHROPIC_API_KEY — deterministic facts stand on their own
 
     # Phase 20: enforce "Layer 2 never contradicts Layer 1" — check the explanation's numbers
     # against the facts. Advisory (never blocks); only runs when there is an explanation.
