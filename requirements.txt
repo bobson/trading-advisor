@@ -15,6 +15,7 @@ anthropic         # official SDK to call Claude
 python-dotenv     # load ANTHROPIC_API_KEY from .env
 pydantic>=2       # validate config so a typo can't silently break things
 PyYAML            # parse config.yaml
+requests          # Phase 21 context sources (Fear & Greed / Finnhub)
 
 # Tests
 pytest            # tests, especially for detector logic

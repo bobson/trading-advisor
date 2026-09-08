@@ -51,6 +51,15 @@ mtf:
 market_adaptation:
   significant_move_atr_mult: 1.5  # a "significant move" = this x ATR, volatility-relative (Phase 19)
 
+context:                     # Phase 21 — background facts for Layer 2 (context, not prediction)
+  fear_greed: true           # crypto Fear & Greed (alternative.me, no key)
+  economic_calendar: true    # high-impact events (Finnhub, needs FINNHUB_API_KEY)
+  news: true                 # recent headlines (Finnhub, needs FINNHUB_API_KEY)
+
+derivatives:                 # Phase 22 — crypto perp positioning (funding + open interest), facts only
+  enabled: true              # crypto-only in effect; forex has no perp funding/OI
+  funding_extreme: 0.0005    # |funding per 8h| above this flags crowded positioning (contrarian)
+
 advisor:
   model: claude-sonnet-4-6   # see docs.claude.com for current model names; used in Phase 7
   explanation_style: teaching

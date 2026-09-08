@@ -118,6 +118,20 @@ class MultiTimeframeConfig(_Strict):
     context_from: list[str] = Field(default_factory=lambda: ["4h", "1d"])
 
 
+class DerivativesConfig(_Strict):
+    # Phase 22: crypto-only positioning context (funding rate + open interest) shown as FACTS.
+    # Gated to crypto in code; forex has no perp funding/OI. No vote yet (pending a study).
+    enabled: bool = True
+    funding_extreme: float = 0.0005  # |funding per 8h| above this = crowded (contrarian) flag
+
+
+class ContextConfig(_Strict):
+    # Phase 21: extra background facts for Layer 2 (never touches the detectors).
+    fear_greed: bool = True          # crypto Fear & Greed (alternative.me, no key)
+    economic_calendar: bool = True   # high-impact events (Finnhub, needs FINNHUB_API_KEY)
+    news: bool = True                # recent headlines (Finnhub, needs FINNHUB_API_KEY)
+
+
 class AdvisorConfig(_Strict):
     model: str = "claude-sonnet-4-6"
     explanation_style: str = "teaching"
@@ -135,10 +149,15 @@ class Config(_Strict):
     mtf: MultiTimeframeConfig = Field(default_factory=MultiTimeframeConfig)
     # Optional (Phase 19): defaults apply if config.yaml omits the `market_adaptation:` block.
     market_adaptation: MarketAdaptationConfig = Field(default_factory=MarketAdaptationConfig)
+    # Optional (Phase 21): defaults apply if config.yaml omits the `context:` block.
+    context: ContextConfig = Field(default_factory=ContextConfig)
+    # Optional (Phase 22): defaults apply if config.yaml omits the `derivatives:` block.
+    derivatives: DerivativesConfig = Field(default_factory=DerivativesConfig)
 
     # Injected from .env, not from config.yaml. Optional so the deterministic
     # Layer 1 pipeline (data + detectors) runs without an API key.
     anthropic_api_key: Optional[str] = None
+    finnhub_api_key: Optional[str] = None  # Phase 21: economic calendar + news (optional)
 
     def require_api_key(self) -> str:
         """Return the Anthropic key or raise — call this from Layer 2 only."""
@@ -153,4 +172,8 @@ def load_config(path: str | Path = DEFAULT_CONFIG_PATH) -> Config:
     """Read config.yaml, validate it, and attach the API key from .env."""
     load_dotenv(PROJECT_ROOT / ".env")
     raw = yaml.safe_load(Path(path).read_text()) or {}
-    return Config(**raw, anthropic_api_key=os.getenv("ANTHROPIC_API_KEY"))
+    return Config(
+        **raw,
+        anthropic_api_key=os.getenv("ANTHROPIC_API_KEY"),
+        finnhub_api_key=os.getenv("FINNHUB_API_KEY"),
+    )

@@ -83,6 +83,8 @@ def advise(
     *,
     df: Optional[pd.DataFrame] = None,
     client: Any = None,
+    context: Optional[dict] = None,
+    derivatives: Optional[dict] = None,
 ) -> AnalysisResult:
     """Run the full pipeline for one market/timeframe and return a JSON-able result.
 
@@ -103,6 +105,13 @@ def advise(
     swings = find_swings(df, req.structure.swing_sensitivity)
 
     facts = build_facts(featured, swings, req)
+    # Phase 21: context (sentiment/calendar/news) is CURRENT-state, live-only. It is injected by
+    # the caller (CLI/API), never fetched here and never inside build_facts (which runs per-bar
+    # in the backtest). Default None -> tests/backtest touch no network.
+    if context is not None:
+        facts = {**facts, "context": context}
+    if derivatives is not None:
+        facts = {**facts, "derivatives": derivatives}
     facts_text = facts_to_prompt(facts)
 
     # Same swings + params as build_facts used internally -> byte-identical geometry.

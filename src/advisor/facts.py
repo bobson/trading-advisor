@@ -386,6 +386,40 @@ def facts_to_prompt(facts: dict) -> str:
         lines.append("FIBONACCI: no clean price leg to measure")
     lines.append("")
 
+    ctx = facts.get("context")
+    if ctx:
+        lines.append("MARKET CONTEXT (background — helps avoid being blindsided; context, not prediction):")
+        fg = ctx.get("fear_greed")
+        if fg:
+            lines.append(f"  - Crypto Fear & Greed: {fg['value']}/100 ({fg['label']}), as of {fg['as_of']}")
+        cal = ctx.get("economic_calendar") or []
+        if cal:
+            lines.append("  - Upcoming high-impact economic events:")
+            for e in cal:
+                lines.append(f"      {e['time']} {e['country']}: {e['event']} [{e['impact']}]")
+        news = ctx.get("news") or []
+        if news:
+            lines.append("  - Recent headlines:")
+            for h in news:
+                lines.append(f"      ({h['when']}) {h['source']}: {h['headline']}")
+        if not fg and not cal and not news:
+            lines.append("  - none available")
+        lines.append(f"  (pulled {ctx.get('as_of', 'unknown')})")
+        lines.append("")
+
+    deriv = facts.get("derivatives")
+    if deriv:
+        lines.append("DERIVATIVES / POSITIONING (crypto perp — leverage crowd; context, not prediction):")
+        f = deriv.get("funding")
+        if f:
+            lines.append(f"  - Funding: {f['rate_pct']}%/8h ({f['annualized_pct']}%/yr) — {f['state']}")
+        oi = deriv.get("open_interest")
+        if oi:
+            notional = f" (~${oi['notional_usd']:,.0f})" if oi.get("notional_usd") else ""
+            lines.append(f"  - Open interest: {oi['amount']:,.0f} contracts{notional}")
+        lines.append(f"  (pulled {deriv.get('as_of', 'unknown')})")
+        lines.append("")
+
     c = facts["confluence"]
     conf_pct = f"{c['confidence'] * 100:.0f}%"
     verdict = (

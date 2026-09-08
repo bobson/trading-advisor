@@ -25,6 +25,8 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 import pandas as pd  # noqa: E402
 
 from src.config import PROJECT_ROOT, Config, load_config  # noqa: E402
+from src.context import gather_context  # noqa: E402
+from src.derivatives import gather_derivatives  # noqa: E402
 from src.service.analyze import AnalysisResult, advise  # noqa: E402
 from src.viz.chart import render_chart  # noqa: E402
 
@@ -103,7 +105,9 @@ def run_analysis(df: pd.DataFrame, cfg: Config, outputs_dir: Path) -> SavedAnaly
 def main() -> None:
     cfg = load_config()
     m = cfg.market
-    result = advise(m.symbol, m.timeframe, cfg)
+    context = gather_context(m.symbol, cfg)  # live background facts (graceful; may be empty)
+    derivatives = gather_derivatives(m.symbol, cfg)  # crypto perp positioning (None for forex)
+    result = advise(m.symbol, m.timeframe, cfg, context=context, derivatives=derivatives)
     saved = _write_outputs(result, OUTPUTS_DIR)
 
     print(f"Saved annotated chart: {saved.chart_path}")
