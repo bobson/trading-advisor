@@ -15,3 +15,7 @@ __pycache__/
 # ignore source files there.
 /data/
 /outputs/
+
+# Frontend (Phase 25)
+web/node_modules/
+web/dist/
