@@ -64,10 +64,10 @@ def test_analysis_returns_full_payload(synthetic_candles):
     assert body["explanation"] is None
 
 
-def test_analysis_forex_without_provider_is_501(synthetic_candles, monkeypatch):
-    # Force the real (unimplemented) forex fetch by removing the synthetic override for a forex pair.
+def test_analysis_forex_without_key_errors(synthetic_candles, monkeypatch):
+    # Phase 26: forex is implemented but needs TWELVEDATA_API_KEY -> RuntimeError -> 502.
     from src.data.forex_api import ForexProvider
     monkeypatch.setattr(service, "get_candles",
-                        lambda symbol, tf, cfg, **k: ForexProvider().fetch(symbol, tf, 100))
+                        lambda symbol, tf, cfg, **k: ForexProvider(api_key=None).fetch(symbol, tf, 100))
     r = client.get("/analysis", params={"symbol": "EUR/USD", "timeframe": "1h"})
-    assert r.status_code == 501
+    assert r.status_code == 502

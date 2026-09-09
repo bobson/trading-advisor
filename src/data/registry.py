@@ -43,6 +43,7 @@ PAIRS: list[Pair] = [
     Pair("BTC/USDT", CRYPTO, "Bitcoin / Tether"),
     Pair("ETH/USDT", CRYPTO, "Ethereum / Tether"),
     Pair("SOL/USDT", CRYPTO, "Solana / Tether"),
+    Pair("XRP/USDT", CRYPTO, "XRP / Tether"),
     Pair("EUR/USD", FOREX, "Euro / US Dollar"),
     Pair("GBP/USD", FOREX, "British Pound / US Dollar"),
 ]
@@ -68,7 +69,7 @@ def asset_class_for(symbol: str) -> str:
 def provider_for(symbol: str, cfg: Config) -> DataProvider:
     """The data provider for a symbol, chosen by its asset class."""
     if asset_class_for(symbol) == FOREX:
-        return ForexProvider()
+        return ForexProvider(api_key=cfg.twelvedata_api_key)
     return CryptoProvider(exchange_id=cfg.market.exchange)
 
 
@@ -80,15 +81,29 @@ def get_candles(
     limit: int | None = None,
     refresh: bool = False,
     data_dir: Path = DATA_DIR,
+    stale_after_minutes: int | None = None,
 ) -> pd.DataFrame:
-    """Return clean candles for `symbol`/`timeframe`, cache-first, via the asset-class provider."""
+    """Return clean candles for `symbol`/`timeframe`, cache-first, via the asset-class provider.
+
+    `stale_after_minutes`: when set, a cached frame whose newest bar is older than this is
+    re-fetched live (so the live API/UI shows up-to-the-latest-closed-bar data). Default None
+    keeps pure cache-first behavior (deterministic for tests/backtest).
+    """
     limit = limit or cfg.market.history_candles
     exchange_id = cfg.market.exchange
 
     path = cache_path(symbol, timeframe, exchange_id, data_dir)
+    df = None
     if not refresh and path.exists():
-        df = load_candles(symbol, timeframe, exchange_id, data_dir)
-    else:
+        cached = load_candles(symbol, timeframe, exchange_id, data_dir)
+        fresh = (
+            stale_after_minutes is None
+            or cached.empty
+            or (pd.Timestamp.now(tz="UTC") - cached.index[-1]).total_seconds() / 60.0 <= stale_after_minutes
+        )
+        if fresh:
+            df = cached
+    if df is None:
         provider = provider_for(symbol, cfg)
         df = provider.fetch(symbol, timeframe, limit)
         save_candles(df, symbol, timeframe, exchange_id, data_dir)

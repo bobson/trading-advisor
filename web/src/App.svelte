@@ -8,9 +8,11 @@
   let symbol = $state('BTC/USDT')
   let timeframe = $state('1h')
   let explain = $state(false)
+  let auto = $state(false)
   let loading = $state(false)
   let error = $state<string | null>(null)
   let result = $state<Analysis | null>(null)
+  const REFRESH_MS = 30_000
 
   onMount(async () => {
     try {
@@ -23,11 +25,12 @@
     }
   })
 
-  async function run() {
+  async function run(useExplain = explain) {
+    if (loading) return
     loading = true
     error = null
     try {
-      result = await getAnalysis(symbol, timeframe, explain)
+      result = await getAnalysis(symbol, timeframe, useExplain)
     } catch (e: any) {
       error = e.message
       result = null
@@ -35,6 +38,14 @@
       loading = false
     }
   }
+
+  // Auto-refresh: poll every REFRESH_MS while `auto` is on. NEVER calls Claude (explain=false),
+  // so it can't silently burn API credits.
+  $effect(() => {
+    if (!auto) return
+    const id = setInterval(() => run(false), REFRESH_MS)
+    return () => clearInterval(id)
+  })
 
   const conf = $derived(result?.confluence)
 </script>
@@ -51,7 +62,8 @@
       {#each timeframes as t}<option value={t}>{t}</option>{/each}
     </select>
     <label class="explain"><input type="checkbox" bind:checked={explain} /> explain (uses API credit)</label>
-    <button onclick={run} disabled={loading}>{loading ? 'Analyzing…' : 'Analyze'}</button>
+    <label class="explain"><input type="checkbox" bind:checked={auto} /> auto-refresh (30s)</label>
+    <button onclick={() => run()} disabled={loading}>{loading ? 'Analyzing…' : 'Analyze'}</button>
   </div>
 
   {#if error}<p class="error">{error}</p>{/if}

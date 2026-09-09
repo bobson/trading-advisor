@@ -17,7 +17,7 @@ from __future__ import annotations
 import pandas as pd
 
 from src.service.analyze import AnalysisResult
-from src.structure.support_resistance import annotate_roles
+from src.structure.support_resistance import RESISTANCE, SUPPORT, annotate_roles
 from src.structure.swings import SWING_HIGH
 
 
@@ -25,20 +25,35 @@ def _epoch(ts) -> int:
     return int(pd.Timestamp(ts).timestamp())
 
 
-def serialize_chart(result: AnalysisResult, limit: int = 500) -> dict:
+def _price_precision(price: float) -> int:
+    """Decimals appropriate for the price magnitude — so an FX pair (~1.1030) keeps its
+    precision instead of being flattened to 1.10, while BTC (~80000) stays at 2."""
+    p = abs(price)
+    if p >= 100:
+        return 2
+    if p >= 1:
+        return 5
+    return 6
+
+
+def serialize_chart(result: AnalysisResult, limit: int = 500, levels_per_side: int = 3) -> dict:
     """Candles + overlays for the given result, as lightweight-charts-ready JSON."""
     df = result.df
     window = df.iloc[-limit:]
     start_ts = _epoch(window.index[0])
     last_close = float(df["close"].iloc[-1])
+    prec = _price_precision(last_close)
+
+    def rp(x) -> float:
+        return round(float(x), prec)
 
     candles = [
         {
             "time": _epoch(idx),
-            "open": round(float(row["open"]), 2),
-            "high": round(float(row["high"]), 2),
-            "low": round(float(row["low"]), 2),
-            "close": round(float(row["close"]), 2),
+            "open": rp(row["open"]),
+            "high": rp(row["high"]),
+            "low": rp(row["low"]),
+            "close": rp(row["close"]),
             "volume": (None if "volume" not in window.columns or pd.isna(row["volume"])
                        else round(float(row["volume"]), 2)),
         }
@@ -52,39 +67,34 @@ def serialize_chart(result: AnalysisResult, limit: int = 500) -> dict:
         if 0 <= bar < len(df):
             t = _epoch(df.index[bar])
             if t >= start_ts:
-                swings.append({
-                    "time": t,
-                    "price": round(float(s["price"]), 2),
-                    "kind": "high" if s["kind"] == SWING_HIGH else "low",
-                })
+                swings.append({"time": t, "price": rp(s["price"]),
+                               "kind": "high" if s["kind"] == SWING_HIGH else "low"})
 
-    # Support/resistance as horizontal price lines (role relative to the current price).
+    # Support/resistance as horizontal price lines — only the NEAREST few per side, so the
+    # chart isn't buried under every detected level (mirrors the PNG chart's selection).
     levels = []
     if not result.levels.empty:
         roled = annotate_roles(result.levels, last_close)
-        for _, lv in roled.iterrows():
-            levels.append({
-                "price": round(float(lv["price"]), 2),
-                "role": str(lv["role"]),
-                "touches": int(lv["touches"]),
-            })
+        roled = roled.assign(_dist=(roled["price"] - last_close).abs())
+        for role in (SUPPORT, RESISTANCE):
+            side = roled[roled["role"] == role].sort_values("_dist").head(levels_per_side)
+            for _, lv in side.iterrows():
+                levels.append({"price": rp(lv["price"]), "role": str(lv["role"]), "touches": int(lv["touches"])})
 
     fib = None
     if result.fib is not None:
-        fib = {
-            "direction": result.fib.direction,
-            "levels": {str(r): round(float(p), 2) for r, p in result.fib.levels.items()},
-        }
+        fib = {"direction": result.fib.direction,
+               "levels": {str(r): rp(p) for r, p in result.fib.levels.items()}}
 
     # The confluence marker reflects CURRENT state only (last bar), colored by bias, only when
     # a setup is flagged — mirrors chart.py (not a rolling backtest).
     conf = result.facts["confluence"]
-    marker = None
-    if conf["triggered"]:
-        marker = {"time": _epoch(df.index[-1]), "bias": conf["bias"]}
+    marker = {"time": _epoch(df.index[-1]), "bias": conf["bias"]} if conf["triggered"] else None
 
     return {
         "candles": candles,
+        "price_precision": prec,
+        "min_move": 10 ** -prec,
         "overlays": {"swings": swings, "levels": levels, "fibonacci": fib, "marker": marker},
     }
 

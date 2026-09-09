@@ -67,8 +67,9 @@ def test_provider_dispatch(cfg):
     assert isinstance(provider_for("EUR/USD", cfg), ForexProvider)
 
 
-def test_forex_provider_raises_clearly():
-    with pytest.raises(NotImplementedError, match="Phase 26"):
+def test_forex_provider_raises_clearly_without_key():
+    # Phase 26: forex is implemented (Twelve Data) but needs a key.
+    with pytest.raises(RuntimeError, match="TWELVEDATA_API_KEY"):
         ForexProvider().fetch("EUR/USD", "1h", 100)
 
 

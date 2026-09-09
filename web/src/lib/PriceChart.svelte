@@ -33,6 +33,10 @@
 
   function render() {
     if (!chart || !series || !data) return
+    // Match the price-axis decimals to the instrument (2 for BTC, ~5 for EUR/USD).
+    series.applyOptions({
+      priceFormat: { type: 'price', precision: data.price_precision ?? 2, minMove: data.min_move ?? 0.01 },
+    })
     series.setData(data.candles as any)
 
     // Redraw horizontal levels: clear the old price lines first (v4 has no clear-all).

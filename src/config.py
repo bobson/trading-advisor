@@ -169,6 +169,7 @@ class Config(_Strict):
     # Layer 1 pipeline (data + detectors) runs without an API key.
     anthropic_api_key: Optional[str] = None
     finnhub_api_key: Optional[str] = None  # Phase 21: economic calendar + news (optional)
+    twelvedata_api_key: Optional[str] = None  # Phase 26: forex OHLC (optional; crypto needs none)
 
     def require_api_key(self) -> str:
         """Return the Anthropic key or raise — call this from Layer 2 only."""
@@ -187,4 +188,5 @@ def load_config(path: str | Path = DEFAULT_CONFIG_PATH) -> Config:
         **raw,
         anthropic_api_key=os.getenv("ANTHROPIC_API_KEY"),
         finnhub_api_key=os.getenv("FINNHUB_API_KEY"),
+        twelvedata_api_key=os.getenv("TWELVEDATA_API_KEY"),
     )

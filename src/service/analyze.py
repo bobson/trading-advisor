@@ -70,6 +70,14 @@ class AnalysisResult:
         return {**self.facts, "explanation": self.explanation, "verification": self.verification}
 
 
+_TF_UNIT_MINUTES = {"m": 1, "h": 60, "d": 1440}
+
+
+def _timeframe_minutes(timeframe: str) -> int:
+    """'15m'->15, '1h'->60, '4h'->240, '1d'->1440 (for the refresh-stale threshold)."""
+    return int(timeframe[:-1]) * _TF_UNIT_MINUTES[timeframe[-1]]
+
+
 def _request_config(cfg: Config, symbol: str, timeframe: str) -> Config:
     """A copy of `cfg` whose market reflects THIS request (symbol/timeframe per call)."""
     market = cfg.market.model_copy(update={"symbol": symbol, "timeframe": timeframe})
@@ -86,6 +94,7 @@ def advise(
     context: Optional[dict] = None,
     derivatives: Optional[dict] = None,
     explain_enabled: bool = True,
+    refresh_stale: bool = False,
 ) -> AnalysisResult:
     """Run the full pipeline for one market/timeframe and return a JSON-able result.
 
@@ -99,7 +108,9 @@ def advise(
     m = req.market
 
     if df is None:
-        df = get_candles(m.symbol, m.timeframe, req)
+        # refresh_stale: re-pull once the cached data is older than ~one bar (live API/UI).
+        stale = _timeframe_minutes(m.timeframe) if refresh_stale else None
+        df = get_candles(m.symbol, m.timeframe, req, stale_after_minutes=stale)
 
     featured = add_features(df, req)
     assert len(featured) == len(df), "featured frame desynced from candles"

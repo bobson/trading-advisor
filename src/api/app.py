@@ -74,7 +74,8 @@ def analysis(
     try:
         ctx = gather_context(symbol, cfg) if context else None
         deriv = gather_derivatives(symbol, cfg) if context else None
-        result = advise(symbol, timeframe, cfg, context=ctx, derivatives=deriv, explain_enabled=explain)
+        result = advise(symbol, timeframe, cfg, context=ctx, derivatives=deriv,
+                        explain_enabled=explain, refresh_stale=True)
     except NotImplementedError as exc:  # e.g. forex before Phase 26
         raise HTTPException(status_code=501, detail=str(exc))
     except Exception as exc:  # data fetch / analysis failure

@@ -9,6 +9,8 @@ export interface Fib { direction: string; levels: Record<string, number> }
 export interface Marker { time: number; bias: string }
 export interface ChartData {
   candles: Candle[]
+  price_precision: number
+  min_move: number
   overlays: { levels: Level[]; swings: SwingMarker[]; fibonacci: Fib | null; marker: Marker | null }
 }
 export interface Confluence { bias: string; triggered: boolean; confidence: number; agreeing_categories: number }
