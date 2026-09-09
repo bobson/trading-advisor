@@ -20,6 +20,7 @@ import time
 from fastapi import FastAPI, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
 
+from src.backtest.base_rate import load_base_rates
 from src.config import load_config
 from src.context import gather_context
 from src.data.registry import list_pairs
@@ -28,6 +29,7 @@ from src.service.analyze import advise
 from src.service.serialize import serialize_analysis
 
 cfg = load_config()
+BASE_RATES = load_base_rates()  # precomputed track record (data/base_rates.json); {} if absent
 
 app = FastAPI(title="Trading Advisor API", version="1.0")
 # The Svelte dev server runs on a different origin; allow it (tighten for production if needed).
@@ -75,7 +77,8 @@ def analysis(
         ctx = gather_context(symbol, cfg) if context else None
         deriv = gather_derivatives(symbol, cfg) if context else None
         result = advise(symbol, timeframe, cfg, context=ctx, derivatives=deriv,
-                        explain_enabled=explain, refresh_stale=True)
+                        explain_enabled=explain, refresh_stale=True,
+                        base_rate=BASE_RATES.get(f"{symbol}|{timeframe}"))
     except NotImplementedError as exc:  # e.g. forex before Phase 26
         raise HTTPException(status_code=501, detail=str(exc))
     except Exception as exc:  # data fetch / analysis failure

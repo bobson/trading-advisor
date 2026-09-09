@@ -26,6 +26,7 @@ import pandas as pd
 from src.advisor.explain import explain
 from src.advisor.facts import build_facts, facts_to_prompt
 from src.advisor.verify import verify_explanation
+from src.backtest.base_rate import base_rate_entry
 from src.config import Config
 from src.data.registry import get_candles
 from src.indicators.features import add_features
@@ -95,6 +96,7 @@ def advise(
     derivatives: Optional[dict] = None,
     explain_enabled: bool = True,
     refresh_stale: bool = False,
+    base_rate: Optional[dict] = None,
 ) -> AnalysisResult:
     """Run the full pipeline for one market/timeframe and return a JSON-able result.
 
@@ -124,6 +126,11 @@ def advise(
         facts = {**facts, "context": context}
     if derivatives is not None:
         facts = {**facts, "derivatives": derivatives}
+    # Rec #2: attach the historical track record for THIS setup's bias (honest, not a forecast).
+    if base_rate is not None:
+        entry = base_rate_entry(base_rate, facts["confluence"]["bias"])
+        if entry:
+            facts = {**facts, "base_rate": entry}
     facts_text = facts_to_prompt(facts)
 
     # Same swings + params as build_facts used internally -> byte-identical geometry.

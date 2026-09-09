@@ -443,6 +443,14 @@ def facts_to_prompt(facts: dict) -> str:
         if align == "conflict":
             lines.append("  (downgraded: this base-timeframe setup fights the higher-timeframe trend)")
 
+    br = facts.get("base_rate")
+    if br:
+        lines.append(
+            f"TRACK RECORD: historically, {br['bias']} setups like this resolved favorably "
+            f"{br['win_rate'] * 100:.0f}% of the time ({br['n']} past cases, {br['horizon']}-bar "
+            "horizon). This is a base rate, NOT a prediction."
+        )
+
     lines.append("Every detector's vote:")
     for s in c["signals"]:
         lines.append(f"  [{s['direction'].upper()}] {s['name']}: {s['reason']}")

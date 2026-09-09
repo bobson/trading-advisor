@@ -14,9 +14,11 @@ export interface ChartData {
   overlays: { levels: Level[]; swings: SwingMarker[]; fibonacci: Fib | null; marker: Marker | null }
 }
 export interface Confluence { bias: string; triggered: boolean; confidence: number; agreeing_categories: number }
+export interface BaseRate { bias: string; win_rate: number; n: number; horizon: number }
 export interface Analysis {
   market: { symbol: string; timeframe: string; last_close: number }
   confluence: Confluence
+  base_rate: BaseRate | null
   explanation: string | null
   chart: ChartData
   [k: string]: any

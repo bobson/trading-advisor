@@ -76,6 +76,15 @@
       {#if conf?.triggered}<span class="flag">SETUP FLAGGED</span>{/if}
     </div>
 
+    {#if result.base_rate}
+      <p class="track">
+        📊 Track record: {result.base_rate.bias} setups like this were right
+        <b>{(result.base_rate.win_rate * 100).toFixed(0)}%</b> of the time
+        ({result.base_rate.n} past cases, {result.base_rate.horizon}-bar horizon).
+        <b>A base rate, not a prediction.</b>
+      </p>
+    {/if}
+
     <PriceChart data={result.chart} />
 
     {#if result.explanation}
@@ -107,6 +116,7 @@
   .verdict.bull { border-color: #26a641; }
   .verdict.bear { border-color: #f85149; }
   .flag { background: #238636; color: #fff; padding: 2px 8px; border-radius: 999px; font-size: 12px; }
+  .track { color: #8b949e; font-size: 13px; margin: 0 0 12px; }
   .panel { border: 1px solid #30363d; border-radius: 8px; padding: 14px; margin-top: 14px; }
   .panel h2 { margin: 0 0 8px; font-size: 16px; }
   pre { white-space: pre-wrap; margin: 0; color: #c9d1d9; }
