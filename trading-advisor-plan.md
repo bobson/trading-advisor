@@ -402,3 +402,60 @@ multi-timeframe (16), confidence scoring (17), toolkit (18), market adaptation (
 (20) → additive context (21) and crypto derivatives (22) → timeframe synthesis (23) → **front
 door**: API (24) then Svelte UI (25) → forex last (26). Measurement precedes tuning; the UI sits
 on an engine whose signals you've actually measured; forex is a drop-in, not a rebuild.
+
+---
+
+# Part 8 — ML prediction harness (honest attempt at an edge)
+
+Built AFTER Phases 0–26 and the recommendations. Context: the out-of-sample tests (Rec #1)
+showed the rule engine is ~coin-flip with no demonstrable edge. This part asks — rigorously —
+whether a MODEL trained on our features can predict forward moves better than a coin flip,
+out-of-sample, **after costs**. **"No edge" is a first-class, acceptable result:** the value is
+finding out for real, and the harness is reusable even if the answer is no. Honest prior: with
+public hourly data (the same game millions of bots play), a durable edge is unlikely.
+
+**Guardrails (why this won't fool us like most "predictors" do):**
+- **Walk-forward only** — train on the past, test on the *untouched* future, roll forward; never
+  shuffle a time series. This is the one thing that catches overfitting.
+- **Look-ahead-safe features** — every input known at bar close only (same discipline as the
+  backtest; enforced by a guard test).
+- **Costs subtracted** — a 55%-right model that loses to fees/spread is not an edge.
+- **Must persist across coins AND periods** — a fluke on one coin/window doesn't count.
+- **Honest reporting** — always vs the coin-flip baseline, with sample size and calibration
+  (does "60% confident" actually win ~60%?).
+- **Never becomes auto-trading or financial advice; paper-trade before anything real.**
+
+### Phase A — Feature matrix *(DONE)*
+`src/ml/features_matrix.py`: one row per bar, 12 causal, price-normalized features
+(`FEATURE_COLUMNS`). Reuses causal `add_features`; warm-up rows NaN.
+**Done when:** clean feature table + a guard test proving mutating future bars doesn't change an
+earlier row. ✅
+
+### Phase B — Labels (the target)
+`src/ml/labels.py`: **triple-barrier** labels — for each bar, does price hit +`atr_mult`×ATR
+(up) before −`atr_mult`×ATR (down) within `horizon` bars → +1 / −1 / 0 (timeout)? Realistic
+("how a trade actually resolves"). Features(≤i) stay strictly separate from the label (which
+reads the future — that's the *answer*, only used in training).
+**Done when:** labels computed with barriers set from info ≤ i; the last `horizon` bars are NaN;
+hand-built up/down/neither cases verified.
+
+### Phase C — Walk-forward harness (the instrument)
+`src/ml/walkforward.py`: sequential train/test folds; a **gradient-boosted-trees** model
+(scikit-learn `HistGradientBoostingClassifier` — one new dep, no GPU). Report OUT-OF-SAMPLE
+accuracy, AUC, and **calibration** vs the majority-class / coin-flip baseline.
+**Done when:** it runs on BTC and reports honest out-of-sample metrics per fold vs baseline.
+
+### Phase D — Costs + multi-market verdict
+Translate predictions to a return-based edge with ~round-trip costs subtracted; run across
+BTC/ETH/SOL/XRP and time-halves. 
+**Done when:** one report that says plainly whether the model beats baseline out-of-sample AFTER
+costs, CONSISTENTLY — with a first-class "no edge → stop here" path.
+
+### Phase E — Integrate *(ONLY if D shows a real edge)*
+Expose the model's **calibrated probability** as a new fact/confidence input, clearly labeled,
+ALONGSIDE the rules (never replacing them), with its own out-of-sample track record and a loud
+"paper-trade first, not financial advice." Retrain periodically.
+**Done when:** the probability shows in the report/UI with its honest track record — or we
+document "no edge found" and shelve it.
+
+New dependency: `scikit-learn` (Phase C). Lives in `src/ml/` + `scripts/ml_eval.py` + tests.

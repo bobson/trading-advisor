@@ -15,9 +15,10 @@ in the auto-generated /docs before wiring the frontend.
 
 from __future__ import annotations
 
+import logging
 import time
 
-from fastapi import FastAPI, HTTPException, Query
+from fastapi import Depends, FastAPI, Header, HTTPException, Query, Request
 from fastapi.middleware.cors import CORSMiddleware
 
 from src.backtest.base_rate import load_base_rates
@@ -32,16 +33,51 @@ cfg = load_config()
 BASE_RATES = load_base_rates()  # precomputed track record (data/base_rates.json); {} if absent
 
 app = FastAPI(title="Trading Advisor API", version="1.0")
-# The Svelte dev server runs on a different origin; allow it (tighten for production if needed).
+# CORS restricted to the configured origins (default: the local Svelte dev server), NOT "*".
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=cfg.allowed_origins,
     allow_methods=["GET"],
     allow_headers=["*"],
 )
 
+if not cfg.api_key:
+    logging.getLogger(__name__).warning(
+        "API is running WITHOUT an API_KEY — fine for local use, but set API_KEY in .env "
+        "before exposing it publicly (the explain endpoint spends Claude credits)."
+    )
+
 _CACHE: dict[tuple, tuple[float, dict]] = {}
 _TTL_SECONDS = 60
+
+# --- #8 lockdown: auth + per-client rate limit (in-memory, no extra deps) ---
+_HITS: dict[str, int] = {}
+
+
+def require_api_key(x_api_key: str | None = Header(default=None)) -> None:
+    """When API_KEY is configured, every data endpoint needs a matching X-API-Key header."""
+    if cfg.api_key and x_api_key != cfg.api_key:
+        raise HTTPException(status_code=401, detail="missing or invalid X-API-Key")
+
+
+def rate_limit(request: Request) -> None:
+    """Fixed-window per-client cap (a backstop against abuse / runaway loops)."""
+    limit = cfg.rate_limit_per_min
+    if limit <= 0:
+        return
+    ip = request.client.host if request.client else "unknown"
+    window = int(time.time() // 60)
+    key = f"{ip}:{window}"
+    count = _HITS.get(key, 0) + 1
+    _HITS[key] = count
+    if count == 1:  # new window -> drop stale windows
+        for k in [k for k in _HITS if not k.endswith(f":{window}")]:
+            _HITS.pop(k, None)
+    if count > limit:
+        raise HTTPException(status_code=429, detail="rate limit exceeded — slow down")
+
+
+_GUARDS = [Depends(rate_limit), Depends(require_api_key)]
 
 
 @app.get("/health")
@@ -49,17 +85,17 @@ def health() -> dict:
     return {"status": "ok"}
 
 
-@app.get("/pairs")
+@app.get("/pairs", dependencies=_GUARDS)
 def pairs() -> list[dict]:
     return [{"symbol": p.symbol, "asset_class": p.asset_class, "label": p.label} for p in list_pairs()]
 
 
-@app.get("/timeframes")
+@app.get("/timeframes", dependencies=_GUARDS)
 def timeframes() -> list[str]:
     return list(cfg.timeframes.selectable)
 
 
-@app.get("/analysis")
+@app.get("/analysis", dependencies=_GUARDS)
 def analysis(
     symbol: str = Query(..., description="e.g. BTC/USDT"),
     timeframe: str = Query("1h"),

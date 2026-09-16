@@ -6,7 +6,6 @@ no-key error, and the crypto-vs-forex dispatch.
 
 from __future__ import annotations
 
-import pandas as pd
 import pytest
 
 from src.config import load_config

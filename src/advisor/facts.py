@@ -392,6 +392,15 @@ def facts_to_prompt(facts: dict) -> str:
         fg = ctx.get("fear_greed")
         if fg:
             lines.append(f"  - Crypto Fear & Greed: {fg['value']}/100 ({fg['label']}), as of {fg['as_of']}")
+        fund = ctx.get("fundamentals")
+        if fund:
+            mc, v = fund.get("market_cap"), fund.get("volume_24h")
+            lines.append(
+                f"  - Fundamentals ({fund['coin']}): market cap "
+                f"{('$%.1fB' % (mc / 1e9)) if mc else 'n/a'}, 24h vol "
+                f"{('$%.1fB' % (v / 1e9)) if v else 'n/a'}, {fund.get('change_24h_pct')}% 24h, "
+                f"{fund.get('ath_change_pct')}% from all-time high"
+            )
         cal = ctx.get("economic_calendar") or []
         if cal:
             lines.append("  - Upcoming high-impact economic events:")
@@ -402,7 +411,7 @@ def facts_to_prompt(facts: dict) -> str:
             lines.append("  - Recent headlines:")
             for h in news:
                 lines.append(f"      ({h['when']}) {h['source']}: {h['headline']}")
-        if not fg and not cal and not news:
+        if not fg and not fund and not cal and not news:
             lines.append("  - none available")
         lines.append(f"  (pulled {ctx.get('as_of', 'unknown')})")
         lines.append("")

@@ -51,6 +51,7 @@ COL_OBV = "obv"
 
 COL_DOJI = "doji"
 COL_HAMMER = "hammer"
+COL_SHOOTING_STAR = "shooting_star"
 COL_BULLISH_ENGULFING = "bullish_engulfing"
 COL_BEARISH_ENGULFING = "bearish_engulfing"
 
@@ -75,6 +76,7 @@ INDICATOR_COLUMNS = [
 PATTERN_COLUMNS = [
     COL_DOJI,
     COL_HAMMER,
+    COL_SHOOTING_STAR,
     COL_BULLISH_ENGULFING,
     COL_BEARISH_ENGULFING,
 ]
@@ -174,6 +176,11 @@ def add_candlestick_patterns(df: pd.DataFrame) -> pd.DataFrame:
     out[COL_DOJI] = has_range & (body <= DOJI_BODY_MAX_FRACTION * rng)
     out[COL_HAMMER] = (
         has_range & (body > 0) & (lower_shadow >= 2 * body) & (upper_shadow <= body)
+    )
+    # shooting star: the bearish mirror of the hammer — small body near the low, long upper
+    # shadow (>= 2x body), short lower shadow. A potential bearish-reversal shape.
+    out[COL_SHOOTING_STAR] = (
+        has_range & (body > 0) & (upper_shadow >= 2 * body) & (lower_shadow <= body)
     )
 
     # Two-candle patterns: compare each candle with the previous one.

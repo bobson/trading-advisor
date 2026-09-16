@@ -48,6 +48,8 @@
   })
 
   const conf = $derived(result?.confluence)
+
+  const fmtLevel = (x: any) => (x ? `${x.price.toLocaleString()} (${x.touches} touches)` : '—')
 </script>
 
 <main>
@@ -87,6 +89,69 @@
 
     <PriceChart data={result.chart} />
 
+    <div class="panels">
+      <section class="panel">
+        <h3>Confluence by category</h3>
+        {#each Object.entries(result.confluence.categories ?? {}) as [cat, dir]}
+          <div class="row"><span>{cat}</span><b class={dir}>{dir}</b></div>
+        {/each}
+      </section>
+
+      <section class="panel">
+        <h3>Key levels</h3>
+        <div class="row"><span>Resistance</span><b>{fmtLevel(result.support_resistance?.nearest_resistance)}</b></div>
+        <div class="row"><span>Price</span><b>{result.market.last_close.toLocaleString()}</b></div>
+        <div class="row"><span>Support</span><b>{fmtLevel(result.support_resistance?.nearest_support)}</b></div>
+        {#if result.round_number}
+          <div class="row"><span>Round #</span><b>{result.round_number.nearest.toLocaleString()}{result.round_number.is_near ? ' · at it' : ''}</b></div>
+        {/if}
+        {#if result.fibonacci}
+          <div class="row"><span>Fib ({result.fibonacci.direction})</span><b>{Object.entries(result.fibonacci.key_levels).map(([k, v]) => `${(+k * 100).toFixed(0)}%:${v}`).join('  ')}</b></div>
+        {/if}
+      </section>
+
+      <section class="panel">
+        <h3>Momentum & volatility</h3>
+        <div class="row"><span>RSI</span><b>{result.momentum.rsi ?? '—'} ({result.momentum.rsi_zone})</b></div>
+        <div class="row"><span>MACD</span><b>{result.momentum.macd_state}</b></div>
+        {#if result.momentum.stochastic_zone}
+          <div class="row"><span>Stochastic</span><b>{result.momentum.stochastic_k} ({result.momentum.stochastic_zone})</b></div>
+        {/if}
+        {#if result.volatility}
+          <div class="row"><span>ADX</span><b>{result.volatility.adx ?? '—'} ({result.volatility.regime ?? '—'})</b></div>
+          <div class="row"><span>Bollinger</span><b>{result.volatility.bollinger_position ?? '—'}</b></div>
+          <div class="row"><span>ATR</span><b>{result.volatility.atr_pct ?? '—'}%</b></div>
+        {/if}
+        {#if result.divergence}<div class="row"><span>Divergence</span><b class={result.divergence.kind}>{result.divergence.kind}</b></div>{/if}
+      </section>
+
+      <section class="panel">
+        <h3>Market context</h3>
+        {#if result.market_adaptation}
+          <div class="row"><span>Type</span><b>{result.market_adaptation.asset_class} · {result.market_adaptation.volume_type} vol</b></div>
+          {#if result.market_adaptation.active_session}<div class="row"><span>Session</span><b>{result.market_adaptation.active_session}</b></div>{/if}
+          {#if result.market_adaptation.weekend_gap}<div class="row"><span>Gap</span><b>weekend gap</b></div>{/if}
+        {/if}
+        {#if result.context?.fear_greed}
+          <div class="row"><span>Fear &amp; Greed</span><b>{result.context.fear_greed.value} ({result.context.fear_greed.label})</b></div>
+        {/if}
+        {#if result.context?.fundamentals}
+          <div class="row"><span>Market cap</span><b>${(result.context.fundamentals.market_cap / 1e9).toFixed(1)}B</b></div>
+          <div class="row"><span>24h change</span><b>{result.context.fundamentals.change_24h_pct}%</b></div>
+          <div class="row"><span>From ATH</span><b>{result.context.fundamentals.ath_change_pct}%</b></div>
+        {/if}
+        {#if result.derivatives?.funding}
+          <div class="row"><span>Funding</span><b>{result.derivatives.funding.state}</b></div>
+        {/if}
+        {#if result.derivatives?.open_interest}
+          <div class="row"><span>Open interest</span><b>{result.derivatives.open_interest.amount.toLocaleString()}</b></div>
+        {/if}
+        {#if !result.context?.fear_greed && !result.context?.fundamentals && !result.derivatives}
+          <div class="row"><span class="muted">no extra context (crypto-only / needs keys)</span></div>
+        {/if}
+      </section>
+    </div>
+
     {#if result.explanation}
       <section class="panel"><h2>Explanation</h2><pre>{result.explanation}</pre></section>
     {:else}
@@ -117,6 +182,24 @@
   .verdict.bear { border-color: #f85149; }
   .flag { background: #238636; color: #fff; padding: 2px 8px; border-radius: 999px; font-size: 12px; }
   .track { color: #8b949e; font-size: 13px; margin: 0 0 12px; }
+  .panels { display: grid; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); gap: 12px; margin: 14px 0; }
+  .panel h3 { margin: 0 0 8px; font-size: 13px; color: #8b949e; text-transform: uppercase; letter-spacing: .04em; }
+  .row { display: flex; justify-content: space-between; gap: 12px; padding: 3px 0; font-size: 14px; border-bottom: 1px solid #161b22; }
+  .row span { color: #8b949e; }
+  .row .muted { font-size: 12px; }
+  .row b.bullish { color: #26a641; }
+  .row b.bearish { color: #f85149; }
+  .row b.neutral { color: #8b949e; }
+
+  /* Mobile: stack the controls, full-width thumb-sized targets, tighter padding. */
+  @media (max-width: 640px) {
+    main { padding: 14px; }
+    h1 { font-size: 22px; }
+    .controls { flex-direction: column; align-items: stretch; }
+    .controls select, .controls button { width: 100%; padding: 12px; font-size: 16px; }
+    .verdict { gap: 10px; }
+    .panels { grid-template-columns: 1fr; }
+  }
   .panel { border: 1px solid #30363d; border-radius: 8px; padding: 14px; margin-top: 14px; }
   .panel h2 { margin: 0 0 8px; font-size: 16px; }
   pre { white-space: pre-wrap; margin: 0; color: #c9d1d9; }

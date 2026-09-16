@@ -28,7 +28,6 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Optional
 
-import numpy as np
 import pandas as pd
 
 from src.config import Config
@@ -37,6 +36,7 @@ from src.indicators.features import (
     COL_BULLISH_ENGULFING,
     COL_DOJI,
     COL_HAMMER,
+    COL_SHOOTING_STAR,
     COL_MACD,
     COL_MACD_SIGNAL,
     COL_RSI,
@@ -45,7 +45,6 @@ from src.indicators.features import (
 )
 from src.structure.fibonacci import UP, FibRetracement, fib_retracement
 from src.structure.support_resistance import (
-    RESISTANCE,
     SUPPORT,
     annotate_roles,
     find_support_resistance,
@@ -178,6 +177,8 @@ def signal_from_patterns(featured_df: pd.DataFrame) -> Signal:
         return Signal("candlestick", BULLISH, "The last candle is a hammer (potential bullish reversal).")
     if bool(last[COL_BEARISH_ENGULFING]):
         return Signal("candlestick", BEARISH, "The last candle is a bearish engulfing.")
+    if bool(last[COL_SHOOTING_STAR]):
+        return Signal("candlestick", BEARISH, "The last candle is a shooting star (potential bearish reversal).")
     if bool(last[COL_DOJI]):
         return Signal("candlestick", NEUTRAL, "The last candle is a doji (indecision).")
     return Signal("candlestick", NEUTRAL, "No notable candlestick pattern on the last candle.")

@@ -55,8 +55,14 @@ timeframes:                  # Phase 23 — selectable timeframes + their author
   selectable: [15m, 30m, 1h, 4h, 1d]   # 5m deliberately excluded (mostly noise)
   weights: {15m: 0.6, 30m: 0.7, 1h: 1.0, 4h: 1.2, 1d: 1.4}  # higher TF = more weight
 
+alerts:                      # #7 — watchlist scanned by scripts/watch.py (run via cron)
+  symbols: [BTC/USDT, ETH/USDT, SOL/USDT, XRP/USDT]
+  timeframe: 1h
+  min_confidence: 0.5        # only ping on setups at least this confident
+
 context:                     # Phase 21 — background facts for Layer 2 (context, not prediction)
   fear_greed: true           # crypto Fear & Greed (alternative.me, no key)
+  fundamentals: true         # crypto market cap/supply/volume/ATH (CoinGecko, no key)
   economic_calendar: true    # high-impact events (Finnhub, needs FINNHUB_API_KEY)
   news: true                 # recent headlines (Finnhub, needs FINNHUB_API_KEY)
 

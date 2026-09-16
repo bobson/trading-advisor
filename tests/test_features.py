@@ -29,6 +29,7 @@ from src.indicators.features import (
     COL_BB_LOWER,
     COL_BB_UPPER,
     COL_OBV,
+    COL_SHOOTING_STAR,
     COL_SMA_FAST,
     COL_SMA_SLOW,
     COL_STOCH_K,
@@ -145,6 +146,14 @@ def test_hammer_fires_on_long_lower_shadow():
     df = pd.DataFrame([_candle(100, 100.3, 90, 100.2)])
     out = add_candlestick_patterns(df)
     assert bool(out[COL_HAMMER].iloc[0])
+
+
+def test_shooting_star_fires_on_long_upper_shadow():
+    # small body near the low, long upper wick, ~no lower wick -> bearish mirror of the hammer
+    df = pd.DataFrame([_candle(100, 110, 99.8, 100.2)])
+    out = add_candlestick_patterns(df)
+    assert bool(out[COL_SHOOTING_STAR].iloc[0])
+    assert not bool(out[COL_HAMMER].iloc[0])
 
 
 def test_bullish_engulfing():

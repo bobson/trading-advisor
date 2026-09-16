@@ -12,6 +12,7 @@ from __future__ import annotations
 from datetime import datetime, timezone
 
 from src.context.calendar import fetch_economic_calendar
+from src.context.fundamentals import fetch_fundamentals
 from src.context.news import fetch_news
 from src.context.sentiment import fetch_fear_greed
 from src.data.base import CRYPTO
@@ -24,12 +25,14 @@ def gather_context(symbol: str, cfg, *, fetch=None) -> dict:
     is_crypto = asset_class_for(symbol) == CRYPTO
 
     fg = fetch_fear_greed(fetch) if (c.fear_greed and is_crypto) else None
+    fundamentals = fetch_fundamentals(symbol, fetch) if (c.fundamentals and is_crypto) else None
     calendar = fetch_economic_calendar(cfg, fetch) if c.economic_calendar else []
     news = fetch_news(cfg, fetch) if c.news else []
 
     return {
         "as_of": datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M UTC"),
         "fear_greed": None if fg is None else {"value": fg.value, "label": fg.label, "as_of": fg.as_of},
+        "fundamentals": fundamentals,
         "economic_calendar": [
             {"time": e.time, "country": e.country, "event": e.event, "impact": e.impact}
             for e in calendar

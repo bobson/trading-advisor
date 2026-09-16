@@ -20,6 +20,7 @@ from src.indicators.features import (
     COL_MACD,
     COL_MACD_SIGNAL,
     COL_RSI,
+    COL_SHOOTING_STAR,
     COL_VOLUME,
     COL_VOLUME_MA,
 )
@@ -130,12 +131,13 @@ def test_macd_votes():
     assert signal_from_macd(_one_row(**{COL_MACD: np.nan, COL_MACD_SIGNAL: 1.0})).direction == NEUTRAL
 
 
-def _pattern_row(bull_eng=False, hammer=False, bear_eng=False, doji=False):
+def _pattern_row(bull_eng=False, hammer=False, bear_eng=False, doji=False, shooting_star=False):
     return _one_row(**{
         COL_BULLISH_ENGULFING: bull_eng,
         COL_HAMMER: hammer,
         COL_BEARISH_ENGULFING: bear_eng,
         COL_DOJI: doji,
+        COL_SHOOTING_STAR: shooting_star,
     })
 
 
@@ -143,6 +145,7 @@ def test_pattern_votes():
     assert signal_from_patterns(_pattern_row(bull_eng=True)).direction == BULLISH
     assert signal_from_patterns(_pattern_row(hammer=True)).direction == BULLISH
     assert signal_from_patterns(_pattern_row(bear_eng=True)).direction == BEARISH
+    assert signal_from_patterns(_pattern_row(shooting_star=True)).direction == BEARISH
     assert signal_from_patterns(_pattern_row(doji=True)).direction == NEUTRAL
     assert signal_from_patterns(_pattern_row()).direction == NEUTRAL
 

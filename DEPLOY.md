@@ -69,5 +69,8 @@ auto-generated API explorer), and `/trading/analysis?symbol=BTC/USDT&timeframe=1
   `?explain=true` for Claude's write-up (uses API credit) and `?context=true` for
   sentiment/positioning.
 - Keep the port (`API_PORT`) different from whatever your other server uses.
-- The Phase-25 Svelte frontend will be a separate static site that calls these endpoints; CORS
-  is already open on the API. Tighten `allow_origins` in `app.py` to your domain for production.
+- **Before exposing publicly, set these in `.env`** (the #8 lockdown): `API_KEY` (then every
+  data endpoint requires header `X-API-Key: <it>` — this also protects the credit-spending
+  `explain` path), `ALLOWED_ORIGINS` (your frontend URL, comma-separated — CORS default is only
+  localhost), and optionally `RATE_LIMIT_PER_MIN` (default 60). The API logs a warning at startup
+  if no `API_KEY` is set. The Svelte frontend then sends the key as the `X-API-Key` header.

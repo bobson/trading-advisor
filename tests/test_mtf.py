@@ -21,7 +21,6 @@ from src.structure.mtf import (
     CONFLICT,
     MtfContext,
     alignment,
-    build_mtf_context,
     higher_timeframe_trend,
     resample_ohlcv,
     resolve_mtf,

@@ -32,5 +32,7 @@ async function get<T>(path: string): Promise<T> {
 
 export const getPairs = () => get<Pair[]>('/pairs')
 export const getTimeframes = () => get<string[]>('/timeframes')
-export const getAnalysis = (symbol: string, timeframe: string, explain = false) =>
-  get<Analysis>(`/analysis?symbol=${encodeURIComponent(symbol)}&timeframe=${timeframe}&explain=${explain}`)
+export const getAnalysis = (symbol: string, timeframe: string, explain = false, context = true) =>
+  get<Analysis>(
+    `/analysis?symbol=${encodeURIComponent(symbol)}&timeframe=${timeframe}&explain=${explain}&context=${context}`,
+  )

@@ -127,6 +127,13 @@ class MultiTimeframeConfig(_Strict):
     context_from: list[str] = Field(default_factory=lambda: ["4h", "1d"])
 
 
+class AlertsConfig(_Strict):
+    # #7 watchlist: scan these on a schedule (cron) and notify when a setup fires.
+    symbols: list[str] = Field(default_factory=lambda: ["BTC/USDT", "ETH/USDT", "SOL/USDT", "XRP/USDT"])
+    timeframe: str = "1h"
+    min_confidence: float = 0.5  # only alert on setups at least this confident (avoid spam)
+
+
 class DerivativesConfig(_Strict):
     # Phase 22: crypto-only positioning context (funding rate + open interest) shown as FACTS.
     # Gated to crypto in code; forex has no perp funding/OI. No vote yet (pending a study).
@@ -137,6 +144,7 @@ class DerivativesConfig(_Strict):
 class ContextConfig(_Strict):
     # Phase 21: extra background facts for Layer 2 (never touches the detectors).
     fear_greed: bool = True          # crypto Fear & Greed (alternative.me, no key)
+    fundamentals: bool = True        # crypto market cap/supply/volume (CoinGecko, no key)
     economic_calendar: bool = True   # high-impact events (Finnhub, needs FINNHUB_API_KEY)
     news: bool = True                # recent headlines (Finnhub, needs FINNHUB_API_KEY)
 
@@ -164,12 +172,21 @@ class Config(_Strict):
     derivatives: DerivativesConfig = Field(default_factory=DerivativesConfig)
     # Optional (Phase 23): defaults apply if config.yaml omits the `timeframes:` block.
     timeframes: TimeframesConfig = Field(default_factory=TimeframesConfig)
+    # Optional (#7 alerts): defaults apply if config.yaml omits the `alerts:` block.
+    alerts: AlertsConfig = Field(default_factory=AlertsConfig)
 
     # Injected from .env, not from config.yaml. Optional so the deterministic
     # Layer 1 pipeline (data + detectors) runs without an API key.
     anthropic_api_key: Optional[str] = None
     finnhub_api_key: Optional[str] = None  # Phase 21: economic calendar + news (optional)
     twelvedata_api_key: Optional[str] = None  # Phase 26: forex OHLC (optional; crypto needs none)
+    webhook_url: Optional[str] = None  # #7 alerts: Discord/Slack-style webhook to get pinged
+    # #8 API lockdown (env-injected; safe defaults for local dev).
+    api_key: Optional[str] = None      # when set, the API requires X-API-Key on data endpoints
+    allowed_origins: list[str] = Field(
+        default_factory=lambda: ["http://localhost:5173", "http://127.0.0.1:5173"]
+    )
+    rate_limit_per_min: int = 60       # per-client request cap (0 disables)
 
     def require_api_key(self) -> str:
         """Return the Anthropic key or raise — call this from Layer 2 only."""
@@ -184,9 +201,15 @@ def load_config(path: str | Path = DEFAULT_CONFIG_PATH) -> Config:
     """Read config.yaml, validate it, and attach the API key from .env."""
     load_dotenv(PROJECT_ROOT / ".env")
     raw = yaml.safe_load(Path(path).read_text()) or {}
-    return Config(
-        **raw,
-        anthropic_api_key=os.getenv("ANTHROPIC_API_KEY"),
-        finnhub_api_key=os.getenv("FINNHUB_API_KEY"),
-        twelvedata_api_key=os.getenv("TWELVEDATA_API_KEY"),
-    )
+    origins = os.getenv("ALLOWED_ORIGINS")
+    api_env = {
+        "anthropic_api_key": os.getenv("ANTHROPIC_API_KEY"),
+        "finnhub_api_key": os.getenv("FINNHUB_API_KEY"),
+        "twelvedata_api_key": os.getenv("TWELVEDATA_API_KEY"),
+        "webhook_url": os.getenv("WEBHOOK_URL"),
+        "api_key": os.getenv("API_KEY"),
+        "rate_limit_per_min": int(os.getenv("RATE_LIMIT_PER_MIN", "60")),
+    }
+    if origins:
+        api_env["allowed_origins"] = [o.strip() for o in origins.split(",") if o.strip()]
+    return Config(**raw, **api_env)

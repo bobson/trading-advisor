@@ -13,6 +13,7 @@ import pytest
 
 from src.config import load_config
 from src.context.calendar import fetch_economic_calendar
+from src.context.fundamentals import fetch_fundamentals
 from src.context.gather import gather_context
 from src.context.news import fetch_news
 from src.context.sentiment import fetch_fear_greed
@@ -62,7 +63,36 @@ def test_calendar_parses_high_impact_with_key(cfg):
     assert len(events) == 1 and events[0].event == "CPI"  # low-impact filtered out
 
 
+# --- fundamentals (CoinGecko, keyless) -----------------------------------------
+
+def _fake_cg(_url, params=None):
+    return [{"market_cap": 1.5e12, "total_volume": 3e10, "circulating_supply": 1.9e7,
+             "ath": 100000, "ath_change_percentage": -20.5, "price_change_percentage_24h": 1.23}]
+
+
+def test_fundamentals_parses_and_unknown():
+    f = fetch_fundamentals("BTC/USDT", fetch=_fake_cg)
+    assert f["coin"] == "bitcoin" and f["market_cap"] == 1.5e12 and f["change_24h_pct"] == 1.23
+    assert fetch_fundamentals("DOGE/USDT", fetch=_fake_cg) is None  # not in the id map
+
+
+def test_fundamentals_degrades_on_error():
+    assert fetch_fundamentals("BTC/USDT", fetch=_raises) is None
+
+
 # --- gather_context aggregation ------------------------------------------------
+
+
+def _fake_multi(url, params=None):
+    if "coins/markets" in url:
+        return _fake_cg(url, params)
+    return _fake_fng(url, params)
+
+
+def test_gather_context_includes_fundamentals(cfg):
+    ctx = gather_context("BTC/USDT", cfg, fetch=_fake_multi)
+    assert ctx["fear_greed"]["value"] == 72
+    assert ctx["fundamentals"]["coin"] == "bitcoin"
 
 def test_gather_context_crypto(cfg):
     ctx = gather_context("BTC/USDT", cfg, fetch=_fake_fng)

@@ -10,9 +10,11 @@
   let series: ISeriesApi<'Candlestick'> | null = null
   let priceLines: IPriceLine[] = []
 
+  const chartHeight = () => (window.innerWidth < 640 ? 300 : 460)
+
   onMount(() => {
     chart = createChart(el, {
-      height: 460,
+      height: chartHeight(),
       layout: { background: { color: '#0e1117' }, textColor: '#c9d1d9' },
       grid: { vertLines: { color: '#1c2128' }, horzLines: { color: '#1c2128' } },
       timeScale: { timeVisible: true, borderColor: '#30363d' },
@@ -23,7 +25,7 @@
       borderVisible: false, wickUpColor: '#26a641', wickDownColor: '#f85149',
     })
     render()
-    const ro = new ResizeObserver(() => chart?.applyOptions({ width: el.clientWidth }))
+    const ro = new ResizeObserver(() => chart?.applyOptions({ width: el.clientWidth, height: chartHeight() }))
     ro.observe(el)
     return () => { ro.disconnect(); chart?.remove(); chart = null }
   })

@@ -40,9 +40,9 @@
         "reason": "MACD line is below its signal line (bearish momentum)."
       },
       {
-        "direction": "neutral",
+        "direction": "bearish",
         "name": "candlestick",
-        "reason": "No notable candlestick pattern on the last candle."
+        "reason": "The last candle is a shooting star (potential bearish reversal)."
       },
       {
         "direction": "bearish",

@@ -11,7 +11,6 @@ only the most recent ~1000 and miss the requested window.
 
 from __future__ import annotations
 
-import time
 
 import ccxt
 import pandas as pd

@@ -11,15 +11,18 @@ import pandas as pd
 import pytest
 from fastapi.testclient import TestClient
 
+import src.api.app as api
 import src.service.analyze as service
-from src.api.app import _CACHE, app
+from src.api.app import _CACHE, _HITS, app
 
 
 @pytest.fixture(autouse=True)
-def _clear_cache():
+def _clear_state():
     _CACHE.clear()
+    _HITS.clear()
     yield
     _CACHE.clear()
+    _HITS.clear()
 
 
 @pytest.fixture
@@ -62,6 +65,20 @@ def test_analysis_returns_full_payload(synthetic_candles):
     assert "confluence" in body and "confidence" in body["confluence"]
     # explain defaulted false -> no Claude call -> no explanation
     assert body["explanation"] is None
+
+
+def test_api_key_required_when_configured(synthetic_candles, monkeypatch):
+    monkeypatch.setattr(api.cfg, "api_key", "secret")
+    assert client.get("/analysis", params={"symbol": "BTC/USDT"}).status_code == 401  # no header
+    ok = client.get("/analysis", params={"symbol": "BTC/USDT"}, headers={"X-API-Key": "secret"})
+    assert ok.status_code == 200
+
+
+def test_rate_limit_returns_429(synthetic_candles, monkeypatch):
+    monkeypatch.setattr(api.cfg, "rate_limit_per_min", 2)
+    assert client.get("/timeframes").status_code == 200
+    assert client.get("/timeframes").status_code == 200
+    assert client.get("/timeframes").status_code == 429  # 3rd in the window -> blocked
 
 
 def test_analysis_forex_without_key_errors(synthetic_candles, monkeypatch):

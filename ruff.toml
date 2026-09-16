@@ -1,0 +1,10 @@
+# Lint config for CI. Focus on real errors (pyflakes F: unused imports / undefined names,
+# pycodestyle E) — line length (E501) is not enforced to avoid style churn.
+line-length = 120
+target-version = "py311"
+
+[lint]
+select = ["E", "F"]
+# E501 line length (not enforced), E741 ambiguous name (`l` = low in OHLC is fine),
+# E702 semicolons (intentional compact lines in viz/scripts).
+ignore = ["E501", "E741", "E702"]

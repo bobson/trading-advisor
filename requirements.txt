@@ -22,5 +22,8 @@ fastapi           # JSON API the frontend consumes
 uvicorn[standard] # ASGI server to run the API
 httpx             # required by FastAPI's TestClient (also nice for API tests)
 
+# ML prediction harness (Part 8, Phase C+)
+scikit-learn      # gradient-boosted trees + walk-forward eval
+
 # Tests
 pytest            # tests, especially for detector logic
