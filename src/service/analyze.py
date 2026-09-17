@@ -62,6 +62,10 @@ class AnalysisResult:
     # Phase 20 — Layer-2 consistency check ({ok, issues}); None when there is no explanation.
     verification: Optional[dict] = None
 
+    # Feature 1 — total bars in the FULL frame before any `as_of_bar` truncation, so a scrubbing
+    # UI knows the maximum bar it can seek to (candles are capped to `limit`, so length != total).
+    total_bars: int = 0
+
     def to_payload(self) -> dict:
         """The JSON-serializable result: the computed facts plus Claude's explanation.
 
@@ -97,6 +101,7 @@ def advise(
     explain_enabled: bool = True,
     refresh_stale: bool = False,
     base_rate: Optional[dict] = None,
+    as_of_bar: Optional[int] = None,
 ) -> AnalysisResult:
     """Run the full pipeline for one market/timeframe and return a JSON-able result.
 
@@ -113,6 +118,17 @@ def advise(
         # refresh_stale: re-pull once the cached data is older than ~one bar (live API/UI).
         stale = _timeframe_minutes(m.timeframe) if refresh_stale else None
         df = get_candles(m.symbol, m.timeframe, req, stale_after_minutes=stale)
+
+    total_bars = len(df)
+    # Feature 1 — historical scrubbing. `as_of_bar=N` recomputes the WHOLE pipeline on bars
+    # <= N only, so the result is exactly what the engine would have seen at that bar. This is
+    # look-ahead-safe by construction: it's literally a run on the truncated frame `df[:N+1]`
+    # (`find_swings`' confirmed-interior filter can't see past the cut, `add_features` is causal).
+    # Clamp up to a feature-warmup floor since `add_features` is fragile on very short frames.
+    if as_of_bar is not None and total_bars:
+        floor = req.indicators.slow_ma
+        cut = min(max(int(as_of_bar), floor), total_bars - 1)
+        df = df.iloc[: cut + 1]
 
     featured = add_features(df, req)
     assert len(featured) == len(df), "featured frame desynced from candles"
@@ -163,4 +179,5 @@ def advise(
         fib=fib,
         cfg=req,
         verification=verification,
+        total_bars=total_bars,
     )

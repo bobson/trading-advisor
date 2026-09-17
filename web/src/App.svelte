@@ -1,7 +1,7 @@
 <script lang="ts">
   import { onMount } from 'svelte'
   import PriceChart from './lib/PriceChart.svelte'
-  import { getPairs, getTimeframes, getAnalysis, type Pair, type Analysis } from './lib/api'
+  import { getPairs, getTimeframes, getAnalysis, type Pair, type Analysis, type PanelToggles } from './lib/api'
 
   let pairs = $state<Pair[]>([])
   let timeframes = $state<string[]>([])
@@ -13,6 +13,40 @@
   let error = $state<string | null>(null)
   let result = $state<Analysis | null>(null)
   const REFRESH_MS = 30_000
+
+  // ---- per-overlay / per-pane toggles, persisted to localStorage ----
+  const DEFAULT_TOGGLES: PanelToggles = {
+    levels: true, fib: true, swings: true, patterns: true, marker: true,
+    volume: true, rsi: true, macd: true, adx: false, atr: false,
+  }
+  const TOGGLE_KEY = 'tw.toggles'
+  function loadToggles(): PanelToggles {
+    try { return { ...DEFAULT_TOGGLES, ...JSON.parse(localStorage.getItem(TOGGLE_KEY) || '{}') } }
+    catch { return { ...DEFAULT_TOGGLES } }
+  }
+  let toggles = $state<PanelToggles>(loadToggles())
+  $effect(() => { localStorage.setItem(TOGGLE_KEY, JSON.stringify(toggles)) })
+  const OVERLAY_KEYS: (keyof PanelToggles)[] = ['levels', 'fib', 'swings', 'patterns', 'marker']
+  const PANE_KEYS: (keyof PanelToggles)[] = ['volume', 'rsi', 'macd', 'adx', 'atr']
+
+  // ---- historical scrubbing (as_of_bar) ----
+  let asOfBar = $state<number | null>(null)          // null = live / latest bar
+  const totalBars = $derived(result?.chart.total_bars ?? 0)
+  const scrubMax = $derived(Math.max(0, totalBars - 1))
+  const scrubValue = $derived(asOfBar ?? scrubMax)   // slider sits at the right when live
+  let scrubTimer: any = null
+  function scrubTo(bar: number) {
+    asOfBar = Math.min(Math.max(0, bar), scrubMax)
+    clearTimeout(scrubTimer)
+    scrubTimer = setTimeout(() => run(false), 180)    // debounce; per-bar responses are cached
+  }
+  function stepScrub(delta: number) { scrubTo((asOfBar ?? scrubMax) + delta) }
+  function goLive() { asOfBar = null; run() }
+  function onScrubKey(e: KeyboardEvent) {
+    const step = e.shiftKey ? 10 : 1
+    if (e.key === 'ArrowLeft') { e.preventDefault(); stepScrub(-step) }
+    else if (e.key === 'ArrowRight') { e.preventDefault(); stepScrub(step) }
+  }
 
   onMount(async () => {
     try {
@@ -30,7 +64,9 @@
     loading = true
     error = null
     try {
-      result = await getAnalysis(symbol, timeframe, useExplain)
+      // Skip context/explain while scrubbing (current-state context is anachronistic on a past bar).
+      const scrubbing = asOfBar != null
+      result = await getAnalysis(symbol, timeframe, scrubbing ? false : useExplain, !scrubbing, asOfBar)
     } catch (e: any) {
       error = e.message
       result = null
@@ -57,10 +93,10 @@
   <p class="tag">Reads the chart, explains its reasoning — not financial advice.</p>
 
   <div class="controls">
-    <select bind:value={symbol}>
+    <select bind:value={symbol} onchange={() => (asOfBar = null)}>
       {#each pairs as p}<option value={p.symbol}>{p.label} ({p.symbol})</option>{/each}
     </select>
-    <select bind:value={timeframe}>
+    <select bind:value={timeframe} onchange={() => (asOfBar = null)}>
       {#each timeframes as t}<option value={t}>{t}</option>{/each}
     </select>
     <label class="explain"><input type="checkbox" bind:checked={explain} /> explain (uses API credit)</label>
@@ -87,7 +123,45 @@
       </p>
     {/if}
 
-    <PriceChart data={result.chart} />
+    <!-- Research controls: scrub back through history + choose which overlays/panes to draw. -->
+    <div class="research">
+      <div class="scrub">
+        <button class="mini" onclick={() => stepScrub(-1)} title="step back (←)">‹</button>
+        <input type="range" min="0" max={scrubMax} value={scrubValue}
+               oninput={(e) => scrubTo(+e.currentTarget.value)} onkeydown={onScrubKey}
+               aria-label="scrub through history" />
+        <button class="mini" onclick={() => stepScrub(1)} title="step forward (→)">›</button>
+        <span class="scrub-label">
+          {#if asOfBar == null}bar {scrubMax} · <b>live</b>{:else}bar {asOfBar} / {scrubMax}{/if}
+        </span>
+        {#if asOfBar != null}<button class="mini live" onclick={goLive}>⤒ live</button>{/if}
+      </div>
+      <details class="toggles">
+        <summary>overlays &amp; panes</summary>
+        <div class="toggle-grid">
+          <div><span class="grp">overlays</span>
+            {#each OVERLAY_KEYS as k}
+              <label><input type="checkbox" bind:checked={toggles[k]} /> {k}</label>
+            {/each}
+          </div>
+          <div><span class="grp">panes</span>
+            {#each PANE_KEYS as k}
+              <label><input type="checkbox" bind:checked={toggles[k]} /> {k}</label>
+            {/each}
+          </div>
+        </div>
+      </details>
+    </div>
+
+    {#if result.chart.overlays.patterns.length}
+      <div class="patterns">
+        {#each result.chart.overlays.patterns as p}
+          <span class="pchip {p.state}">{p.type} · {p.state}</span>
+        {/each}
+      </div>
+    {/if}
+
+    <PriceChart data={result.chart} {toggles} />
 
     <div class="panels">
       <section class="panel">
@@ -203,4 +277,25 @@
   .panel { border: 1px solid #30363d; border-radius: 8px; padding: 14px; margin-top: 14px; }
   .panel h2 { margin: 0 0 8px; font-size: 16px; }
   pre { white-space: pre-wrap; margin: 0; color: #c9d1d9; }
+
+  /* Research controls: scrub + toggles */
+  .research { display: flex; justify-content: space-between; align-items: center; gap: 12px;
+    flex-wrap: wrap; margin: 6px 0 4px; }
+  .scrub { display: flex; align-items: center; gap: 8px; flex: 1; min-width: 240px; }
+  .scrub input[type=range] { flex: 1; accent-color: #58a6ff; }
+  .scrub-label { color: #8b949e; font-size: 13px; white-space: nowrap; }
+  .mini { padding: 2px 9px; font-size: 13px; background: #161b22; border: 1px solid #30363d;
+    border-radius: 6px; color: #c9d1d9; cursor: pointer; }
+  .mini.live { border-color: #238636; }
+  .toggles { color: #8b949e; font-size: 13px; }
+  .toggles summary { cursor: pointer; }
+  .toggle-grid { display: flex; gap: 20px; margin-top: 8px; }
+  .toggle-grid .grp { display: block; text-transform: uppercase; letter-spacing: .04em;
+    font-size: 11px; color: #6e7681; margin-bottom: 4px; }
+  .toggle-grid label { display: block; padding: 1px 0; text-transform: capitalize; }
+  .patterns { display: flex; gap: 6px; flex-wrap: wrap; margin: 4px 0 8px; }
+  .pchip { font-size: 12px; padding: 2px 8px; border-radius: 999px; border: 1px solid #30363d; }
+  .pchip.confirmed { border-color: #26a641; color: #26a641; }
+  .pchip.failed { border-color: #6e7681; color: #6e7681; }
+  .pchip.forming { border-color: #d29922; color: #d29922; }
 </style>

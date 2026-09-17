@@ -102,24 +102,33 @@ def analysis(
     explain: bool = Query(False, description="call Claude for the explanation (uses API credit)"),
     context: bool = Query(False, description="also fetch sentiment/positioning (extra network)"),
     limit: int = Query(500, ge=50, le=5000, description="candles returned for the chart"),
+    as_of_bar: int | None = Query(
+        None, ge=0,
+        description="historical scrubbing: recompute as of bar N only (look-ahead-safe)"),
 ) -> dict:
-    key = (symbol, timeframe, explain, context, limit)
+    # `as_of_bar` MUST be in the cache key — otherwise scrubbing to a new bar returns a stale
+    # payload for a different bar. context/derivatives are skipped when scrubbing (they're
+    # current-state and would be anachronistic against a historical bar).
+    key = (symbol, timeframe, explain, context, limit, as_of_bar)
     now = time.time()
     cached = _CACHE.get(key)
     if cached and now - cached[0] < _TTL_SECONDS:
         return cached[1]
 
+    scrubbing = as_of_bar is not None
     try:
-        ctx = gather_context(symbol, cfg) if context else None
-        deriv = gather_derivatives(symbol, cfg) if context else None
+        ctx = gather_context(symbol, cfg) if (context and not scrubbing) else None
+        deriv = gather_derivatives(symbol, cfg) if (context and not scrubbing) else None
         result = advise(symbol, timeframe, cfg, context=ctx, derivatives=deriv,
-                        explain_enabled=explain, refresh_stale=True,
-                        base_rate=BASE_RATES.get(f"{symbol}|{timeframe}"))
+                        explain_enabled=explain, refresh_stale=not scrubbing,
+                        base_rate=BASE_RATES.get(f"{symbol}|{timeframe}"),
+                        as_of_bar=as_of_bar)
     except NotImplementedError as exc:  # e.g. forex before Phase 26
         raise HTTPException(status_code=501, detail=str(exc))
     except Exception as exc:  # data fetch / analysis failure
         raise HTTPException(status_code=502, detail=f"analysis failed: {exc}")
 
     payload = serialize_analysis(result, limit=limit)
+    payload["as_of_bar"] = as_of_bar        # echo so the scrub UI knows the current position
     _CACHE[key] = (now, payload)
     return payload
