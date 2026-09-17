@@ -149,6 +149,18 @@ class ContextConfig(_Strict):
     news: bool = True                # recent headlines (Finnhub, needs FINNHUB_API_KEY)
 
 
+class RegimeConfig(_Strict):
+    # Feature 6 (market regime). Defaults tuned for multi-week trend following on DAILY/WEEKLY
+    # bars (ADX/ATR periods come from IndicatorsConfig; adx_trend_threshold there is reused).
+    atr_percentile_window: int = 100     # rolling window for the ATR-volatility percentile
+    atr_percentile_min_periods: int = 30  # start labelling once this many bars exist (still rolling)
+    slope_window: int = 10               # bars over which the slow-MA slope sets direction
+    slope_flat_pct: float = 1.0          # |slow-MA % change over slope_window| below this = flat
+    vol_high_pct: float = 0.80           # ATR percentile above this (and not trending) = volatile
+    vol_low_pct: float = 0.20            # ATR percentile below this (and not trending) = quiet
+    persist_bars: int = 3                # hysteresis: a new regime must hold this many bars to switch
+
+
 class AdvisorConfig(_Strict):
     model: str = "claude-sonnet-4-6"
     explanation_style: str = "teaching"
@@ -174,6 +186,8 @@ class Config(_Strict):
     timeframes: TimeframesConfig = Field(default_factory=TimeframesConfig)
     # Optional (#7 alerts): defaults apply if config.yaml omits the `alerts:` block.
     alerts: AlertsConfig = Field(default_factory=AlertsConfig)
+    # Optional (Feature 6): defaults apply if config.yaml omits the `regime:` block.
+    regime: RegimeConfig = Field(default_factory=RegimeConfig)
 
     # Injected from .env, not from config.yaml. Optional so the deterministic
     # Layer 1 pipeline (data + detectors) runs without an API key.
