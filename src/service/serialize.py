@@ -25,6 +25,7 @@ from src.indicators.features import (
     COL_RSI,
     COL_VOLUME_MA,
 )
+from src.market.regime import classify_regime
 from src.patterns.chart_patterns import find_chart_patterns
 from src.service.analyze import AnalysisResult
 from src.structure.divergence import find_rsi_divergence
@@ -194,6 +195,15 @@ def serialize_chart(result: AnalysisResult, limit: int = 500, levels_per_side: i
     patterns = _serialize_patterns(result, df, rp)
     divergence = _serialize_divergence(result, df)
 
+    # TEMP (Feature 6 eyeball): per-bar regime label over the window, for a colored strip under
+    # the candles. Warm-up bars (no label yet) are dropped. Standalone — not wired into any vote.
+    regime_full = classify_regime(result.featured, result.cfg)
+    regime = [
+        {"time": _epoch(t), "label": str(v)}
+        for t, v in regime_full.loc[window.index].items()
+        if v is not None and not pd.isna(v)
+    ]
+
     # Feature 1 — synchronised sub-pane series (volume MA, RSI, MACD, ADX, ATR) over the window.
     fw = result.featured.loc[window.index]
     indicators = {
@@ -217,7 +227,7 @@ def serialize_chart(result: AnalysisResult, limit: int = 500, levels_per_side: i
         "total_bars": result.total_bars,
         "indicators": indicators,
         "overlays": {"swings": swings, "levels": levels, "fibonacci": fib, "marker": marker,
-                     "patterns": patterns, "divergence": divergence},
+                     "patterns": patterns, "divergence": divergence, "regime": regime},
     }
 
 

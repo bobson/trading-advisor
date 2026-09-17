@@ -54,6 +54,13 @@
     }
   }
 
+  // TEMP (Feature 6 eyeball): regime -> strip color.
+  const REGIME_COLORS: Record<string, string> = {
+    trending_up: '#26a641', trending_down: '#f85149', ranging: '#8b949e',
+    volatile: '#d29922', quiet: '#3b6ea5',
+  }
+  const regimeColor = (label: string) => REGIME_COLORS[label] ?? '#484f58'
+
   const patternStyle = (p: Pattern) => {
     if (p.state === 'failed') return { color: '#6e7681', width: 1, dashed: true }
     if (p.state === 'confirmed')
@@ -134,6 +141,13 @@
         shape: ov.marker.bias === 'bullish' ? 'arrowUp' : 'arrowDown' })
     markers.sort((a, b) => a.time - b.time)
     series.setMarkers(markers as any)
+
+    // ---- TEMP regime strip (Feature 6 eyeball): a full-height colored bar per candle ----
+    if (ov.regime && ov.regime.length) {
+      const c = newPane('regime', 40)
+      const strip = c.addHistogramSeries({ priceLineVisible: false, lastValueVisible: false })
+      strip.setData(ov.regime.map((r) => ({ time: r.time, value: 1, color: regimeColor(r.label) })) as any)
+    }
 
     // ---- sub-panes ----
     if (toggles.volume) {

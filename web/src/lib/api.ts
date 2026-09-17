@@ -28,6 +28,7 @@ export interface ChartData {
   overlays: {
     levels: Level[]; swings: SwingMarker[]; fibonacci: Fib | null; marker: Marker | null
     patterns: Pattern[]; divergence: Divergence | null
+    regime?: { time: number; label: string }[]   // TEMP: Feature-6 eyeball strip
   }
 }
 // Which overlays/sub-panes are drawn (persisted to localStorage; see App.svelte).
