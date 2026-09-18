@@ -72,4 +72,4 @@ derivatives:                 # Phase 22 — crypto perp positioning (funding + o
 
 advisor:
   model: claude-sonnet-4-6   # see docs.claude.com for current model names; used in Phase 7
-  explanation_style: teaching
+  explanation_style: brief   # brief = §8 word budgets; teaching = fuller breakdown (per-request override in the UI)

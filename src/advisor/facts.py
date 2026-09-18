@@ -36,6 +36,7 @@ from src.indicators.features import (
 )
 from src.patterns.chart_patterns import find_chart_patterns
 from src.signals.confluence import (
+    SIGNAL_CATEGORY,
     evaluate_confluence,
     signal_from_fibonacci,
     signal_from_macd,
@@ -287,14 +288,37 @@ def build_facts(featured_df: pd.DataFrame, swings: pd.DataFrame, cfg: Config) ->
             "agreeing_categories": confluence.agreeing_categories,
             "require_categories": cfg.confluence.require_categories,
             "categories": confluence.categories,
+            # Every signal carries its Layer-1 vote AND category (from the confluence engine's own
+            # SIGNAL_CATEGORY). This is the authoritative classification — Layer 2 narrates it and
+            # must never re-decide bullish/bearish/neutral for a signal.
             "signals": [
-                {"name": s.name, "direction": s.direction, "reason": s.reason}
+                {
+                    "name": s.name,
+                    "direction": s.direction,
+                    "category": SIGNAL_CATEGORY.get(s.name, "other"),
+                    "reason": s.reason,
+                }
                 for s in confluence.signals
             ],
             "mtf_alignment": confluence.mtf_alignment,
             "mtf_trends": confluence.mtf_trends,
         },
     }
+
+
+def _fear_greed_read(value) -> str:
+    """Layer-1 informativeness of a Fear & Greed value, per the analyst guide's §5 bands: only
+    the extremes (<20 / >80) carry a contrarian read; mid-range is deliberately uninformative.
+    This is NOT a directional vote — it tells Layer 2 how much (if any) weight to give it."""
+    try:
+        v = int(value)
+    except (TypeError, ValueError):
+        return "unclassified"
+    if v < 20:
+        return "extreme fear — contrarian caution only, not a directional signal"
+    if v > 80:
+        return "extreme greed — contrarian caution only, not a directional signal"
+    return "mid-range — no directional information (only the <20 / >80 extremes are read contrarily)"
 
 
 def facts_to_prompt(facts: dict) -> str:
@@ -388,10 +412,14 @@ def facts_to_prompt(facts: dict) -> str:
 
     ctx = facts.get("context")
     if ctx:
-        lines.append("MARKET CONTEXT (background — helps avoid being blindsided; context, not prediction):")
+        lines.append("MARKET CONTEXT (CONTEXT ONLY — conditions, never direction. Narrate the "
+                     "label/state as given; NEVER assign a context item a bullish/bearish vote):")
         fg = ctx.get("fear_greed")
         if fg:
-            lines.append(f"  - Crypto Fear & Greed: {fg['value']}/100 ({fg['label']}), as of {fg['as_of']}")
+            lines.append(
+                f"  - Crypto Fear & Greed: {fg['value']}/100 (source label: {fg['label']}) — "
+                f"{_fear_greed_read(fg['value'])}. [as of {fg['as_of']}]"
+            )
         fund = ctx.get("fundamentals")
         if fund:
             mc, v = fund.get("market_cap"), fund.get("volume_24h")
@@ -399,7 +427,8 @@ def facts_to_prompt(facts: dict) -> str:
                 f"  - Fundamentals ({fund['coin']}): market cap "
                 f"{('$%.1fB' % (mc / 1e9)) if mc else 'n/a'}, 24h vol "
                 f"{('$%.1fB' % (v / 1e9)) if v else 'n/a'}, {fund.get('change_24h_pct')}% 24h, "
-                f"{fund.get('ath_change_pct')}% from all-time high"
+                f"{fund.get('ath_change_pct')}% from all-time high "
+                "(regime/liquidity context, not a directional vote)"
             )
         cal = ctx.get("economic_calendar") or []
         if cal:
@@ -418,10 +447,14 @@ def facts_to_prompt(facts: dict) -> str:
 
     deriv = facts.get("derivatives")
     if deriv:
-        lines.append("DERIVATIVES / POSITIONING (crypto perp — leverage crowd; context, not prediction):")
+        lines.append("DERIVATIVES / POSITIONING (CONTEXT ONLY — the leverage crowd, never a "
+                     "trigger; do not turn any of it into a bullish/bearish vote):")
         f = deriv.get("funding")
         if f:
-            lines.append(f"  - Funding: {f['rate_pct']}%/8h ({f['annualized_pct']}%/yr) — {f['state']}")
+            lines.append(
+                f"  - Funding: {f['rate_pct']}%/8h ({f['annualized_pct']}%/yr) — state: {f['state']}. "
+                "Only an EXTREME is a contrarian flag; otherwise no directional information."
+            )
         oi = deriv.get("open_interest")
         if oi:
             notional = f" (~${oi['notional_usd']:,.0f})" if oi.get("notional_usd") else ""
@@ -460,8 +493,10 @@ def facts_to_prompt(facts: dict) -> str:
             "horizon). This is a base rate, NOT a prediction."
         )
 
-    lines.append("Every detector's vote:")
+    lines.append("Every detector's PRE-COMPUTED vote and category (authoritative Layer-1 "
+                 "classification — narrate these, NEVER re-classify a signal yourself):")
     for s in c["signals"]:
-        lines.append(f"  [{s['direction'].upper()}] {s['name']}: {s['reason']}")
+        cat = s.get("category", "other")
+        lines.append(f"  [{s['direction'].upper()} · {cat}] {s['name']}: {s['reason']}")
 
     return "\n".join(lines)

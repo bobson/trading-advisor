@@ -105,11 +105,13 @@ def analysis(
     as_of_bar: int | None = Query(
         None, ge=0,
         description="historical scrubbing: recompute as of bar N only (look-ahead-safe)"),
+    explanation_style: str = Query(
+        "brief", description="explanation mode: 'brief' (word-budgeted) or 'teaching' (fuller)"),
 ) -> dict:
-    # `as_of_bar` MUST be in the cache key — otherwise scrubbing to a new bar returns a stale
-    # payload for a different bar. context/derivatives are skipped when scrubbing (they're
-    # current-state and would be anachronistic against a historical bar).
-    key = (symbol, timeframe, explain, context, limit, as_of_bar)
+    # `as_of_bar` and `explanation_style` MUST be in the cache key — otherwise scrubbing to a new
+    # bar, or switching modes, returns a stale payload. context/derivatives are skipped when
+    # scrubbing (they're current-state and would be anachronistic against a historical bar).
+    key = (symbol, timeframe, explain, context, limit, as_of_bar, explanation_style)
     now = time.time()
     cached = _CACHE.get(key)
     if cached and now - cached[0] < _TTL_SECONDS:
@@ -122,7 +124,7 @@ def analysis(
         result = advise(symbol, timeframe, cfg, context=ctx, derivatives=deriv,
                         explain_enabled=explain, refresh_stale=not scrubbing,
                         base_rate=BASE_RATES.get(f"{symbol}|{timeframe}"),
-                        as_of_bar=as_of_bar)
+                        as_of_bar=as_of_bar, explanation_style=explanation_style)
     except NotImplementedError as exc:  # e.g. forex before Phase 26
         raise HTTPException(status_code=501, detail=str(exc))
     except Exception as exc:  # data fetch / analysis failure

@@ -102,6 +102,7 @@ def advise(
     refresh_stale: bool = False,
     base_rate: Optional[dict] = None,
     as_of_bar: Optional[int] = None,
+    explanation_style: Optional[str] = None,
 ) -> AnalysisResult:
     """Run the full pipeline for one market/timeframe and return a JSON-able result.
 
@@ -112,6 +113,11 @@ def advise(
     no API key is available, so the deterministic result is always produced.
     """
     req = _request_config(cfg, symbol, timeframe)
+    # Per-request explanation mode (brief/teaching) overrides config, without mutating the caller's.
+    if explanation_style is not None:
+        req = req.model_copy(update={
+            "advisor": req.advisor.model_copy(update={"explanation_style": explanation_style})
+        })
     m = req.market
 
     if df is None:

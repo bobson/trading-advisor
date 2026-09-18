@@ -1,84 +1,81 @@
-"""Phase 7 — the reasoning layer: Claude turns Layer 1 facts into a plain-language lesson.
+"""Phase 7 — the reasoning layer: Claude turns Layer 1 facts into a plain-language read.
 
 This is Layer 2, the *voice*. It receives the structured facts assembled by `facts.py` and
-explains them in trading language that teaches as it describes. The single hard rule of the
-project applies here: **Layer 1 facts are authoritative.** Claude explains them, connects
-them, and teaches from them — it never overrides a computed number or flips a computed
-label. If the explanation disagreed with the facts, that would be a bug in how facts are
-fed, not a judgement call.
+explains them. The single hard rule of the project applies: **Layer 1 facts are authoritative** —
+Claude explains and connects them, never overrides a number or flips a label.
 
-The model is config-driven (`cfg.advisor.model`) — the user chose it in `config.yaml`, so we
-honour it rather than hardcoding one. A `cache_control` breakpoint sits on the (stable)
-system prompt; on Sonnet-tier a short teaching prompt is below the cacheable minimum so it's
-effectively a no-op today, but it's the right, forward-looking placement if this ever runs
-in a loop. The call stays deliberately plain (no thinking parameter) so it works across
-whatever model the config names — the reasoning is light narration over facts already
-computed, not fresh analysis.
+ONE SOURCE OF TRUTH for behaviour: the analyst guide in `analyst-guide-system-prompt.md` (loaded
+at import; a missing file is a hard, loud failure). It is the system prompt for EVERY Claude call
+here — `explain`, `synthesize`, and `explain_structured` — so the three can't drift. The
+structured/synthesis calls append a short task-specific note AFTER the guide, but the guide's
+rules bind all of them.
+
+Two output modes (config `advisor.explanation_style`, default `brief`):
+  - brief    — obey the guide's §8 word budgets; `max_tokens` ~400 so the limit is STRUCTURAL,
+               not merely requested.
+  - teaching — a fuller educational breakdown, EXEMPT from §8's word budgets only; every other
+               rule still binds; `max_tokens` 2048.
+
+The guide is byte-identical on every call and sits behind a `cache_control` breakpoint, so it is
+a real prompt-cache prefix (it's well above the cache minimum). The model stays config-driven
+(`cfg.advisor.model`) and the call stays plain (no thinking parameter) for model-agnosticism.
 """
 
 from __future__ import annotations
 
+from pathlib import Path
+
 from src.config import Config
 
-# Stable across runs — keep it byte-identical so it's a clean cache prefix.
-SYSTEM_PROMPT = """You are a trading educator explaining a chart analysis to a learner.
-
-You are given a set of COMPUTED FACTS about a market: trend, momentum (RSI/MACD), \
-support/resistance levels, Fibonacci retracements, candlestick patterns, named chart \
-patterns, and a "confluence" verdict that tallies how many independent signals agree.
-
-Named chart patterns (head & shoulders, double tops, triangles) are BEST-EFFORT geometry \
-that over-calls by design — treat them as lower-confidence hints, calibrate your language \
-accordingly, and lean on the confluence verdict and the harder facts (levels, trend, \
-momentum) as your backbone.
-
-Absolute rules:
-- These computed facts are AUTHORITATIVE. Explain them; never contradict, override, or \
-invent numbers or labels. If you're tempted to disagree with a fact, explain what it means \
-instead.
-- Some facts answer different questions and are complementary, not contradictory. For \
-example, a "nearest resistance" level is ranked by distance, while the confluence \
-support/resistance vote only fires when price is within a proximity threshold — so \
-"resistance at X" and "price is not near a level" can both be true. Do not manufacture a \
-contradiction between complementary facts.
-- You do NOT place trades and you do NOT predict the future. Your value is clarity and \
-education. No financial advice.
-
-Structure your explanation as:
-1. THE SETUP — what the chart is showing right now, in plain terms.
-2. WHY — which signals agree or disagree, and what that confluence (or lack of it) means.
-3. WHAT WOULD INVALIDATE IT — the specific, concrete conditions (a level breaking, a signal \
-flipping) that would change the read.
-
-Teach as you go: briefly define terms a learner might not know. Be concise and grounded — \
-every claim should trace back to a provided fact."""
-
-# Phase 23 — cross-timeframe synthesis. Reasons over the RAW per-timeframe facts (never a
-# summary of separate write-ups — that loses precision and can't catch real conflicts).
-SYNTHESIS_SYSTEM_PROMPT = """You are a trading educator giving ONE cross-timeframe read of a \
-single market.
-
-You are given the COMPUTED FACTS for the SAME market on several timeframes, each with an \
-authority weight (higher timeframe = more weight). The disciplined way to read multiple \
-timeframes:
-- HIGHER timeframes set the DIRECTION / bias.
-- LOWER timeframes are for TIMING and entry, and must never override a higher-timeframe read.
-
-Your job:
-1. State the higher-timeframe direction.
-2. Say EXPLICITLY whether the timeframes ALIGN (all pointing the same way — a stronger read) \
-or CONFLICT (e.g. daily up but 1h making lower highs — a mixed, lower-confidence picture).
-3. If they align, where the lower timeframe suggests timing; if they conflict, say to wait / \
-treat it as low-confidence.
-
-Absolute rules: the computed facts are AUTHORITATIVE — never invent or contradict numbers. \
-You do not predict the future and give no financial advice; this is clarity and education."""
+# The analyst guide IS the system prompt. Load it once, at import, and fail loudly if it's gone —
+# a silent fallback to some other prompt is exactly the drift this wiring exists to prevent.
+_GUIDE_PATH = Path(__file__).with_name("analyst-guide-system-prompt.md")
+try:
+    ANALYST_GUIDE = _GUIDE_PATH.read_text(encoding="utf-8")
+except OSError as exc:  # missing / unreadable
+    raise RuntimeError(
+        f"Analyst guide system prompt not found at {_GUIDE_PATH} — Layer 2 cannot run without it."
+    ) from exc
 
 
-_STYLE_NOTE = {
-    "teaching": "Explain like a patient mentor teaching a beginner; define jargon in a few words as it comes up.",
-    "concise": "Be brief and direct; assume the reader knows basic trading terms.",
+# Output modes. `note` is appended AFTER the guide (small, uncached); `max_tokens` makes the brief
+# ceiling structural, not merely requested.
+_MODES = {
+    "brief": {
+        "max_tokens": 400,
+        "note": (
+            "OUTPUT MODE: BRIEF. Section 8's word budgets are HARD CEILINGS — obey them "
+            "(no clear setup 30, mildly notable 70, confirmed setup 130, multi-timeframe 150). "
+            "Follow §8's format exactly: no headings, no preamble, name only the 2–3 facts that "
+            "carry the read. If it will not fit the budget, say the read is unclear instead."
+        ),
+    },
+    "teaching": {
+        "max_tokens": 2048,
+        "note": (
+            "OUTPUT MODE: TEACHING. You are EXEMPT from Section 8's WORD BUDGETS ONLY — give a "
+            "fuller educational breakdown and define terms as you go. EVERY OTHER RULE in the "
+            "guide still binds without exception: facts are authoritative, invent no numbers or "
+            "labels, force no signal where none exists, make no prediction, give no financial "
+            "advice."
+        ),
+    },
 }
+DEFAULT_MODE = "brief"
+
+
+def _mode(cfg: Config) -> dict:
+    return _MODES.get(cfg.advisor.explanation_style, _MODES[DEFAULT_MODE])
+
+
+def _system(mode: dict, task_note: str = "") -> list[dict]:
+    """System prompt: the guide as a CACHED prefix (identical every call), then the small
+    task/mode note as a separate, uncached block so it never invalidates the guide cache."""
+    tail = f"{task_note}\n\n{mode['note']}" if task_note else mode["note"]
+    return [
+        {"type": "text", "text": ANALYST_GUIDE, "cache_control": {"type": "ephemeral"}},
+        {"type": "text", "text": tail},
+    ]
 
 
 def build_messages(facts_text: str) -> list[dict]:
@@ -105,6 +102,21 @@ ANALYSIS_TOOL = {
 
 _STRUCTURED_FIELDS = ("setup", "why", "invalidation")
 
+_STRUCTURED_NOTE = (
+    "TASK: return the analysis via the emit_analysis tool as three fields — `setup` (the read), "
+    "`why`, and `invalidation` — instead of prose. Each field obeys the guide's rules and, in "
+    "brief mode, its §8 word budgets."
+)
+
+_SYNTHESIS_NOTE = (
+    "TASK: give ONE cross-timeframe read of the SAME market from the per-timeframe facts below "
+    "(each labeled with an authority weight). Reason over the RAW facts, not summaries. Higher "
+    "timeframes set DIRECTION/bias; lower timeframes are for TIMING only and never override them. "
+    "State the higher-timeframe direction, say EXPLICITLY whether the timeframes ALIGN or CONFLICT, "
+    "and give the timing if they align or 'wait / low-confidence' if they conflict. This is the "
+    "multi-timeframe case in §8."
+)
+
 
 def build_synthesis_messages(per_tf: list[tuple[str, str, float]]) -> list[dict]:
     """The user turn: each timeframe's raw facts text, labeled with its authority weight."""
@@ -118,52 +130,44 @@ def build_synthesis_messages(per_tf: list[tuple[str, str, float]]) -> list[dict]
     }]
 
 
-def synthesize(per_tf: list[tuple[str, str, float]], cfg: Config, client=None, max_tokens: int = 1024) -> str:
+def synthesize(per_tf: list[tuple[str, str, float]], cfg: Config, client=None, max_tokens: int | None = None) -> str:
     """One cross-timeframe read from the per-timeframe facts.
 
     `per_tf` is a list of `(timeframe, facts_text, weight)` — the RAW facts text per timeframe,
-    not summaries. `client` is injectable for tests.
+    not summaries. `client` is injectable for tests. Uses the shared analyst guide + a synthesis
+    note; `max_tokens` defaults to the current mode's budget.
     """
     if client is None:
         import anthropic
 
         client = anthropic.Anthropic(api_key=cfg.require_api_key())
 
-    system = [{"type": "text", "text": SYNTHESIS_SYSTEM_PROMPT, "cache_control": {"type": "ephemeral"}}]
+    mode = _mode(cfg)
     response = client.messages.create(
         model=cfg.advisor.model,
-        max_tokens=max_tokens,
-        system=system,
+        max_tokens=max_tokens or mode["max_tokens"],
+        system=_system(mode, _SYNTHESIS_NOTE),
         messages=build_synthesis_messages(per_tf),
     )
     return "".join(b.text for b in response.content if getattr(b, "type", None) == "text").strip()
 
 
-def explain_structured(facts_text: str, cfg: Config, client=None, max_tokens: int = 1024) -> dict:
+def explain_structured(facts_text: str, cfg: Config, client=None, max_tokens: int | None = None) -> dict:
     """Like `explain`, but returns `{setup, why, invalidation}` via a forced tool call.
 
-    Same authoritative-facts rules as `explain` (the system prompt is shared). `client` is
-    injectable for tests; extraction is defensive so a malformed response raises a clear error
-    rather than a KeyError.
+    Same authoritative-facts guide and output mode as `explain`. `client` is injectable for tests;
+    extraction is defensive so a malformed response raises a clear error rather than a KeyError.
     """
     if client is None:
         import anthropic
 
         client = anthropic.Anthropic(api_key=cfg.require_api_key())
 
-    style = _STYLE_NOTE.get(cfg.advisor.explanation_style, _STYLE_NOTE["teaching"])
-    system = [
-        {
-            "type": "text",
-            "text": f"{SYSTEM_PROMPT}\n\nStyle: {style}",
-            "cache_control": {"type": "ephemeral"},
-        }
-    ]
-
+    mode = _mode(cfg)
     response = client.messages.create(
         model=cfg.advisor.model,
-        max_tokens=max_tokens,
-        system=system,
+        max_tokens=max_tokens or mode["max_tokens"],
+        system=_system(mode, _STRUCTURED_NOTE),
         messages=build_messages(facts_text),
         tools=[ANALYSIS_TOOL],
         tool_choice={"type": "tool", "name": "emit_analysis"},
@@ -179,31 +183,23 @@ def explain_structured(facts_text: str, cfg: Config, client=None, max_tokens: in
     raise RuntimeError("model did not return an emit_analysis tool call")
 
 
-def explain(facts_text: str, cfg: Config, client=None, max_tokens: int = 2048) -> str:
+def explain(facts_text: str, cfg: Config, client=None, max_tokens: int | None = None) -> str:
     """Send the facts to Claude and return the plain-language explanation.
 
     `client` is injectable for testing; in normal use it's created here from the API key.
-    Requires `ANTHROPIC_API_KEY` (via `cfg.require_api_key()`) — this is the one place in
-    the pipeline that needs it.
+    Requires `ANTHROPIC_API_KEY` (via `cfg.require_api_key()`). The system prompt is the shared
+    analyst guide; `max_tokens` defaults to the current mode's budget (brief ~400, teaching 2048).
     """
     if client is None:
         import anthropic
 
         client = anthropic.Anthropic(api_key=cfg.require_api_key())
 
-    style = _STYLE_NOTE.get(cfg.advisor.explanation_style, _STYLE_NOTE["teaching"])
-    system = [
-        {
-            "type": "text",
-            "text": f"{SYSTEM_PROMPT}\n\nStyle: {style}",
-            "cache_control": {"type": "ephemeral"},
-        }
-    ]
-
+    mode = _mode(cfg)
     response = client.messages.create(
         model=cfg.advisor.model,
-        max_tokens=max_tokens,
-        system=system,
+        max_tokens=max_tokens or mode["max_tokens"],
+        system=_system(mode),
         messages=build_messages(facts_text),
     )
 
