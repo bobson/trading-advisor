@@ -28,6 +28,7 @@ from typing import Optional
 
 import pandas as pd
 
+from src.backtest.costs import CostReport, apply_costs
 from src.config import Config
 from src.indicators.features import add_features
 from src.signals.confluence import (
@@ -88,6 +89,7 @@ class BacktestReport:
     by_agreeing: dict[str, Stats] = field(default_factory=dict)  # "2 cats" vs "3+ cats"
     downgraded: int = 0  # setups the multi-timeframe gate vetoed (Phase 16)
     outcomes: list[SetupOutcome] = field(default_factory=list)
+    costs: Optional[CostReport] = None  # Feature 10 — net-of-costs results (None when disabled/empty)
 
     def summary(self) -> str:
         lines = [
@@ -119,6 +121,8 @@ class BacktestReport:
             "CAVEAT: with step small the forward windows overlap, so N is NOT independent "
             "trials and a good number is not proof of an edge. Always read win-rate next to n.",
         ]
+        if self.costs is not None:
+            lines += ["", self.costs.summary()]
         return "\n".join(lines)
 
 
@@ -216,6 +220,9 @@ def evaluate(
         "2 cats": Stats.from_outcomes([o for o in outcomes if o.agreeing_categories == 2]),
         "3+ cats": Stats.from_outcomes([o for o in outcomes if o.agreeing_categories >= 3]),
     }
+    # Feature 10 — net-of-costs results applied by DEFAULT (a backtest without costs is fiction).
+    costs = apply_costs(outcomes, cfg, featured=featured_full) if cfg.costs.enabled else None
+
     return BacktestReport(
         symbol=cfg.market.symbol,
         timeframe=cfg.market.timeframe,
@@ -229,4 +236,5 @@ def evaluate(
         by_agreeing=by_agreeing,
         downgraded=downgraded,
         outcomes=outcomes,
+        costs=costs,
     )

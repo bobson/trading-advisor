@@ -5,35 +5,61 @@ A state file for the Tier-1 "learning instrument" build. Planning docs: `final-r
 
 ## Current state
 
-**Built:** Feature 1 (pattern visualization + multi-panel research view + history scrubber) and
-Feature 6 (market regime classifier), both merged to `main`; a post-merge hardening pass
-(`fix/explanation-and-chart`, merged: chart panning/right-edge fixes, analyst guide wired in as
-the real system prompt with brief/teaching modes, signal classification moved into the facts
-payload); and **Feature 9 (risk of ruin & position sizing)** — implemented on
-`feature/risk-of-ruin`, **not yet committed/merged**. **239 tests green, ruff clean.** Regime is
-still standalone infrastructure (a committed strip overlay eyeballs it) — not in any vote/facts;
-the encyclopedia consumes it next.
+**Built:** Feature 1 (pattern visualization + multi-panel research view + history scrubber),
+Feature 6 (market regime classifier), a hardening pass (`fix/explanation-and-chart`: chart
+panning/right-edge fixes, analyst guide wired in as the real system prompt with brief/teaching
+modes, signal classification moved into the facts payload), and **Feature 9 (risk of ruin &
+position sizing)** — all merged to `main` (Feature 9 = commit `41232b4`). Plus **Feature 10
+(honest cost model)** — implemented on `feature/cost-model`, **not yet committed/merged**. **247
+tests green, ruff clean.** Regime is still standalone infrastructure (a committed strip overlay
+eyeballs it) — not in any vote/facts; the encyclopedia consumes it next.
 
 **Explanation layer:** driven by `src/advisor/analyst-guide-system-prompt.md` (loaded at startup,
 cached prompt prefix). Default mode `brief` (enforces the guide's §8 word budgets); `teaching`
 for long-form; toggle in the UI.
 
-**Next (SURVIVAL-SPEC.md revised order — 1 ✓, 6 ✓, 9 ✓):** Feature 10 (honest cost model) →
-Feature 2 (pattern confirmation states) → Feature 8 (exit-rule laboratory) → Feature 3 (empirical
-pattern encyclopedia) → Feature 4 (prediction journal + calibration) → 11 (pre-registration) →
-12 (behavioural circuit breaker) → 5 (blind mode) → 7 (integrity guard).
+**Next (SURVIVAL-SPEC.md revised order — 1 ✓, 6 ✓, 9 ✓, 10 ✓):** Feature 2 (pattern confirmation
+states) → Feature 8 (exit-rule laboratory) → Feature 3 (empirical pattern encyclopedia) →
+Feature 4 (prediction journal + calibration) → 11 (pre-registration) → 12 (behavioural circuit
+breaker) → 5 (blind mode) → 7 (integrity guard).
 
 **Default config:** symbol `BTC/USDT`, timeframe `1h`, exchange `binance`, history 4320 bars.
 Selectable timeframes: `15m, 30m, 1h, 4h, 1d`. Registered pairs: BTC/ETH/SOL/XRP (USDT) +
-EUR/USD, GBP/USD (forex via Twelve Data). Feature 9 added **no config** (all inputs are
-per-request / UI).
+EUR/USD, GBP/USD (forex via Twelve Data). Feature 9 added no config; **Feature 10 adds a `costs:`
+block** (`CostsConfig`: `enabled` default true + spread/fee/slippage/funding/financing/tax rates;
+defaults apply if `config.yaml` omits it).
 
 ---
 
 ## Log (newest first)
 
+### Feature 10 — Honest cost model
+- **Status:** implemented 2026-09-19 · **branch:** `feature/cost-model` (**not yet committed/merged**)
+- **Done-when:** every backtest reports net-of-everything by default, and you can see what fraction
+  of the gross edge costs consume. Confirmed live (BTC 1d, 506 setups): **gross +0.45%/trade →
+  net −0.14%** (win 50%→48%) — a gross-positive setup flips **net-negative after costs**. Costs
+  consume **~133% of the gross edge**; breakeven needs a **51% win-rate vs the current 50%** (at
+  payoff 1.10), or a 1.13 payoff at the current win-rate. Slippage dominates (~48 bps of ~60).
+- **Build:** `src/backtest/costs.py` — per-trade round-trip cost as a fraction of notional:
+  spread (crypto bps; forex pip-spread per pair, session-aware), taker fees (both sides),
+  volatility-scaled slippage (`mult × ATR/price`), signed perp funding over the holding period,
+  forex overnight financing, configurable tax on realised gains. `evaluate()` applies it by
+  default (`costs.enabled`); `BacktestReport.costs` + `summary()` show gross vs net, per-component
+  bps, cost-share-of-edge, and a breakeven win-rate/payoff. 8 new tests.
+- **Deviations:** funding & crypto spread come from CONFIG defaults, not per-bar live data — the
+  historical backtest doesn't carry live order-book spread or funding, so a universal config rate
+  is used (funding still signed by direction: longs pay positive). Tax defaults to 0 (jurisdiction-
+  specific, opt-in); the transaction costs apply regardless. Session spread multipliers are module
+  constants (base spread is config). Gross stats are unchanged, so base_rate/suite/snapshot are
+  untouched — costs are purely additive.
+- **Learned:** volatility-scaled **slippage dominates** (~48 bps vs ~12 for spread+fees on daily
+  crypto) — "fixed slippage is a lie" is the load-bearing choice; it's what flips gross-positive to
+  net-negative. "Cost as % of gross profit" is ambiguous: against gross WINNINGS it read a
+  reassuring 13% next to a net-NEGATIVE result; against the gross EDGE (total pre-cost P&L) it
+  reads 133% — the honest denominator, consistent with net-negative.
+
 ### Feature 9 — Risk of ruin & position sizing
-- **Status:** implemented 2026-09-19 · **branch:** `feature/risk-of-ruin` (**not yet committed/merged**)
+- **Status:** implemented 2026-09-19 · **branch:** `feature/risk-of-ruin` → **merged to `main`** (commit `41232b4`)
 - **Done-when:** enter your own measured stats → see probability of ruin, expected worst drawdown,
   and a sized position, and the numbers *sober* rather than reassure. Confirmed live: 45% win at
   1:1 payoff → ~100% chance of a 50% drawdown before doubling at any risk level; full-Kelly median

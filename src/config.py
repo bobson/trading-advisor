@@ -161,6 +161,19 @@ class RegimeConfig(_Strict):
     persist_bars: int = 3                # hysteresis: a new regime must hold this many bars to switch
 
 
+class CostsConfig(_Strict):
+    # Feature 10 — the honest cost model, applied to every backtest by default (a backtest
+    # without costs is fiction). All rates are round-trip unless noted; bps = basis points.
+    enabled: bool = True
+    crypto_spread_bps: float = 2.0        # round-trip order-book spread, bps of price (crypto)
+    forex_spread_pips: float = 1.0        # base pip spread for majors (widened by session)
+    taker_fee_bps: float = 5.0            # exchange taker fee PER SIDE, bps
+    slippage_atr_mult: float = 0.05       # slippage per side = mult × (ATR / price) — volatility-scaled
+    funding_bps_8h: float = 1.0           # perp funding per 8h, bps of notional (crypto; longs pay when +)
+    forex_financing_bps_day: float = 0.5  # overnight/weekend financing per day, bps (forex CFD)
+    tax_rate: float = 0.0                 # drag on REALISED gains (0 = off; set to your rate — its absence flatters results)
+
+
 class AdvisorConfig(_Strict):
     model: str = "claude-sonnet-4-6"
     # Explanation mode (Layer 2). "brief" enforces the analyst guide's §8 word budgets (default);
@@ -191,6 +204,8 @@ class Config(_Strict):
     alerts: AlertsConfig = Field(default_factory=AlertsConfig)
     # Optional (Feature 6): defaults apply if config.yaml omits the `regime:` block.
     regime: RegimeConfig = Field(default_factory=RegimeConfig)
+    # Optional (Feature 10): defaults apply if config.yaml omits the `costs:` block.
+    costs: CostsConfig = Field(default_factory=CostsConfig)
 
     # Injected from .env, not from config.yaml. Optional so the deterministic
     # Layer 1 pipeline (data + detectors) runs without an API key.
