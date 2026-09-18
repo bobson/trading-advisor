@@ -8,6 +8,7 @@
   let symbol = $state('BTC/USDT')
   let timeframe = $state('1h')
   let explain = $state(false)
+  let explanationStyle = $state<'brief' | 'teaching'>('brief')
   let auto = $state(false)
   let loading = $state(false)
   let error = $state<string | null>(null)
@@ -66,7 +67,7 @@
     try {
       // Skip context/explain while scrubbing (current-state context is anachronistic on a past bar).
       const scrubbing = asOfBar != null
-      result = await getAnalysis(symbol, timeframe, scrubbing ? false : useExplain, !scrubbing, asOfBar)
+      result = await getAnalysis(symbol, timeframe, scrubbing ? false : useExplain, !scrubbing, asOfBar, 5000, explanationStyle)
     } catch (e: any) {
       error = e.message
       result = null
@@ -100,6 +101,12 @@
       {#each timeframes as t}<option value={t}>{t}</option>{/each}
     </select>
     <label class="explain"><input type="checkbox" bind:checked={explain} /> explain (uses API credit)</label>
+    {#if explain}
+      <select class="mode" bind:value={explanationStyle} title="explanation length">
+        <option value="brief">brief</option>
+        <option value="teaching">teaching</option>
+      </select>
+    {/if}
     <label class="explain"><input type="checkbox" bind:checked={auto} /> auto-refresh (30s)</label>
     <button onclick={() => run()} disabled={loading}>{loading ? 'Analyzing…' : 'Analyze'}</button>
   </div>

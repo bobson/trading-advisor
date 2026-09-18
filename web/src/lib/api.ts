@@ -59,10 +59,14 @@ async function get<T>(path: string): Promise<T> {
 
 export const getPairs = () => get<Pair[]>('/pairs')
 export const getTimeframes = () => get<string[]>('/timeframes')
+// limit = candles returned. Default 5000 (the API cap) so the chart holds the FULL history and
+// you can pan all the way back, not just the last 500 bars.
 export const getAnalysis = (
-  symbol: string, timeframe: string, explain = false, context = true, asOfBar: number | null = null,
+  symbol: string, timeframe: string, explain = false, context = true,
+  asOfBar: number | null = null, limit = 5000, explanationStyle = 'brief',
 ) =>
   get<Analysis>(
     `/analysis?symbol=${encodeURIComponent(symbol)}&timeframe=${timeframe}&explain=${explain}` +
-      `&context=${context}` + (asOfBar != null ? `&as_of_bar=${asOfBar}` : ''),
+      `&context=${context}&limit=${limit}&explanation_style=${explanationStyle}` +
+      (asOfBar != null ? `&as_of_bar=${asOfBar}` : ''),
   )

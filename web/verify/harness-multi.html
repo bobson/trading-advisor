@@ -1,0 +1,58 @@
+<!doctype html>
+<html>
+<head><meta charset="utf-8" /><style>html,body{margin:0;background:#0e1117}.pane{position:relative}</style></head>
+<body>
+  <div id="root" style="width:900px"></div>
+  <script src="../node_modules/lightweight-charts/dist/lightweight-charts.standalone.production.js"></script>
+  <script>
+    // Mirrors PriceChart.svelte's multi-pane structure: a main price chart + two synced sub-panes,
+    // time-scale sync with a reentrancy guard, and the manual right-edge clamp on the main. Sub
+    // series start later than the candles (warm-up) so the differing-length case is exercised.
+    const { createChart } = LightweightCharts;
+    const RIGHT_OFFSET = 25, N = 300;
+    const root = document.getElementById('root');
+    const charts = [];
+    let syncing = false;
+
+    // Only the MAIN pane owns edge behavior (fixLeftEdge + rightOffset). Sub-panes are passive
+    // followers (no fixEdges) so their warm-up-trimmed data can't clamp and push back through sync.
+    const baseOpts = (h, isMain) => ({
+      height: h, width: 900,
+      layout: { background: { color: '#0e1117' }, textColor: '#c9d1d9' },
+      grid: { vertLines: { color: '#1c2128' }, horzLines: { color: '#1c2128' } },
+      timeScale: { timeVisible: true, borderColor: '#30363d', fixLeftEdge: isMain, fixRightEdge: false, rightOffset: RIGHT_OFFSET },
+      rightPriceScale: { borderColor: '#30363d', minimumWidth: 68 },
+      handleScroll: { mouseWheel: true, pressedMouseMove: true, horzTouchDrag: true, vertTouchDrag: false },
+      handleScale: { mouseWheel: true, pinch: true, axisPressedMouseMove: { time: false, price: false }, axisDoubleClickReset: { time: true, price: true } },
+    });
+    const newPane = (h, isMain) => { const d = document.createElement('div'); d.className = 'pane'; root.appendChild(d); const c = createChart(d, baseOpts(h, isMain)); charts.push(c); return c; };
+
+    const start = 1600000000, candles = [];
+    for (let i = 0; i < N; i++) { const o = 100 + i * 0.4 + Math.sin(i / 6) * 8; const c = o + Math.sin(i / 3) * 3; candles.push({ time: start + i * 86400, open: o, high: Math.max(o, c) + 2, low: Math.min(o, c) - 2, close: c }); }
+
+    const main = newPane(400, true);
+    const s = main.addCandlestickSeries({ upColor: '#26a641', downColor: '#f85149', borderVisible: false });
+    s.setData(candles);
+    // two sub-panes with warm-up-trimmed line data (different lengths, like RSI/MACD)
+    const sub1 = newPane(110, false); sub1.addLineSeries({ color: '#d29922' }).setData(candles.slice(30).map((k) => ({ time: k.time, value: 50 + Math.sin(k.time / 5e5) * 20 })));
+    const sub2 = newPane(110, false); sub2.addLineSeries({ color: '#58a6ff' }).setData(candles.slice(20).map((k) => ({ time: k.time, value: Math.sin(k.time / 4e5) * 3 })));
+
+    for (const src of charts) src.timeScale().subscribeVisibleTimeRangeChange((range) => {
+      if (syncing || !range) return; syncing = true;
+      for (const dst of charts) if (dst !== src) dst.timeScale().setVisibleRange(range); syncing = false;
+    });
+
+    const maxRight = N - 1 + RIGHT_OFFSET;
+    let clamping = false;
+    main.timeScale().subscribeVisibleLogicalRangeChange((r) => {
+      if (!r || clamping || r.to <= maxRight) return;
+      clamping = true;
+      main.timeScale().setVisibleLogicalRange({ from: maxRight - (r.to - r.from), to: maxRight });
+      clamping = false;
+    });
+    main.timeScale().setVisibleLogicalRange({ from: 0, to: maxRight });
+
+    window.__main = main; window.__charts = charts; window.__N = N; window.__RIGHT_OFFSET = RIGHT_OFFSET; window.__ready = true;
+  </script>
+</body>
+</html>

@@ -163,7 +163,10 @@ class RegimeConfig(_Strict):
 
 class AdvisorConfig(_Strict):
     model: str = "claude-sonnet-4-6"
-    explanation_style: str = "teaching"
+    # Explanation mode (Layer 2). "brief" enforces the analyst guide's §8 word budgets (default);
+    # "teaching" gives a fuller educational breakdown, exempt from the budgets but bound by every
+    # other guide rule. See src/advisor/explain.py.
+    explanation_style: str = "brief"
 
 
 class Config(_Strict):

@@ -1,0 +1,77 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <style>html,body{margin:0;background:#0e1117}#c{width:900px;height:400px}</style>
+</head>
+<body>
+  <div id="c"></div>
+  <script src="../node_modules/lightweight-charts/dist/lightweight-charts.standalone.production.js"></script>
+  <script>
+    // Parameterized so drive.mjs can compare configs in a REAL browser:
+    //   A: fixRightEdge:false + rightOffset gap (no whitespace)
+    //   B: fixRightEdge:true  + whitespace gap  (rightOffset:0)
+    //   C: fixRightEdge:false + whitespace gap  (rightOffset:0)
+    const { createChart } = LightweightCharts;
+    const RIGHT_OFFSET = 25;
+    const N = 300;
+    const mode = new URLSearchParams(location.search).get('mode') || 'B';
+    const cfg = {
+      A: { fixRight: false, whitespace: false, rOffset: RIGHT_OFFSET },
+      B: { fixRight: true, whitespace: true, rOffset: 0 },
+      C: { fixRight: false, whitespace: true, rOffset: 0 },
+      // D: left edge fixed; right edge free but MANUALLY clamped so `to` never passes
+      // last-candle + RIGHT_OFFSET — a bounded hard stop that rests in a permanent gap.
+      D: { fixRight: false, whitespace: false, rOffset: RIGHT_OFFSET, clamp: true },
+    }[mode];
+
+    const candles = [];
+    const start = 1600000000;
+    for (let i = 0; i < N; i++) {
+      const o = 100 + i * 0.4 + Math.sin(i / 6) * 8;
+      const c = o + Math.sin(i / 3) * 3;
+      candles.push({ time: start + i * 86400, open: o, high: Math.max(o, c) + 2, low: Math.min(o, c) - 2, close: c });
+    }
+    const chart = createChart(document.getElementById('c'), {
+      height: 400, width: 900,
+      layout: { background: { color: '#0e1117' }, textColor: '#c9d1d9' },
+      grid: { vertLines: { color: '#1c2128' }, horzLines: { color: '#1c2128' } },
+      timeScale: { timeVisible: true, borderColor: '#30363d', fixLeftEdge: true, fixRightEdge: cfg.fixRight, rightOffset: cfg.rOffset },
+      rightPriceScale: { borderColor: '#30363d', minimumWidth: 68 },
+      handleScroll: { mouseWheel: true, pressedMouseMove: true, horzTouchDrag: true, vertTouchDrag: false },
+      handleScale: { mouseWheel: true, pinch: true, axisPressedMouseMove: { time: false, price: false }, axisDoubleClickReset: { time: true, price: true } },
+    });
+    const s = chart.addCandlestickSeries({ upColor: '#26a641', downColor: '#f85149', borderVisible: false, wickUpColor: '#26a641', wickDownColor: '#f85149' });
+    let data = candles.slice();
+    if (cfg.whitespace) {
+      const step = candles[N - 1].time - candles[N - 2].time;
+      for (let k = 1; k <= RIGHT_OFFSET; k++) data.push({ time: candles[N - 1].time + k * step });
+    }
+    s.setData(data);
+    const last = candles[N - 1].close;
+    [['support', last - 20], ['support', last - 35], ['support', last - 50],
+     ['resistance', last + 15], ['resistance', last + 30], ['resistance', last + 45]].forEach(([role, price]) => {
+      s.createPriceLine({ price, color: role === 'support' ? '#26a641' : '#f85149', lineWidth: 1, lineStyle: 0, axisLabelVisible: true, title: role + ' (3)' });
+    });
+    [0, 0.236, 0.382, 0.5, 0.618, 1].forEach((r) => {
+      s.createPriceLine({ price: last - 30 + r * 60, color: '#8b949e', lineWidth: 1, lineStyle: 2, axisLabelVisible: true, title: 'fib ' + (r * 100).toFixed(1) + '%' });
+    });
+    if (cfg.clamp) {
+      const MAX = N - 1 + cfg.rOffset;
+      let clamping = false;
+      chart.timeScale().subscribeVisibleLogicalRangeChange((r) => {
+        if (!r || clamping || r.to <= MAX) return;
+        clamping = true;
+        chart.timeScale().setVisibleLogicalRange({ from: MAX - (r.to - r.from), to: MAX });
+        clamping = false;
+      });
+    }
+    if (mode === 'A' || mode === 'D') chart.timeScale().scrollToRealTime(); else chart.timeScale().fitContent();
+    window.__chart = chart;
+    window.__N = N;
+    window.__RIGHT_OFFSET = RIGHT_OFFSET;
+    window.__mode = mode;
+    window.__ready = true;
+  </script>
+</body>
+</html>

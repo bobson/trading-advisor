@@ -25,36 +25,43 @@
     "require_categories": 2,
     "signals": [
       {
+        "category": "trend",
         "direction": "neutral",
         "name": "trend",
         "reason": "Swing highs and lows are not consistently rising or falling."
       },
       {
+        "category": "momentum",
         "direction": "neutral",
         "name": "rsi",
         "reason": "RSI is 40, in the neutral zone."
       },
       {
+        "category": "momentum",
         "direction": "bearish",
         "name": "macd",
         "reason": "MACD line is below its signal line (bearish momentum)."
       },
       {
+        "category": "structure",
         "direction": "bearish",
         "name": "candlestick",
         "reason": "The last candle is a shooting star (potential bearish reversal)."
       },
       {
+        "category": "structure",
         "direction": "bearish",
         "name": "support_resistance",
         "reason": "Price is testing resistance near 64166.59."
       },
       {
+        "category": "structure",
         "direction": "neutral",
         "name": "fibonacci",
         "reason": "Price is not near a key Fibonacci level."
       },
       {
+        "category": "volume",
         "direction": "neutral",
         "name": "volume",
         "reason": "Volume is 0.6x its average \u2014 below the 1.2x bar, so the move is not confirmed by participation."
