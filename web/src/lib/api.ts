@@ -51,11 +51,43 @@ export interface Analysis {
   [k: string]: any
 }
 
+// --- Feature 9: risk of ruin & position sizing ---
+export interface RiskResult {
+  inputs: Record<string, number>
+  ruin: {
+    analytic: number
+    monte_carlo: { prob: number; ci_low: number; ci_high: number; unresolved: number; n_paths: number }
+  }
+  kelly: { edge: number; full: number; half: number; quarter: number; has_edge: boolean }
+  kelly_drawdowns: Record<string, { fraction: number; median_drawdown: number; p90_drawdown: number }>
+  table: { payoff_ratio: number; win_rates: number[]; drawdown: number; target: number; rows: { risk_fraction: number; ruin: number[] }[] }
+  position?: { risk_amount: number; stop_distance: number; stop_distance_pct: number; units: number; position_value: number; leverage: number }
+  position_error?: string
+}
+export interface MeasuredStats {
+  win_rate: number | null; win_rate_ci: [number, number] | null
+  payoff_ratio: number | null; n: number; source: string; thin: boolean
+}
+
 async function get<T>(path: string): Promise<T> {
   const r = await fetch(API_BASE + path)
   if (!r.ok) throw new Error(`${r.status}: ${await r.text()}`)
   return r.json() as Promise<T>
 }
+
+export const getRisk = (p: {
+  win_rate: number; payoff_ratio: number; risk_fraction: number; account: number; entry?: number; stop?: number
+}) => {
+  const q = new URLSearchParams({
+    win_rate: String(p.win_rate), payoff_ratio: String(p.payoff_ratio),
+    risk_fraction: String(p.risk_fraction), account: String(p.account),
+  })
+  if (p.entry != null) q.set('entry', String(p.entry))
+  if (p.stop != null) q.set('stop', String(p.stop))
+  return get<RiskResult>('/risk?' + q.toString())
+}
+export const getMeasured = (symbol: string, timeframe: string) =>
+  get<MeasuredStats>(`/risk/measured?symbol=${encodeURIComponent(symbol)}&timeframe=${timeframe}`)
 
 export const getPairs = () => get<Pair[]>('/pairs')
 export const getTimeframes = () => get<string[]>('/timeframes')

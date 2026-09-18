@@ -17,6 +17,7 @@ from __future__ import annotations
 
 import logging
 import time
+from dataclasses import asdict
 
 from fastapi import Depends, FastAPI, Header, HTTPException, Query, Request
 from fastapi.middleware.cors import CORSMiddleware
@@ -134,3 +135,47 @@ def analysis(
     payload["as_of_bar"] = as_of_bar        # echo so the scrub UI knows the current position
     _CACHE[key] = (now, payload)
     return payload
+
+
+@app.get("/risk", dependencies=_GUARDS)
+def risk(
+    win_rate: float = Query(..., ge=0.0, le=1.0, description="measured win rate (0–1)"),
+    payoff_ratio: float = Query(1.0, gt=0.0, description="avg win / avg loss"),
+    risk_fraction: float = Query(0.01, gt=0.0, lt=1.0, description="fraction of account risked per trade"),
+    account: float = Query(10_000.0, gt=0.0),
+    entry: float | None = Query(None, gt=0.0),
+    stop: float | None = Query(None, gt=0.0),
+    drawdown: float = Query(0.5, gt=0.0, lt=1.0, description="drawdown that counts as ruin"),
+    target: float = Query(2.0, gt=1.0, description="equity multiple that counts as success"),
+) -> dict:
+    """Feature 9 — the survival maths for the calculator: analytic + Monte Carlo risk of ruin,
+    Kelly sizing with the drawdown pain, the risk×win-rate ruin table, and (if entry/stop given)
+    a sized position. Pure math, no market data — deliberately sobering, not reassuring."""
+    from src.risk import ruin as R
+
+    out: dict = {
+        "inputs": {"win_rate": win_rate, "payoff_ratio": payoff_ratio, "risk_fraction": risk_fraction,
+                   "account": account, "drawdown": drawdown, "target": target},
+        "ruin": {
+            "analytic": R.risk_of_ruin_analytic(win_rate, payoff_ratio, risk_fraction, drawdown=drawdown, target=target),
+            "monte_carlo": asdict(R.risk_of_ruin_mc(win_rate, payoff_ratio, risk_fraction,
+                                                    drawdown=drawdown, target=target, n_paths=4000, seed=1)),
+        },
+        "kelly": asdict(R.kelly(win_rate, payoff_ratio)),
+        "kelly_drawdowns": R.kelly_drawdown_pain(win_rate, payoff_ratio, n_paths=2000, seed=1),
+        "table": R.ruin_table(payoff_ratio, drawdown=drawdown, target=target),
+    }
+    if entry is not None and stop is not None:
+        try:
+            out["position"] = asdict(R.position_size(account, entry, stop, risk_fraction))
+        except ValueError as exc:
+            out["position_error"] = str(exc)
+    return out
+
+
+@app.get("/risk/measured", dependencies=_GUARDS)
+def risk_measured(symbol: str = Query(...), timeframe: str = Query("1h")) -> dict:
+    """Measured win rate (and payoff ratio once the journal exists) for a pair, with a Wilson
+    interval and a `thin` flag when the sample is too small to trust a point estimate."""
+    from src.risk.ruin import gather_measured_stats
+    return asdict(gather_measured_stats(symbol, timeframe, base_rates=BASE_RATES))

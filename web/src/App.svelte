@@ -1,8 +1,10 @@
 <script lang="ts">
   import { onMount } from 'svelte'
   import PriceChart from './lib/PriceChart.svelte'
+  import RiskCalculator from './lib/RiskCalculator.svelte'
   import { getPairs, getTimeframes, getAnalysis, type Pair, type Analysis, type PanelToggles } from './lib/api'
 
+  let view = $state<'analysis' | 'risk'>('analysis')
   let pairs = $state<Pair[]>([])
   let timeframes = $state<string[]>([])
   let symbol = $state('BTC/USDT')
@@ -93,6 +95,12 @@
   <h1>🧙 Trading Wizard</h1>
   <p class="tag">Reads the chart, explains its reasoning — not financial advice.</p>
 
+  <nav class="views">
+    <button class:active={view === 'analysis'} onclick={() => (view = 'analysis')}>Analysis</button>
+    <button class:active={view === 'risk'} onclick={() => (view = 'risk')}>Risk calculator</button>
+  </nav>
+
+  {#if view === 'analysis'}
   <div class="controls">
     <select bind:value={symbol} onchange={() => (asOfBar = null)}>
       {#each pairs as p}<option value={p.symbol}>{p.label} ({p.symbol})</option>{/each}
@@ -241,6 +249,9 @@
   {:else if !error}
     <p class="hint">Pick a pair and timeframe, then press Analyze.</p>
   {/if}
+  {:else}
+    <RiskCalculator {symbol} {timeframe} />
+  {/if}
 </main>
 
 <style>
@@ -249,6 +260,9 @@
   main { max-width: 1000px; margin: 0 auto; padding: 24px; }
   h1 { margin: 0 0 4px; }
   .tag { color: #8b949e; margin: 0 0 20px; }
+  .views { display: flex; gap: 8px; margin-bottom: 18px; }
+  .views button { background: #161b22; border: 1px solid #30363d; font-weight: 500; }
+  .views button.active { background: #238636; border-color: #238636; }
   .controls { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; margin-bottom: 16px; }
   select, button { background: #161b22; color: #c9d1d9; border: 1px solid #30363d;
     border-radius: 6px; padding: 8px 12px; font-size: 14px; }
