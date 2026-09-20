@@ -5,36 +5,58 @@ A state file for the Tier-1 "learning instrument" build. Planning docs: `final-r
 
 ## Current state
 
-**Built:** Feature 1 (pattern visualization + multi-panel research view + history scrubber),
-Feature 6 (market regime classifier), a hardening pass (`fix/explanation-and-chart`: chart
-panning/right-edge fixes, analyst guide wired in as the real system prompt with brief/teaching
-modes, signal classification moved into the facts payload), and **Feature 9 (risk of ruin &
-position sizing)** — all merged to `main` (Feature 9 = commit `41232b4`). Plus **Feature 10
-(honest cost model)** — implemented on `feature/cost-model`, **not yet committed/merged**. **247
-tests green, ruff clean.** Regime is still standalone infrastructure (a committed strip overlay
-eyeballs it) — not in any vote/facts; the encyclopedia consumes it next.
+**Built (all merged to `main`):** Feature 1 (pattern visualization + research view), Feature 6
+(market regime), the hardening pass (`fix/explanation-and-chart`: chart panning fixes, analyst
+guide wired in as the real system prompt with brief/teaching modes, signal classification moved
+into the facts payload), Feature 9 (risk of ruin, `41232b4`), Feature 10 (honest cost model,
+`53e37df`), and Feature 2 (pattern confirmation states, `6b8dfd5`). **256 tests green, ruff +
+svelte-check clean.** Regime is still standalone infrastructure (not in any vote/facts);
+patterns now carry state/quality/confirmation but stay OUT of the confluence score.
 
 **Explanation layer:** driven by `src/advisor/analyst-guide-system-prompt.md` (loaded at startup,
 cached prompt prefix). Default mode `brief` (enforces the guide's §8 word budgets); `teaching`
 for long-form; toggle in the UI.
 
-**Next (SURVIVAL-SPEC.md revised order — 1 ✓, 6 ✓, 9 ✓, 10 ✓):** Feature 2 (pattern confirmation
-states) → Feature 8 (exit-rule laboratory) → Feature 3 (empirical pattern encyclopedia) →
-Feature 4 (prediction journal + calibration) → 11 (pre-registration) → 12 (behavioural circuit
-breaker) → 5 (blind mode) → 7 (integrity guard).
+**Next (SURVIVAL-SPEC.md revised order — 1 ✓, 6 ✓, 9 ✓, 10 ✓, 2 ✓):** **Feature 8 (exit-rule
+laboratory)** → Feature 3 (empirical pattern encyclopedia) → Feature 4 (prediction journal +
+calibration) → 11 (pre-registration) → 12 (behavioural circuit breaker) → 5 (blind mode) →
+7 (integrity guard).
 
 **Default config:** symbol `BTC/USDT`, timeframe `1h`, exchange `binance`, history 4320 bars.
 Selectable timeframes: `15m, 30m, 1h, 4h, 1d`. Registered pairs: BTC/ETH/SOL/XRP (USDT) +
-EUR/USD, GBP/USD (forex via Twelve Data). Feature 9 added no config; **Feature 10 adds a `costs:`
-block** (`CostsConfig`: `enabled` default true + spread/fee/slippage/funding/financing/tax rates;
-defaults apply if `config.yaml` omits it).
+EUR/USD, GBP/USD (forex via Twelve Data). **Feature 10** adds a `costs:` block (`CostsConfig`);
+**Feature 2** adds `patterns.equal_atr_mult` / `depth_atr_mult` (ATR-scaled tolerances; the old
+percent fields are kept for `config.yaml` compat). Defaults apply if `config.yaml` omits them.
 
 ---
 
 ## Log (newest first)
 
+### Feature 2 — Pattern confirmation states
+- **Merged:** 2026-09-20 · **branch:** `feature/pattern-confirmation` → **`main`** (commit `6b8dfd5`, fast-forward)
+- **Done-when:** every pattern reports state, breakout, invalidation, quality, and a full 7-category
+  confirmation profile; overlaps are deduplicated; the guard passes. Confirmed on real data —
+  BTC 1h: one *confirmed bullish ascending triangle* (4 supports / 0 contradicts); BTC 1d: one
+  *forming bearish double top* (quality 0.68). No over-calling (dedupe collapses to one each).
+  Snapshot diff confined to `chart_patterns`, and `confluence.signals` stays length-7 — proving
+  patterns stayed OUT of the score. 24 new tests; **256 green**.
+- **Build:** `src/patterns/base.py` (`Pattern` + `ConfirmationProfile`: price/volume/momentum/
+  volatility/candlestick/higher_tf/structure, each supports/contradicts/neutral/unavailable;
+  look-ahead-safe `classify_state`). Detectors refactored to emit `Pattern` with ATR-scaled
+  tolerances; added **rectangle + channel** (continuation). `dedupe.py` keeps highest quality,
+  ties preferring continuation. Wired into facts + serialize (additive chart contract → no
+  `PriceChart.svelte` edit).
+- **Deviations:** **flags deferred** (fuzziest, most over-call-prone geometry) — a note, not a
+  gap; triangles + rectangle + channel already cover continuation. Old percent config fields kept
+  (config.yaml sets them; `extra="forbid"`). Triangle quality uses flatness × linearity, not the
+  degenerate flat-side r2.
+- **Learned:** on the same swings a rectangle/triangle also reads as a double top/bottom — the old
+  code returned all; dedupe now collapses them, and a continuation-first tie-break resolves it
+  (matches the trend-riding use case). Keeping the serialize contract additive meant no chart edit
+  and no browser re-verification loop.
+
 ### Feature 10 — Honest cost model
-- **Status:** implemented 2026-09-19 · **branch:** `feature/cost-model` (**not yet committed/merged**)
+- **Merged:** 2026-09-19 · **branch:** `feature/cost-model` → **`main`** (commit `53e37df`)
 - **Done-when:** every backtest reports net-of-everything by default, and you can see what fraction
   of the gross edge costs consume. Confirmed live (BTC 1d, 506 setups): **gross +0.45%/trade →
   net −0.14%** (win 50%→48%) — a gross-positive setup flips **net-negative after costs**. Costs
