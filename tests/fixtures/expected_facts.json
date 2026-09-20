@@ -1,11 +1,43 @@
 {
   "chart_patterns": [
     {
-      "direction": "bullish",
-      "name": "ascending triangle",
-      "neckline": null,
-      "reason": "Recent highs and lows form flat highs with rising lows (buyers pressing into resistance).",
-      "target": null
+      "bars": [
+        330,
+        340,
+        343
+      ],
+      "breakout_level": 64214.0,
+      "confirmation": {
+        "candlestick": "supports",
+        "higher_tf": "neutral",
+        "momentum": "supports",
+        "price": "supports",
+        "structure": "supports",
+        "volatility": "supports",
+        "volume": "contradicts"
+      },
+      "direction": "bearish",
+      "invalidation_level": 64762.77,
+      "kind": "reversal",
+      "points": [
+        {
+          "bar": 330,
+          "price": 64762.77
+        },
+        {
+          "bar": 340,
+          "price": 64214.0
+        },
+        {
+          "bar": 343,
+          "price": 64664.0
+        }
+      ],
+      "quality": 0.643,
+      "reason": "Two peaks ~equal (within 138.2, ATR-scaled) with a reversal between.",
+      "state": "confirmed",
+      "target": 63764.0,
+      "type": "double top"
     }
   ],
   "confluence": {

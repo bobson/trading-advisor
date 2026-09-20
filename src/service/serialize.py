@@ -26,7 +26,7 @@ from src.indicators.features import (
     COL_VOLUME_MA,
 )
 from src.market.regime import classify_regime
-from src.patterns.chart_patterns import find_chart_patterns
+from src.patterns.chart_patterns import find_patterns
 from src.service.analyze import AnalysisResult
 from src.structure.divergence import find_rsi_divergence
 from src.structure.support_resistance import RESISTANCE, SUPPORT, annotate_roles
@@ -48,65 +48,35 @@ def _price_precision(price: float) -> int:
     return 6
 
 
-def _pattern_state(direction: str, neckline, prices: list[float], last_close: float) -> str:
-    """DISPLAY-ONLY pattern state, look-ahead-safe (only `last_close`, the bar-N close, is read).
-
-    forming -> not yet resolved; confirmed -> price closed through the neckline in the pattern's
-    direction; failed -> price closed beyond the pattern's own extreme (it broke the wrong way).
-    The full forming/confirmed/failed ConfirmationProfile is Feature 2; this NEVER feeds the
-    confidence score — patterns stay out of the score until measured.
-    """
-    if neckline is None:
-        return "forming"                        # e.g. a symmetric triangle: unresolved coil
-    if direction == "bullish":
-        if last_close > neckline:
-            return "confirmed"
-        if prices and last_close < min(prices):
-            return "failed"
-        return "forming"
-    if direction == "bearish":
-        if last_close < neckline:
-            return "confirmed"
-        if prices and last_close > max(prices):
-            return "failed"
-        return "forming"
-    return "forming"                            # neutral direction (symmetric triangle)
-
-
 def _serialize_patterns(result: AnalysisResult, df: pd.DataFrame, rp) -> list[dict]:
-    """Chart patterns as drawable geometry: the defining swings (points/lines), the neckline as
-    a breakout level, an invalidation level (the pattern's extreme), a measured target, and a
-    look-ahead-safe display state. Recomputed from the SAME swings+cfg the facts used, so the
-    drawn pattern and the quoted numbers can't disagree."""
-    bar_price = {int(b): float(p) for b, p in zip(result.swings["bar"], result.swings["price"])}
-    last_close = float(df["close"].iloc[-1])
+    """Chart patterns (Feature 2) as drawable JSON. Same keys the chart already reads
+    (type/direction/state/points/breakout_level/invalidation_level/target) PLUS quality and the
+    confirmation profile — state now comes from the real look-ahead-safe machine, not a heuristic.
+    Recomputed from the SAME featured/swings/cfg the facts used, so drawn == quoted."""
     n = len(df)
+    conf = result.facts.get("confluence", {})
+    mtf_trends = conf.get("mtf_trends") or {}
+    htf = list(mtf_trends.values())[-1] if mtf_trends else None
+    levels = (result.levels["price"].tolist()
+              if result.levels is not None and not result.levels.empty else None)
     out: list[dict] = []
-    for pat in find_chart_patterns(result.swings, result.cfg):
-        points = [
-            {"time": _epoch(df.index[bar]), "price": rp(bar_price[bar])}
-            for bar in sorted(set(pat.bars))
-            if 0 <= bar < n and bar in bar_price
-        ]
+    for pat in find_patterns(result.featured, result.swings, result.cfg,
+                             higher_tf_trend=htf, structure_levels=levels, fib=result.fib):
+        points = [{"time": _epoch(df.index[bar]), "price": rp(price)}
+                  for bar, price in pat.points if 0 <= bar < n]
         if len(points) < 2:
             continue
-        prices = [p["price"] for p in points]
-        if pat.direction == "bearish":
-            invalidation = max(prices)
-        elif pat.direction == "bullish":
-            invalidation = min(prices)
-        else:
-            invalidation = None
         out.append({
-            "type": pat.name,
+            "type": pat.type,
             "direction": pat.direction,
-            "state": _pattern_state(pat.direction, pat.neckline, prices, last_close),
-            "quality": None,                    # numeric quality is Feature 2's ConfirmationProfile
+            "state": pat.state,
+            "quality": pat.quality,
             "points": points,
-            "lines": [points],                  # the zigzag through the swings; boundaries = Feature 2
-            "breakout_level": None if pat.neckline is None else rp(pat.neckline),
-            "invalidation_level": None if invalidation is None else rp(invalidation),
+            "lines": [points],
+            "breakout_level": None if pat.breakout_level is None else rp(pat.breakout_level),
+            "invalidation_level": None if pat.invalidation_level is None else rp(pat.invalidation_level),
             "target": None if pat.target is None else rp(pat.target),
+            "confirmation": pat.confirmation.to_dict(),
         })
     return out
 

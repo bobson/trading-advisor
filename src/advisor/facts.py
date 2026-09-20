@@ -34,7 +34,7 @@ from src.indicators.features import (
     COL_VOLUME,
     COL_VOLUME_MA,
 )
-from src.patterns.chart_patterns import find_chart_patterns
+from src.patterns.chart_patterns import find_patterns
 from src.signals.confluence import (
     SIGNAL_CATEGORY,
     evaluate_confluence,
@@ -220,16 +220,19 @@ def build_facts(featured_df: pd.DataFrame, swings: pd.DataFrame, cfg: Config) ->
     if volume_facts is not None:
         volume_facts["type"] = mc.volume_type
 
-    # Chart patterns are best-effort geometry (Phase 9) — additive context, not a vote.
+    # Chart patterns (Feature 2) — each carries state, levels, quality, and a confirmation profile.
+    # Kept OUT of the confluence score (additive context only). Reuses the already-computed levels/
+    # fib/round-number and the higher-timeframe trend for the structure/higher_tf confirmations.
+    mtf_trends = confluence.mtf_trends or {}
+    htf_trend = list(mtf_trends.values())[-1] if mtf_trends else None
     chart_patterns = [
-        {
-            "name": p.name,
-            "direction": p.direction,
-            "reason": p.reason,
-            "neckline": p.neckline,
-            "target": p.target,
-        }
-        for p in find_chart_patterns(swings, cfg)
+        p.to_dict()
+        for p in find_patterns(
+            featured_df, swings, cfg,
+            higher_tf_trend=htf_trend,
+            structure_levels=(levels["price"].tolist() if not levels.empty else None),
+            fib=fib, round_number=rn,
+        )
     ]
 
     fib_facts = None
@@ -392,11 +395,18 @@ def facts_to_prompt(facts: dict) -> str:
     lines.append("")
 
     patterns = facts.get("chart_patterns", [])
-    lines.append("CHART PATTERNS (best-effort geometry — approximate, may over-call):")
+    lines.append("CHART PATTERNS (best-effort geometry — approximate; NOT part of the confluence score):")
     if patterns:
         for p in patterns:
-            extra = f" [neckline {p['neckline']}, target {p['target']}]" if p.get("neckline") is not None else ""
-            lines.append(f"  [{p['direction'].upper()}] {p['name']}: {p['reason']}{extra}")
+            conf = p.get("confirmation", {})
+            sup = [k for k, v in conf.items() if v == "supports"]
+            con = [k for k, v in conf.items() if v == "contradicts"]
+            lines.append(
+                f"  [{p['state'].upper()} · {p['direction']}] {p['type']} ({p['kind']}, quality {p['quality']}): "
+                f"breakout {p['breakout_level']}, invalidation {p['invalidation_level']}, target {p['target']}"
+            )
+            lines.append(f"      confirmation supports: {', '.join(sup) or 'none'}; "
+                         f"contradicts: {', '.join(con) or 'none'}")
     else:
         lines.append("  - none detected in the recent structure")
     lines.append("")

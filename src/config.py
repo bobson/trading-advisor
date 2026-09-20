@@ -102,6 +102,11 @@ class PatternsConfig(_Strict):
     # A fitted trendline whose price change across its own span is smaller than this
     # (percent) counts as "flat" when classifying triangles.
     flat_slope_pct: float = 1.0
+    # Feature 2 — ATR-scaled tolerances (replace the percent ones above in the new `find_patterns`).
+    # Two peaks/troughs count as "equal" within this multiple of ATR; a real reversal/range must be
+    # at least `depth_atr_mult` × ATR deep. Scale-free across BTC (~80k) and EUR/USD (~1.10).
+    equal_atr_mult: float = 0.6
+    depth_atr_mult: float = 1.0
 
 
 class TimeframesConfig(_Strict):
