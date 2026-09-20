@@ -179,6 +179,17 @@ class CostsConfig(_Strict):
     tax_rate: float = 0.0                 # drag on REALISED gains (0 = off; set to your rate — its absence flatters results)
 
 
+class ExitsConfig(_Strict):
+    # Feature 8 — the exit-rule laboratory. All thresholds ATR-scaled (scale-free across markets).
+    target_atr: float = 3.0        # fixed take-profit distance, × ATR at entry
+    stop_atr: float = 2.0          # fixed stop distance, × ATR at entry
+    trail_atr: float = 3.0         # close-based trailing stop, × ATR from the running close-high
+    chandelier_atr: float = 3.0    # wick-based trail, × ATR below the highest high since entry
+    structure_lookback: int = 10   # bars for the rolling swing-low/high PROXY (structure exit)
+    time_bars: int = 20            # time exit: close after this many bars
+    max_hold: int = 200            # hard cap so a stop-only trade can't run forever
+
+
 class AdvisorConfig(_Strict):
     model: str = "claude-sonnet-4-6"
     # Explanation mode (Layer 2). "brief" enforces the analyst guide's §8 word budgets (default);
@@ -211,6 +222,8 @@ class Config(_Strict):
     regime: RegimeConfig = Field(default_factory=RegimeConfig)
     # Optional (Feature 10): defaults apply if config.yaml omits the `costs:` block.
     costs: CostsConfig = Field(default_factory=CostsConfig)
+    # Optional (Feature 8): defaults apply if config.yaml omits the `exits:` block.
+    exits: ExitsConfig = Field(default_factory=ExitsConfig)
 
     # Injected from .env, not from config.yaml. Optional so the deterministic
     # Layer 1 pipeline (data + detectors) runs without an API key.
