@@ -96,6 +96,7 @@ class Pattern:
     state: str                      # forming | confirmed | failed
     bars: list[int]                 # defining swing bars
     points: list[tuple] = field(default_factory=list)  # (bar, price) defining points
+    lines: list = field(default_factory=list)  # boundary geometry: each a polyline [(bar, price), ...]
     breakout_level: float | None = None
     invalidation_level: float | None = None
     target: float | None = None
@@ -115,6 +116,7 @@ class Pattern:
             "state": self.state,
             "bars": list(self.bars),
             "points": [{"bar": int(b), "price": round(float(p), 2)} for b, p in self.points],
+            "lines": [[{"bar": int(b), "price": round(float(p), 2)} for b, p in line] for line in self.lines],
             "breakout_level": None if self.breakout_level is None else round(float(self.breakout_level), 2),
             "invalidation_level": None if self.invalidation_level is None else round(float(self.invalidation_level), 2),
             "target": None if self.target is None else round(float(self.target), 2),

@@ -57,6 +57,10 @@
   function teardown() {
     for (const c of charts) c.remove()
     charts = []; mainSeries = null
+    // Also remove the .pane wrapper DIVS (each holds a label span). Removing only the chart
+    // instances left stale, empty panes to accumulate across re-renders — their labels stacked
+    // into garbled text at the top-left.
+    if (root) root.replaceChildren()
   }
 
   // Sync by LOGICAL (bar-index) range, not time. Every pane is set on the SAME shared index axis
@@ -132,6 +136,16 @@
     series.setData((data.candles as any[]).concat(whitespace))
     mainSeries = series
 
+    // Moving averages overlaid on the price pane (50 = blue, 200 = gold), aligned to the axis.
+    if (toggles.ma) for (const ma of data.mas ?? []) {
+      const maLine = main.addLineSeries({
+        color: ma.key === 'long' ? '#e3b341' : '#58a6ff', lineWidth: 2,
+        priceLineVisible: false, lastValueVisible: true, title: `MA${ma.period}`,
+        crosshairMarkerVisible: false,
+      })
+      maLine.setData(align(ma.values) as any)
+    }
+
     if (toggles.levels) for (const lv of ov.levels)
       series.createPriceLine({
         price: lv.price, color: lv.role === 'support' ? '#26a641' : '#f85149',
@@ -139,29 +153,31 @@
       } as any)
 
     if (toggles.fib && ov.fibonacci)
-      for (const [ratio, price] of Object.entries(ov.fibonacci.levels))
+      for (const [ratio, price] of Object.entries(ov.fibonacci.levels)) {
+        if (![0.382, 0.5, 0.618].includes(Number(ratio))) continue   // key retracements only, less clutter
         series.createPriceLine({
           price, color: '#8b949e', lineWidth: 1, lineStyle: 2,
           axisLabelVisible: true, title: `fib ${(Number(ratio) * 100).toFixed(1)}%`,
         } as any)
+      }
 
-    // Patterns: each as a line through its defining swings, styled by state, plus level lines.
+    // Patterns: draw each ACTUAL boundary (channel/triangle boundaries, neckline, rectangle edges)
+    // as a line series, styled by state. The boundaries ARE the breakout/invalidation levels, so we
+    // don't also draw horizontal lines for those (that was redundant clutter) — only the projected
+    // target gets a single tag.
     if (toggles.patterns) for (const p of ov.patterns) {
       const st = patternStyle(p)
-      const line = main.addLineSeries({
-        color: st.color, lineWidth: st.width as any, lineStyle: st.dashed ? 2 : 0,
-        pointMarkersVisible: true, lastValueVisible: false, priceLineVisible: false,
-      })
-      const pts = dedupeByTime(p.points.map((pt) => ({ time: pt.time, value: pt.price })))
-      line.setData(pts as any)
-      const levelLine = (price: number | null, style: number, title: string) => {
-        if (price == null) return
-        series.createPriceLine({ price, color: st.color, lineWidth: 1, lineStyle: style,
-          axisLabelVisible: true, title } as any)
+      for (const ln of p.lines ?? []) {
+        if (ln.length < 2) continue
+        const bl = main.addLineSeries({
+          color: st.color, lineWidth: st.width as any, lineStyle: st.dashed ? 2 : 0,
+          lastValueVisible: false, priceLineVisible: false, crosshairMarkerVisible: false,
+        })
+        bl.setData(dedupeByTime(ln.map((pt) => ({ time: pt.time, value: pt.price }))) as any)
       }
-      levelLine(p.breakout_level, 0, `${p.type} neckline`)
-      levelLine(p.target, 1, `${p.type} target`)
-      levelLine(p.invalidation_level, 3, `${p.type} invalid`)
+      if (p.target != null)
+        series.createPriceLine({ price: p.target, color: st.color, lineWidth: 1, lineStyle: 1,
+          axisLabelVisible: true, title: `${p.type} target` } as any)
     }
 
     const markers: any[] = []

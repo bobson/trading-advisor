@@ -60,6 +60,16 @@ def _pt(row) -> tuple:
     return (int(row["bar"]), float(row["price"]))
 
 
+def _seg(line, b0, b1) -> list:
+    """A sloped boundary segment from a fitted trendline, as two (bar, price) endpoints."""
+    return [(int(b0), float(line.value_at(b0))), (int(b1), float(line.value_at(b1)))]
+
+
+def _hseg(price, b0, b1) -> list:
+    """A horizontal boundary segment (e.g. a neckline or a rectangle edge)."""
+    return [(int(b0), float(price)), (int(b1), float(price))]
+
+
 def _rel_change_pct(slope: float, bars: np.ndarray, mean_price: float) -> float:
     span = float(bars.max() - bars.min())
     return slope * span / mean_price * 100.0 if mean_price else 0.0
@@ -103,6 +113,9 @@ def _detect_double(highs, lows, cfg, atr, *, top: bool) -> Pattern | None:
         type=name, kind=REVERSAL, direction=direction, state=FORMING,
         bars=[int(p1["bar"]), int(mid_row["bar"]), int(p2["bar"])],
         points=[_pt(p1), _pt(mid_row), _pt(p2)],
+        # the base line connects the two defining extremes (the two lows of a double bottom / two
+        # peaks of a double top), plus the neckline (the breakout level, at the swing between them).
+        lines=[[_pt(p1), _pt(p2)], _hseg(neckline, p1["bar"], p2["bar"])],
         breakout_level=round(float(neckline), 2), invalidation_level=round(float(invalidation), 2),
         target=round(float(target), 2), quality=round(quality, 3),
         reason=f"Two {'peaks' if top else 'troughs'} ~equal (within {tol:.4g}, ATR-scaled) with a reversal between.",
@@ -142,6 +155,7 @@ def _detect_head_and_shoulders(highs, lows, cfg, atr, *, top: bool) -> Pattern |
         type=name, kind=REVERSAL, direction=direction, state=FORMING,
         bars=[int(ls["bar"]), int(head["bar"]), int(rs["bar"])],
         points=[_pt(ls), _pt(head), _pt(rs)],
+        lines=[_hseg(neckline, ls["bar"], rs["bar"])],
         breakout_level=round(neckline, 2), invalidation_level=round(invalidation, 2),
         target=round(float(target), 2), quality=round(quality, 3),
         reason="Three swings, middle most extreme, matching shoulders; break of the neckline confirms.",
@@ -185,10 +199,13 @@ def _detect_triangle(highs, lows, cfg, atr) -> Pattern | None:
         quality = _clamp01(lo_flat * hi_r2)
     else:                           # symmetric: both sloped
         quality = _clamp01((hi_r2 + lo_r2) / 2)
+    tb0 = int(min(hi["bar"].min(), lo["bar"].min()))
+    tb1 = int(max(hi["bar"].max(), lo["bar"].max()))
     return Pattern(
         type=name, kind=CONTINUATION, direction=direction, state=FORMING,
         bars=[int(b) for b in pd.concat([hi["bar"], lo["bar"]]).sort_values()],
         points=[_pt(r) for _, r in pd.concat([hi, lo]).sort_values("bar").iterrows()],
+        lines=[_seg(hi_line, tb0, tb1), _seg(lo_line, tb0, tb1)],
         breakout_level=round(breakout, 2), invalidation_level=round(inval, 2),
         target=None if target is None else round(target, 2), quality=round(quality, 3),
         reason="Converging highs and lows (triangle).",
@@ -209,10 +226,13 @@ def _detect_rectangle(highs, lows, cfg, atr) -> Pattern | None:
         return None
     flat_dev = (hi["price"].max() - hi["price"].min()) + (lo["price"].max() - lo["price"].min())
     quality = _clamp01(1 - flat_dev / (4 * tol)) if tol > 0 else 0.5
+    rb0 = int(min(hi["bar"].min(), lo["bar"].min()))
+    rb1 = int(max(hi["bar"].max(), lo["bar"].max()))
     return Pattern(
         type=RECTANGLE, kind=CONTINUATION, direction=NEUTRAL_DIR, state=FORMING,
         bars=[int(b) for b in pd.concat([hi["bar"], lo["bar"]]).sort_values()],
         points=[_pt(r) for _, r in pd.concat([hi, lo]).sort_values("bar").iterrows()],
+        lines=[_hseg(upper, rb0, rb1), _hseg(lower, rb0, rb1)],
         breakout_level=round(upper, 2), invalidation_level=round(lower, 2),
         target=round(upper + height, 2), quality=round(quality, 3),
         reason="Flat highs and lows — a range; a close beyond either edge resolves it.",
@@ -247,10 +267,12 @@ def _detect_channel(highs, lows, cfg, atr) -> Pattern | None:
     height = abs(upper - lower)
     target = breakout + height if direction == BULLISH else breakout - height
     quality = _clamp01(parallel * (hi_line.r2 + lo_line.r2) / 2)
+    cb0 = int(min(hi["bar"].min(), lo["bar"].min()))
     return Pattern(
         type=name, kind=CONTINUATION, direction=direction, state=FORMING,
         bars=[int(b) for b in pd.concat([hi["bar"], lo["bar"]]).sort_values()],
         points=[_pt(r) for _, r in pd.concat([hi, lo]).sort_values("bar").iterrows()],
+        lines=[_seg(hi_line, cb0, last_bar), _seg(lo_line, cb0, last_bar)],
         breakout_level=round(float(breakout), 2), invalidation_level=round(float(inval), 2),
         target=round(float(target), 2), quality=round(quality, 3),
         reason="Parallel sloped highs and lows — a channel riding the trend.",

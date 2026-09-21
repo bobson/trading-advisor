@@ -19,6 +19,28 @@
       "direction": "bearish",
       "invalidation_level": 64762.77,
       "kind": "reversal",
+      "lines": [
+        [
+          {
+            "bar": 330,
+            "price": 64762.77
+          },
+          {
+            "bar": 343,
+            "price": 64664.0
+          }
+        ],
+        [
+          {
+            "bar": 330,
+            "price": 64214.0
+          },
+          {
+            "bar": 343,
+            "price": 64214.0
+          }
+        ]
+      ],
       "points": [
         {
           "bar": 330,

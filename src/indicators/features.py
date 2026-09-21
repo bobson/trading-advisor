@@ -32,6 +32,7 @@ from src.config import Config
 # --- column-name contract: import these, never hardcode the strings ------------
 COL_SMA_FAST = "sma_fast"
 COL_SMA_SLOW = "sma_slow"
+COL_SMA_LONG = "sma_long"    # long trend MA (default 200), for the chart overlay
 COL_RSI = "rsi"
 COL_MACD = "macd"
 COL_MACD_SIGNAL = "macd_signal"
@@ -58,6 +59,7 @@ COL_BEARISH_ENGULFING = "bearish_engulfing"
 INDICATOR_COLUMNS = [
     COL_SMA_FAST,
     COL_SMA_SLOW,
+    COL_SMA_LONG,
     COL_RSI,
     COL_MACD,
     COL_MACD_SIGNAL,
@@ -95,6 +97,8 @@ def add_indicators(df: pd.DataFrame, cfg: Config) -> pd.DataFrame:
 
     out[COL_SMA_FAST] = ta.sma(out["close"], length=ind.fast_ma)
     out[COL_SMA_SLOW] = ta.sma(out["close"], length=ind.slow_ma)
+    long_sma = ta.sma(out["close"], length=ind.long_ma)   # None on frames shorter than the length
+    out[COL_SMA_LONG] = long_sma if long_sma is not None else float("nan")
     out[COL_RSI] = ta.rsi(out["close"], length=ind.rsi_period)
 
     macd = ta.macd(out["close"], fast=MACD_FAST, slow=MACD_SLOW, signal=MACD_SIGNAL)

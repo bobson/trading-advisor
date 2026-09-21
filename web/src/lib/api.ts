@@ -19,12 +19,14 @@ export interface Indicators {
   volume_ma: Point[]; rsi: Point[]; adx: Point[]; atr: Point[]
   macd: { line: Point[]; signal: Point[]; hist: Point[] }
 }
+export interface MovingAverage { key: string; period: number; values: Point[] }
 export interface ChartData {
   candles: Candle[]
   price_precision: number
   min_move: number
   total_bars: number
   indicators: Indicators
+  mas: MovingAverage[]
   overlays: {
     levels: Level[]; swings: SwingMarker[]; fibonacci: Fib | null; marker: Marker | null
     patterns: Pattern[]; divergence: Divergence | null
@@ -33,7 +35,7 @@ export interface ChartData {
 }
 // Which overlays/sub-panes are drawn (persisted to localStorage; see App.svelte).
 export interface PanelToggles {
-  levels: boolean; fib: boolean; swings: boolean; patterns: boolean; marker: boolean
+  levels: boolean; fib: boolean; swings: boolean; patterns: boolean; marker: boolean; ma: boolean
   volume: boolean; rsi: boolean; macd: boolean; adx: boolean; atr: boolean
 }
 export interface Confluence {

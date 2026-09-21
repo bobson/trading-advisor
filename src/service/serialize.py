@@ -23,6 +23,8 @@ from src.indicators.features import (
     COL_MACD_HIST,
     COL_MACD_SIGNAL,
     COL_RSI,
+    COL_SMA_LONG,
+    COL_SMA_SLOW,
     COL_VOLUME_MA,
 )
 from src.market.regime import classify_regime
@@ -66,13 +68,19 @@ def _serialize_patterns(result: AnalysisResult, df: pd.DataFrame, rp) -> list[di
                   for bar, price in pat.points if 0 <= bar < n]
         if len(points) < 2:
             continue
+        # Actual boundary geometry (channel/triangle boundaries, neckline/rectangle edges) as
+        # time/price polylines, so the chart draws the real shape, not just the swing zigzag.
+        lines = [[{"time": _epoch(df.index[bar]), "price": rp(price)}
+                  for bar, price in line if 0 <= bar < n]
+                 for line in pat.lines]
+        lines = [ln for ln in lines if len(ln) >= 2]
         out.append({
             "type": pat.type,
             "direction": pat.direction,
             "state": pat.state,
             "quality": pat.quality,
             "points": points,
-            "lines": [points],
+            "lines": lines,
             "breakout_level": None if pat.breakout_level is None else rp(pat.breakout_level),
             "invalidation_level": None if pat.invalidation_level is None else rp(pat.invalidation_level),
             "target": None if pat.target is None else rp(pat.target),
@@ -196,6 +204,11 @@ def serialize_chart(result: AnalysisResult, limit: int = 500, levels_per_side: i
         # UI knows the highest bar it can seek to.
         "total_bars": result.total_bars,
         "indicators": indicators,
+        # Moving averages drawn ON the price pane (50 + 200 by default).
+        "mas": [
+            {"key": "slow", "period": result.cfg.indicators.slow_ma, "values": _series(fw, COL_SMA_SLOW, prec)},
+            {"key": "long", "period": result.cfg.indicators.long_ma, "values": _series(fw, COL_SMA_LONG, prec)},
+        ],
         "overlays": {"swings": swings, "levels": levels, "fibonacci": fib, "marker": marker,
                      "patterns": patterns, "divergence": divergence, "regime": regime},
     }

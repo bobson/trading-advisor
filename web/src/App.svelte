@@ -19,7 +19,7 @@
 
   // ---- per-overlay / per-pane toggles, persisted to localStorage ----
   const DEFAULT_TOGGLES: PanelToggles = {
-    levels: true, fib: true, swings: true, patterns: true, marker: true,
+    levels: true, fib: true, swings: true, patterns: true, marker: true, ma: true,
     volume: true, rsi: true, macd: true, adx: false, atr: false,
   }
   const TOGGLE_KEY = 'tw.toggles'
@@ -29,7 +29,7 @@
   }
   let toggles = $state<PanelToggles>(loadToggles())
   $effect(() => { localStorage.setItem(TOGGLE_KEY, JSON.stringify(toggles)) })
-  const OVERLAY_KEYS: (keyof PanelToggles)[] = ['levels', 'fib', 'swings', 'patterns', 'marker']
+  const OVERLAY_KEYS: (keyof PanelToggles)[] = ['levels', 'fib', 'swings', 'patterns', 'marker', 'ma']
   const PANE_KEYS: (keyof PanelToggles)[] = ['volume', 'rsi', 'macd', 'adx', 'atr']
 
   // ---- historical scrubbing (as_of_bar) ----

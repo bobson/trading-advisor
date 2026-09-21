@@ -48,6 +48,7 @@ class IndicatorsConfig(_Strict):
     rsi_overbought: int = 70
     fast_ma: int = 20
     slow_ma: int = 50
+    long_ma: int = 200        # the long trend MA drawn on the chart (with the 50); not a vote
     # Period of the simple moving average of volume (Phase 15). "Above/below average volume"
     # is measured against this.
     volume_ma: int = 20
