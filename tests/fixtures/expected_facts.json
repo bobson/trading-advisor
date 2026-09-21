@@ -2,6 +2,82 @@
   "chart_patterns": [
     {
       "bars": [
+        305,
+        312,
+        324,
+        330,
+        340,
+        343
+      ],
+      "breakout_level": 64762.77,
+      "confirmation": {
+        "candlestick": "contradicts",
+        "higher_tf": "neutral",
+        "momentum": "contradicts",
+        "price": "neutral",
+        "structure": "supports",
+        "volatility": "supports",
+        "volume": "contradicts"
+      },
+      "direction": "bullish",
+      "invalidation_level": 63400.0,
+      "kind": "continuation",
+      "lines": [
+        [
+          {
+            "bar": 305,
+            "price": 64246.55
+          },
+          {
+            "bar": 343,
+            "price": 64727.17
+          }
+        ],
+        [
+          {
+            "bar": 305,
+            "price": 63331.36
+          },
+          {
+            "bar": 343,
+            "price": 64271.02
+          }
+        ]
+      ],
+      "points": [
+        {
+          "bar": 305,
+          "price": 63400.0
+        },
+        {
+          "bar": 312,
+          "price": 63418.66
+        },
+        {
+          "bar": 324,
+          "price": 64350.0
+        },
+        {
+          "bar": 330,
+          "price": 64762.77
+        },
+        {
+          "bar": 340,
+          "price": 64214.0
+        },
+        {
+          "bar": 343,
+          "price": 64664.0
+        }
+      ],
+      "quality": 0.0,
+      "reason": "Converging highs and lows (triangle).",
+      "state": "forming",
+      "target": 66125.54,
+      "type": "ascending triangle"
+    },
+    {
+      "bars": [
         330,
         340,
         343

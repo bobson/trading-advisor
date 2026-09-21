@@ -45,7 +45,7 @@ INVERSE_HEAD_AND_SHOULDERS = "inverse head and shoulders"
 ASCENDING_TRIANGLE = "ascending triangle"
 DESCENDING_TRIANGLE = "descending triangle"
 SYMMETRIC_TRIANGLE = "symmetric triangle"
-RECTANGLE = "rectangle"
+RECTANGLE = "sideways channel"   # a horizontal range: flat-top resistance, flat-bottom support
 ASCENDING_CHANNEL = "ascending channel"
 DESCENDING_CHANNEL = "descending channel"
 
@@ -217,7 +217,9 @@ def _detect_rectangle(highs, lows, cfg, atr) -> Pattern | None:
     if len(highs) < 2 or len(lows) < 2:
         return None
     tol = cfg.patterns.equal_atr_mult * atr
-    hi, lo = highs.tail(3), lows.tail(3)
+    # The flat top/bottom often span only the last two swings each (older swings belong to the
+    # move INTO the range), so 2 flat highs + 2 flat lows define the sideways channel.
+    hi, lo = highs.tail(2), lows.tail(2)
     if (hi["price"].max() - hi["price"].min()) > tol or (lo["price"].max() - lo["price"].min()) > tol:
         return None
     upper, lower = float(hi["price"].mean()), float(lo["price"].mean())
@@ -235,7 +237,8 @@ def _detect_rectangle(highs, lows, cfg, atr) -> Pattern | None:
         lines=[_hseg(upper, rb0, rb1), _hseg(lower, rb0, rb1)],
         breakout_level=round(upper, 2), invalidation_level=round(lower, 2),
         target=round(upper + height, 2), quality=round(quality, 3),
-        reason="Flat highs and lows — a range; a close beyond either edge resolves it.",
+        reason="Sideways channel — flat-top resistance and flat-bottom support; a close beyond "
+               "either edge resolves it.",
     )
 
 

@@ -70,7 +70,22 @@ def test_detects_rectangle(cfg):
     sw = [(1, 110.0, SWING_HIGH), (3, 110.0, SWING_HIGH), (5, 110.0, SWING_HIGH),
           (2, 100.0, SWING_LOW), (4, 100.0, SWING_LOW), (6, 100.0, SWING_LOW)]
     df, sw = _frame(sw, last_close=105)
-    assert RECTANGLE in _types(find_patterns(df, sw, cfg))
+    assert RECTANGLE in _types(find_patterns(df, sw, cfg))   # RECTANGLE == "sideways channel"
+
+
+def test_sideways_channel_after_a_runup_is_not_an_ascending_channel(cfg):
+    """Regression (BTC daily): the flat top/bottom span only the last TWO swings each, while an
+    older run-up swing is lower. That used to fit a rising line and mislabel a horizontal RANGE as
+    an 'ascending channel'. It must now read as a sideways channel, not ascending."""
+    sw = [(1, 60.0, SWING_LOW), (2, 65.0, SWING_HIGH),      # the move INTO the range (older, lower)
+          (3, 75.0, SWING_LOW), (4, 82.0, SWING_HIGH),      # range: flat bottom ~75, flat top ~82
+          (5, 75.5, SWING_LOW), (6, 82.5, SWING_HIGH)]
+    df, sw = _frame(sw, last_close=78)
+    types = _types(find_patterns(df, sw, cfg))
+    assert RECTANGLE in types                                # the sideways channel is detected
+    assert ASCENDING_CHANNEL not in types                    # ...and NOT mislabelled as ascending
+    p = next(p for p in find_patterns(df, sw, cfg) if p.type == RECTANGLE)
+    assert abs(p.breakout_level - 82.25) < 1 and abs(p.invalidation_level - 75.25) < 1   # flat edges
 
 
 def test_detects_ascending_channel(cfg):

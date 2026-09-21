@@ -21,14 +21,17 @@ def _overlap_fraction(a: Pattern, b: Pattern) -> float:
 
 
 def dedupe_patterns(patterns: list[Pattern], *, overlap_threshold: float = 0.5) -> list[Pattern]:
-    """Greedy by quality: keep the best, drop any later pattern overlapping a kept one by at least
-    `overlap_threshold` of the smaller span. Ties break toward CONTINUATION patterns (the use case
-    is trend riding) then more touch points, so it's deterministic and continuation-first."""
+    """Greedy by quality: keep the best, drop a later pattern only when it overlaps a kept one of
+    the SAME KIND by at least `overlap_threshold` of the smaller span. This collapses redundant
+    same-shape detections (a triangle also reading as a double top) while letting a CONTINUATION
+    and a REVERSAL in the same region coexist — a rising channel and a double top are genuinely
+    different reads (trend riding vs. a possible top), and the trend-following use case wants both.
+    Ties break toward continuation then more touch points, so it's deterministic."""
     kept: list[Pattern] = []
     ranked = sorted(patterns, key=lambda x: (x.quality, x.kind == CONTINUATION, len(x.bars), x.span[0]),
                     reverse=True)
     for p in ranked:
-        if any(_overlap_fraction(p, k) >= overlap_threshold for k in kept):
+        if any(p.kind == k.kind and _overlap_fraction(p, k) >= overlap_threshold for k in kept):
             continue
         kept.append(p)
     kept.sort(key=lambda x: x.span[0])   # chronological for display
