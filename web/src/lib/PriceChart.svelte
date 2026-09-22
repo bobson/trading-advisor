@@ -1,9 +1,10 @@
 <script lang="ts">
   import { onMount } from 'svelte'
   import { createChart, type IChartApi, type ISeriesApi } from 'lightweight-charts'
-  import type { ChartData, PanelToggles, Pattern } from './api'
+  import type { ChartData, PanelToggles, Pattern, Trade } from './api'
 
-  let { data, toggles }: { data: ChartData | null; toggles: PanelToggles } = $props()
+  let { data, toggles, trades = [] }:
+    { data: ChartData | null; toggles: PanelToggles; trades?: Trade[] } = $props()
 
   let root: HTMLDivElement
   let charts: IChartApi[] = []
@@ -101,7 +102,7 @@
   })
 
   // Rebuild whenever the data or the toggles change (simple + robust vs incremental updates).
-  $effect(() => { data; toggles; render() })
+  $effect(() => { data; toggles; trades; render() })
 
   function render() {
     if (!root) return
@@ -189,6 +190,27 @@
         position: ov.marker.bias === 'bullish' ? 'belowBar' : 'aboveBar',
         color: ov.marker.bias === 'bullish' ? '#26a641' : '#f85149',
         shape: ov.marker.bias === 'bullish' ? 'arrowUp' : 'arrowDown' })
+
+    // Paper trades: green ▲ (buy) / red ▼ (sell) at the candle whose bar contains the trade time.
+    // A close is the OPPOSITE action, so a closed long draws a buy at entry AND a sell at close
+    // ("green when I bought, red when I sold"). Trades before the loaded window are skipped.
+    const snap = (ts: number): number | null => {
+      let best: number | null = null
+      for (const t of cTimes) { if (t <= ts) best = t; else break }
+      return best
+    }
+    const tradeMarker = (side: string, time: number, amount: number) =>
+      side === 'buy'
+        ? { time, position: 'belowBar', color: '#26a641', shape: 'arrowUp', text: `Buy $${amount}` }
+        : { time, position: 'aboveBar', color: '#f85149', shape: 'arrowDown', text: `Sell $${amount}` }
+    for (const tr of trades) {
+      const et = snap(tr.opened_at)
+      if (et != null) markers.push(tradeMarker(tr.side, et, tr.amount_usd))
+      if (tr.status === 'closed' && tr.closed_at != null) {
+        const xt = snap(tr.closed_at)
+        if (xt != null) markers.push(tradeMarker(tr.side === 'buy' ? 'sell' : 'buy', xt, tr.amount_usd))
+      }
+    }
     markers.sort((a, b) => a.time - b.time)
     series.setMarkers(markers as any)
 

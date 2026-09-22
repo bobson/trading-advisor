@@ -77,6 +77,16 @@ async function get<T>(path: string): Promise<T> {
   return r.json() as Promise<T>
 }
 
+async function send<T>(method: string, path: string, body?: unknown): Promise<T> {
+  const r = await fetch(API_BASE + path, {
+    method,
+    headers: body !== undefined ? { 'content-type': 'application/json' } : undefined,
+    body: body !== undefined ? JSON.stringify(body) : undefined,
+  })
+  if (!r.ok) throw new Error(`${r.status}: ${await r.text()}`)
+  return r.json() as Promise<T>
+}
+
 export const getRisk = (p: {
   win_rate: number; payoff_ratio: number; risk_fraction: number; account: number; entry?: number; stop?: number
 }) => {
@@ -90,6 +100,32 @@ export const getRisk = (p: {
 }
 export const getMeasured = (symbol: string, timeframe: string) =>
   get<MeasuredStats>(`/risk/measured?symbol=${encodeURIComponent(symbol)}&timeframe=${timeframe}`)
+
+// --- Paper-trading simulator ---
+export interface Trade {
+  id: number; symbol: string; timeframe: string | null; side: string
+  amount_usd: number; price: number; entry_source: string | null; units: number
+  opened_at: number; status: string; closed_at: number | null; exit_price: number | null
+  exit_source: string | null; realized_pnl: number | null
+  snapshot: Record<string, any>; note: string | null
+}
+export interface TradePnl { closed: number; wins: number; realized_total: number; win_rate: number | null }
+export interface TradeState { trades: Trade[]; pnl: TradePnl }
+export interface Position {
+  flat: boolean; id?: number; side?: string; amount_usd?: number; entry?: number
+  units?: number; price?: number; unrealized_pnl?: number; unrealized_pct?: number; price_source?: string
+}
+
+export const getTrades = (symbol: string) =>
+  get<TradeState>(`/trades?symbol=${encodeURIComponent(symbol)}`)
+export const getPosition = (symbol: string, lastClose?: number | null) =>
+  get<Position>(`/trades/position?symbol=${encodeURIComponent(symbol)}` +
+    (lastClose != null ? `&last_close=${lastClose}` : ''))
+export const postTrade = (body: {
+  symbol: string; side: string; amount_usd: number
+  timeframe?: string; last_close?: number | null; snapshot?: Record<string, any> | null
+}) => send<{ result: any } & TradeState>('POST', '/trades', body)
+export const deleteTrade = (id: number) => send<{ deleted: number }>('DELETE', `/trades/${id}`)
 
 export const getPairs = () => get<Pair[]>('/pairs')
 export const getTimeframes = () => get<string[]>('/timeframes')

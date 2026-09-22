@@ -2,7 +2,10 @@
   import { onMount } from 'svelte'
   import PriceChart from './lib/PriceChart.svelte'
   import RiskCalculator from './lib/RiskCalculator.svelte'
-  import { getPairs, getTimeframes, getAnalysis, type Pair, type Analysis, type PanelToggles } from './lib/api'
+  import {
+    getPairs, getTimeframes, getAnalysis, getTrades, getPosition, postTrade, deleteTrade,
+    type Pair, type Analysis, type PanelToggles, type Trade, type TradePnl, type Position,
+  } from './lib/api'
 
   let view = $state<'analysis' | 'risk'>('analysis')
   let pairs = $state<Pair[]>([])
@@ -76,6 +79,7 @@
     } finally {
       loading = false
     }
+    if (result) loadTrades()
   }
 
   // Auto-refresh: poll every REFRESH_MS while `auto` is on. NEVER calls Claude (explain=false),
@@ -87,6 +91,60 @@
   })
 
   const conf = $derived(result?.confluence)
+
+  // ---- paper-trading simulator (per-pair; live spot fills server-side) ----
+  let tradeAmount = $state(500)
+  let trades = $state<Trade[]>([])
+  let tradePnl = $state<TradePnl | null>(null)
+  let position = $state<Position | null>(null)
+  let tradeMsg = $state<string | null>(null)
+  let tradeBusy = $state(false)
+
+  async function loadTrades() {
+    if (!symbol) return
+    try {
+      const st = await getTrades(symbol)
+      trades = st.trades
+      tradePnl = st.pnl
+      position = await getPosition(symbol, result?.market?.last_close ?? null)
+    } catch { /* trades are non-critical — never block the analysis view */ }
+  }
+
+  async function doTrade(side: 'buy' | 'sell') {
+    if (tradeBusy || !(tradeAmount > 0)) return
+    tradeBusy = true
+    tradeMsg = null
+    try {
+      // "Whatever is on screen" — the current verdict (+ explanation if it was fetched). No Claude call.
+      const snapshot = result ? {
+        bias: conf?.bias, confidence: conf?.confidence,
+        agreeing_categories: conf?.agreeing_categories, explanation: result.explanation,
+      } : null
+      const r = await postTrade({
+        symbol, side, amount_usd: tradeAmount, timeframe,
+        last_close: result?.market?.last_close ?? null, snapshot,
+      })
+      trades = r.trades
+      tradePnl = r.pnl
+      tradeMsg = r.result.action === 'closed'
+        ? `Closed — realized ${fmtUsd(r.result.realized_pnl)}`
+        : `Opened ${side === 'buy' ? 'LONG' : 'SHORT'} @ ${r.result.price.toLocaleString()}`
+      position = await getPosition(symbol, result?.market?.last_close ?? null)
+    } catch (e: any) {
+      tradeMsg = e.message?.replace(/^\d+:\s*/, '') ?? 'trade failed'
+    } finally {
+      tradeBusy = false
+    }
+  }
+
+  async function undoTrade(id: number) {
+    try { await deleteTrade(id) } catch { /* ignore */ }
+    await loadTrades()
+  }
+
+  const fmtUsd = (x: number | null | undefined) =>
+    x == null ? '—' : `${x < 0 ? '-' : '+'}$${Math.abs(x).toLocaleString(undefined, { maximumFractionDigits: 2 })}`
+  const fmtTime = (secs: number) => new Date(secs * 1000).toLocaleString()
 
   const fmtLevel = (x: any) => (x ? `${x.price.toLocaleString()} (${x.touches} touches)` : '—')
 </script>
@@ -102,7 +160,7 @@
 
   {#if view === 'analysis'}
   <div class="controls">
-    <select bind:value={symbol} onchange={() => (asOfBar = null)}>
+    <select bind:value={symbol} onchange={() => { asOfBar = null; trades = []; position = null; tradePnl = null; tradeMsg = null }}>
       {#each pairs as p}<option value={p.symbol}>{p.label} ({p.symbol})</option>{/each}
     </select>
     <select bind:value={timeframe} onchange={() => (asOfBar = null)}>
@@ -137,6 +195,75 @@
         <b>A base rate, not a prediction.</b>
       </p>
     {/if}
+
+    <!-- Paper-trading simulator: log a simulated Buy/Sell, see the position + PnL. Fills are live
+         spot prices but no slippage/fees are modelled — it's your discipline, not a real account. -->
+    <section class="trade panel">
+      <div class="trade-head">
+        <h3>Paper trade <span class="muted">— simulated, not advice</span></h3>
+        {#if position && !position.flat}
+          <span class="pos-badge {position.side === 'buy' ? 'bull' : 'bear'}">
+            {position.side === 'buy' ? 'LONG' : 'SHORT'} ${position.amount_usd?.toLocaleString()} @ {position.entry?.toLocaleString()}
+            · <b class={(position.unrealized_pnl ?? 0) >= 0 ? 'bullish' : 'bearish'}>
+              {fmtUsd(position.unrealized_pnl)} ({position.unrealized_pct}%)</b>
+          </span>
+        {:else}
+          <span class="pos-badge flat">Flat</span>
+        {/if}
+      </div>
+      <div class="trade-row">
+        <label>$ <input type="number" min="1" step="1" bind:value={tradeAmount} /></label>
+        <button class="buy" onclick={() => doTrade('buy')}
+                disabled={tradeBusy || (position != null && !position.flat && position.side === 'buy')}>
+          {position && !position.flat && position.side === 'sell' ? 'Buy (close short)' : 'Buy'}
+        </button>
+        <button class="sell" onclick={() => doTrade('sell')}
+                disabled={tradeBusy || (position != null && !position.flat && position.side === 'sell')}>
+          {position && !position.flat && position.side === 'buy' ? 'Sell (close long)' : 'Sell'}
+        </button>
+        {#if tradeMsg}<span class="trade-msg">{tradeMsg}</span>{/if}
+      </div>
+      {#if tradePnl && tradePnl.closed}
+        <div class="trade-summary">
+          Record: <b>{tradePnl.wins}/{tradePnl.closed}</b> wins ·
+          realized <b class={tradePnl.realized_total >= 0 ? 'bullish' : 'bearish'}>{fmtUsd(tradePnl.realized_total)}</b>
+          <span class="muted">(paper, {tradePnl.closed} closed)</span>
+        </div>
+      {/if}
+      {#if trades.length}
+        <div class="trade-log">
+          {#each [...trades].reverse().slice(0, 8) as t (t.id)}
+            <div class="log-entry">
+              <div class="log-row">
+                <span class="log-side {t.side === 'buy' ? 'bull' : 'bear'}">{t.side}</span>
+                <span class="log-amt">${t.amount_usd.toLocaleString()}</span>
+                <span class="log-px">@ {t.price.toLocaleString()}</span>
+                {#if t.status === 'closed'}
+                  <span class="log-exit">→ {t.exit_price?.toLocaleString()}
+                    <b class={(t.realized_pnl ?? 0) >= 0 ? 'bullish' : 'bearish'}>{fmtUsd(t.realized_pnl)}</b></span>
+                {:else}
+                  <span class="log-open">open</span>
+                {/if}
+                <span class="log-time">{fmtTime(t.opened_at)}</span>
+                <button class="log-undo" title="undo (delete this paper trade)" onclick={() => undoTrade(t.id)}>✕</button>
+              </div>
+              <!-- The read you had when you traded — "whatever was on screen": verdict always,
+                   Claude's write-up only if explain was ticked. This is the journaling payoff. -->
+              {#if t.snapshot?.bias}
+                <div class="log-snap">
+                  read: <b class={t.snapshot.bias}>{t.snapshot.bias}</b>
+                  {#if t.snapshot.confidence != null}· {(t.snapshot.confidence * 100).toFixed(0)}% conf{/if}
+                  {#if t.snapshot.agreeing_categories != null}· {t.snapshot.agreeing_categories} cats{/if}
+                  {#if t.snapshot.explanation}
+                    <details><summary>explanation</summary><pre>{t.snapshot.explanation}</pre></details>
+                  {/if}
+                </div>
+              {/if}
+            </div>
+          {/each}
+        </div>
+      {/if}
+    </section>
 
     <!-- Research controls: scrub back through history + choose which overlays/panes to draw. -->
     <div class="research">
@@ -176,7 +303,7 @@
       </div>
     {/if}
 
-    <PriceChart data={result.chart} {toggles} />
+    <PriceChart data={result.chart} {toggles} {trades} />
 
     <div class="panels">
       <section class="panel">
@@ -298,6 +425,43 @@
   .panel { border: 1px solid #30363d; border-radius: 8px; padding: 14px; margin-top: 14px; }
   .panel h2 { margin: 0 0 8px; font-size: 16px; }
   pre { white-space: pre-wrap; margin: 0; color: #c9d1d9; }
+
+  /* Paper-trading simulator */
+  .trade .muted { text-transform: none; letter-spacing: 0; color: #6e7681; font-weight: 400; }
+  .trade-head { display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; }
+  .pos-badge { font-size: 13px; padding: 3px 10px; border-radius: 999px; border: 1px solid #30363d; }
+  .pos-badge.bull { border-color: #26a641; }
+  .pos-badge.bear { border-color: #f85149; }
+  .pos-badge.flat { color: #8b949e; }
+  .trade b.bullish { color: #26a641; }
+  .trade b.bearish { color: #f85149; }
+  .trade-row { display: flex; align-items: center; gap: 10px; margin: 12px 0 4px; flex-wrap: wrap; }
+  .trade-row label { color: #8b949e; font-size: 14px; }
+  .trade-row input { width: 110px; padding: 8px; background: #0d1117; border: 1px solid #30363d;
+    border-radius: 6px; color: #c9d1d9; font-size: 15px; }
+  .trade-row button { padding: 8px 20px; border: none; border-radius: 6px; color: #fff;
+    font-weight: 600; font-size: 14px; cursor: pointer; }
+  .trade-row button.buy { background: #238636; }
+  .trade-row button.sell { background: #b62324; }
+  .trade-row button:disabled { opacity: .4; cursor: not-allowed; }
+  .trade-msg { color: #8b949e; font-size: 13px; }
+  .trade-summary { font-size: 13px; color: #8b949e; margin: 6px 0; }
+  .trade-log { margin-top: 8px; border-top: 1px solid #21262d; }
+  .log-entry { border-bottom: 1px solid #161b22; padding: 5px 0; }
+  .log-row { display: flex; align-items: center; gap: 10px; font-size: 13px; }
+  .log-snap { font-size: 12px; color: #8b949e; margin: 3px 0 0 44px; }
+  .log-snap b.bullish { color: #26a641; } .log-snap b.bearish { color: #f85149; }
+  .log-snap b.neutral { color: #8b949e; }
+  .log-snap details { display: inline-block; margin-left: 6px; }
+  .log-snap summary { cursor: pointer; color: #58a6ff; }
+  .log-snap pre { white-space: pre-wrap; margin: 6px 0 0; color: #c9d1d9; font-size: 12px; }
+  .log-side { text-transform: uppercase; font-weight: 600; width: 34px; }
+  .log-side.bull { color: #26a641; }
+  .log-side.bear { color: #f85149; }
+  .log-time { margin-left: auto; color: #6e7681; font-size: 12px; }
+  .log-open { color: #d29922; }
+  .log-undo { background: none; border: none; color: #6e7681; cursor: pointer; font-size: 13px; padding: 0 4px; }
+  .log-undo:hover { color: #f85149; }
 
   /* Research controls: scrub + toggles */
   .research { display: flex; justify-content: space-between; align-items: center; gap: 12px;

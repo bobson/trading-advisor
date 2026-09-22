@@ -24,6 +24,27 @@ CREATE TABLE IF NOT EXISTS regime_cache (
     regime    TEXT,                      -- label, or NULL during warm-up
     PRIMARY KEY (symbol, timeframe, ts)
 );
+
+-- Paper-trading simulator: one row per Buy/Sell. One position at a time per symbol; the opposite
+-- side closes the open one (fills a live spot price at open and close). Append-only in spirit.
+CREATE TABLE IF NOT EXISTS trades (
+    id           INTEGER PRIMARY KEY AUTOINCREMENT,
+    symbol       TEXT    NOT NULL,
+    timeframe    TEXT,
+    side         TEXT    NOT NULL,        -- "buy" | "sell"
+    amount_usd   REAL    NOT NULL,        -- dollar notional entered
+    price        REAL    NOT NULL,        -- live fill price at open
+    entry_source TEXT,                    -- "live" | "last_close"
+    units        REAL    NOT NULL,        -- amount_usd / price
+    opened_at    INTEGER NOT NULL,        -- epoch seconds UTC
+    status       TEXT    NOT NULL,        -- "open" | "closed"
+    closed_at    INTEGER,                 -- epoch secs at close (NULL while open)
+    exit_price   REAL,                    -- live fill price at close (NULL while open)
+    exit_source  TEXT,
+    realized_pnl REAL,                    -- signed $ (NULL while open)
+    snapshot     TEXT,                    -- JSON: {bias, confidence, agreeing_categories, explanation?}
+    note         TEXT
+);
 """
 
 

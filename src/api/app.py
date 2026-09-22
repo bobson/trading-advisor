@@ -21,6 +21,7 @@ from dataclasses import asdict
 
 from fastapi import Depends, FastAPI, Header, HTTPException, Query, Request
 from fastapi.middleware.cors import CORSMiddleware
+from pydantic import BaseModel
 
 from src.backtest.base_rate import load_base_rates
 from src.config import load_config
@@ -179,3 +180,76 @@ def risk_measured(symbol: str = Query(...), timeframe: str = Query("1h")) -> dic
     interval and a `thin` flag when the sample is too small to trust a point estimate."""
     from src.risk.ruin import gather_measured_stats
     return asdict(gather_measured_stats(symbol, timeframe, base_rates=BASE_RATES))
+
+
+# --- Paper-trading simulator (SQLite `trades`; live spot fills; NO Claude call) ----------------
+_TRADES_DB = None   # None -> default data/wizard.db; tests point this at a tmp path
+
+
+def _trades_conn():
+    from src.store.db import connect
+    return connect(_TRADES_DB) if _TRADES_DB else connect()
+
+
+class TradeIn(BaseModel):
+    symbol: str
+    side: str                      # "buy" | "sell"
+    amount_usd: float
+    timeframe: str | None = None
+    last_close: float | None = None    # fallback fill if the live ticker fetch fails
+    snapshot: dict | None = None       # {bias, confidence, agreeing_categories, explanation?}
+    note: str | None = None
+
+
+@app.post("/trades", dependencies=_GUARDS)
+def post_trade(body: TradeIn) -> dict:
+    """Record a paper Buy/Sell: fetch a LIVE spot fill and open or close the position. One position
+    at a time — the same side while open is a 400. No re-analysis, no Claude call."""
+    from src.trading import paper
+    conn = _trades_conn()
+    try:
+        result = paper.record(conn, body.symbol, body.timeframe, body.side, body.amount_usd, cfg,
+                              last_close=body.last_close, snapshot=body.snapshot, note=body.note)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
+    finally:
+        state = {"trades": paper.list_trades(conn, body.symbol), "pnl": paper.pnl_summary(conn, body.symbol)}
+        conn.close()
+    return {"result": result, **state}
+
+
+@app.get("/trades", dependencies=_GUARDS)
+def get_trades(symbol: str = Query(...)) -> dict:
+    from src.trading import paper
+    conn = _trades_conn()
+    try:
+        return {"trades": paper.list_trades(conn, symbol), "pnl": paper.pnl_summary(conn, symbol)}
+    finally:
+        conn.close()
+
+
+@app.get("/trades/position", dependencies=_GUARDS)
+def get_position(symbol: str = Query(...), last_close: float | None = Query(None)) -> dict:
+    """Open position + unrealized PnL at a live price (falls back to `last_close`); flat -> no fetch."""
+    from src.trading import paper
+    conn = _trades_conn()
+    try:
+        if paper._open_trade(conn, symbol) is None:
+            return {"flat": True}
+        price, source = paper.live_price(symbol, cfg, last_close=last_close)
+        pos = paper.position(conn, symbol, price=price)
+        pos["price_source"] = source
+        return pos
+    finally:
+        conn.close()
+
+
+@app.delete("/trades/{trade_id}", dependencies=_GUARDS)
+def delete_trade(trade_id: int) -> dict:
+    from src.trading import paper
+    conn = _trades_conn()
+    try:
+        paper.delete_trade(conn, trade_id)
+        return {"deleted": trade_id}
+    finally:
+        conn.close()

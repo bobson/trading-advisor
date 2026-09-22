@@ -32,6 +32,30 @@ percent fields are kept for `config.yaml` compat). Defaults apply if `config.yam
 
 ## Log (newest first)
 
+### Paper-trading simulator — Buy/Sell, position + PnL, chart markers
+- **Built:** 2026-09-22 · **branch:** `feature/paper-trading` (spec: `paper-trading-spec.md`)
+- **Done-when:** enter a `$` amount, click Buy/Sell, see it recorded (time/price/amount + on-screen
+  verdict snapshot), an open position + unrealized PnL, a trades log, and green ▲ / red ▼ markers
+  on the entry candle — only for the pair you're viewing. **Browser-verified** (headless Chromium +
+  stateful mock): Flat → Buy opens LONG (badge, disabled same-side, relabeled close button, log
+  row, green ▲ marker) → Sell closes it (Flat badge, realized-PnL record line, red ▼ close marker).
+- **Locked decisions:** `$` notional (`units = amount/fill`); one position at a time per symbol
+  (opposite side closes + books realized PnL, same side → 400); snapshot = whatever's on screen
+  (**never a Claude call**); **live spot fill** server-side (ccxt `fetch_ticker`, graceful fallback
+  to `last_close`, source tagged `live`|`last_close`); SQLite `trades` table.
+- **Build:** `src/store/db.py` (+`trades` table), `src/trading/paper.py` (`live_price` w/ 5s TTL
+  cache, `open_or_close`, `record`, `list_trades`, `position`, `pnl_summary`, `delete_trade`),
+  API `POST/GET /trades`, `GET /trades/position`, `DELETE /trades/{id}` (guarded like the rest;
+  `_TRADES_DB` tmp-path seam for tests). Frontend: typed client in `api.ts`, trade panel + badge +
+  log in `App.svelte`, entry/exit markers in `PriceChart.svelte` (snap trade time → entry candle).
+- **Tests:** `tests/test_paper.py` — 7 offline unit (long/short PnL signs, one-at-a-time guard,
+  reopen, `live_price` ticker→fallback, injected-fetch record, summary) + 1 `TestClient` API flow
+  (monkeypatched `live_price`, tmp DB). **276 green, ruff + svelte-check clean.**
+- **Honest framing:** labeled "Paper trading — simulated, not advice"; live fills but no
+  slippage/fees/liquidity — PnL measures discipline & read, not a real account.
+- **Distinct from Feature 4** (journal/calibration): own `trades` table, shares only
+  `src/store/db.py`; extract common resolve-logic later if a 2nd consumer appears.
+
 ### Feature 2 — Pattern confirmation states
 - **Merged:** 2026-09-20 · **branch:** `feature/pattern-confirmation` → **`main`** (commit `6b8dfd5`, fast-forward)
 - **Done-when:** every pattern reports state, breakout, invalidation, quality, and a full 7-category
