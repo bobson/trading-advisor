@@ -1,26 +1,33 @@
 # PROGRESS
 
-A state file for the Tier-1 "learning instrument" build. Planning docs: `final-roadmap.md`
-(strategy) + `tier1-build-spec.md` (implementation). See `CLAUDE.md` for conventions.
+A state file for the "learning instrument" build. Source of truth for what's next: `ROADMAP.md`
+(steps A1…D6; prompts in `PROMPTS.md`). Older plans are in `docs/archive/`. See `CLAUDE.md` for conventions.
+
+**ROADMAP progress:** A1 ✓ (human verification pass — see log). **Next: A2** (verdict reframe +
+no-edge disclosure).
 
 ## Current state
 
-**Built (all merged to `main`):** Feature 1 (pattern visualization + research view), Feature 6
-(market regime), the hardening pass (`fix/explanation-and-chart`: chart panning fixes, analyst
-guide wired in as the real system prompt with brief/teaching modes, signal classification moved
-into the facts payload), Feature 9 (risk of ruin, `41232b4`), Feature 10 (honest cost model,
-`53e37df`), and Feature 2 (pattern confirmation states, `6b8dfd5`). **256 tests green, ruff +
-svelte-check clean.** Regime is still standalone infrastructure (not in any vote/facts);
-patterns now carry state/quality/confirmation but stay OUT of the confluence score.
+**6 of 12 numbered features done — exactly halfway. Built (all merged to `main`):** Feature 1
+(pattern visualization + research view, `d7c0dc9`), Feature 2 (pattern confirmation states,
+`6b8dfd5`), Feature 6 (market regime, `dce3906`), Feature 8 (exit-rule laboratory, `2f4667a`),
+Feature 9 (risk of ruin, `41232b4`), Feature 10 (honest cost model, `53e37df`) — plus the
+hardening pass (`fix/explanation-and-chart`: chart panning fixes, analyst guide wired in as the
+real system prompt with brief/teaching modes, signal classification moved into the facts payload).
+**Two user-requested extras merged this session (not in the numbered specs):** the paper-trading
+simulator (`d3a3b2b`) and three-candle candlestick patterns (`ea0294c`). **284 tests green, ruff +
+svelte-check clean.** Regime is still standalone infrastructure (not in any vote/facts); patterns
+carry state/quality/confirmation but stay OUT of the confluence score; three-candle patterns are
+facts-only (surfaced + charted, never a vote).
 
 **Explanation layer:** driven by `src/advisor/analyst-guide-system-prompt.md` (loaded at startup,
 cached prompt prefix). Default mode `brief` (enforces the guide's §8 word budgets); `teaching`
 for long-form; toggle in the UI.
 
-**Next (SURVIVAL-SPEC.md revised order — 1 ✓, 6 ✓, 9 ✓, 10 ✓, 2 ✓):** **Feature 8 (exit-rule
-laboratory)** → Feature 3 (empirical pattern encyclopedia) → Feature 4 (prediction journal +
-calibration) → 11 (pre-registration) → 12 (behavioural circuit breaker) → 5 (blind mode) →
-7 (integrity guard).
+**Next (revised order — 1 ✓, 6 ✓, 9 ✓, 10 ✓, 2 ✓, 8 ✓):** **Feature 3 (empirical pattern
+encyclopedia ★)** → Feature 4 (prediction journal + calibration ★) → 11 (pre-registration) →
+12 (behavioural circuit breaker) → 5 (blind mode) → 7 (integrity guard). Feature specs live in
+`tier1-build-spec.md` (1–7) and `survival-spec.md` (8–12).
 
 **Default config:** symbol `BTC/USDT`, timeframe `1h`, exchange `binance`, history 4320 bars.
 Selectable timeframes: `15m, 30m, 1h, 4h, 1d`. Registered pairs: BTC/ETH/SOL/XRP (USDT) +
@@ -31,6 +38,36 @@ percent fields are kept for `config.yaml` compat). Defaults apply if `config.yam
 ---
 
 ## Log (newest first)
+
+### ROADMAP A1 — Human verification pass (+ rendering fixes, reclaim rule, 2-point trendlines)
+- **Done:** 2026-09-23 · **branch:** `feature/a1-verification-fixes`
+- **Rendering fixes (browser-verified, desktop + 400px phone):** pattern boundary lines were already
+  drawn since `32da1e5` (the review predated it) — confirmed on SOL 1d. The garbled top-left labels
+  were the full-name 3-candle marker texts from `ea0294c` overlapping/clipping → markers now use
+  short codes (MS/ES/3WS/3BC) with a legend row. Regime strip rebuilt: solid 22px band, no axis/logo,
+  legend row with the latest regime, switches to the hovered bar's regime.
+- **Reclaim rule (Layer 1):** reversal patterns (double top/bottom, H&S) now keep state history
+  (`classify_state_history`): a neckline break later reclaimed by ≥ `patterns.reclaim_atr_mult`
+  (0.25) × that bar's ATR reads `failed` instead of reverting to `forming`. Continuation patterns
+  (sloped rails) still use the last close only. Snapshot unchanged.
+- **Two-point trendlines (user request):** `find_two_point_trendlines` joins the latest swing
+  low/high to an earlier one, kept only while no close crosses it by > `structure.
+  trendline_break_atr_mult` (0.25) × ATR; longest valid line wins. Chart-only (teal support / pink
+  resistance, `trendlines` toggle) — NOT in facts, so no explanation/snapshot change. SOL 1d: rising
+  support Aug 16 → Sep 15, which the user confirmed is the line their eye draws.
+- **Eye-checks (user, in the browser):**
+  - **Regime labels on daily match remembered periods — PASS.** Trends read trending, chop reads
+    ranging, no flicker.
+  - **Old BTC 1d double top (neckline 76,264) reads `failed` — PASS.** Replay: forming → confirmed
+    Sep 15–16 (closes < 76,264) → `failed` Sep 18 (close 80,884, reclaim beyond the 0.25×ATR margin).
+  - **SOL 1d "ascending channel" looks like a channel — FAIL.** User: no channel. Only the lower
+    rail is real (rising support Aug 16 → Sep 15, unbroken); the recent highs don't form a valid
+    parallel upper rail (Aug 27 110.60 > Sep 6 107.36; Aug 9 → Sep 6 was broken Aug 27). The
+    least-squares channel fit doesn't require its rails to be respected → over-calling. **Feeds B1/B2**
+    as a labelled channel false positive; candidate fix: require both rails to pass the 2-point
+    trendline "unbroken" test.
+- **Tests:** +7 reclaim/state-history, +8 two-point trendlines. **300 green, ruff + svelte-check clean.**
+- **Not done here:** phone-width right-axis label pile-up (many price-line labels cover the chart).
 
 ### Three-candle candlestick patterns — morning/evening star, three soldiers/crows (facts-only)
 - **Built:** 2026-09-23 · **branch:** `feature/three-candle-patterns`

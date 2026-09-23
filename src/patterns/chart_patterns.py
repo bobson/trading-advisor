@@ -32,6 +32,7 @@ from src.patterns.base import (
     Pattern,
     build_confirmation,
     classify_state,
+    classify_state_history,
 )
 from src.patterns.dedupe import dedupe_patterns
 from src.structure.swings import SWING_HIGH, SWING_LOW
@@ -343,7 +344,21 @@ def find_patterns(
                 p.direction, p.breakout_level, p.invalidation_level = BULLISH, hi_b, lo_b
             elif last_close < lo_b:
                 p.direction, p.breakout_level, p.invalidation_level = BEARISH, lo_b, hi_b
-        p.state = classify_state(p.direction, p.breakout_level, p.invalidation_level, last_close)
+        if p.kind == REVERSAL and p.bars:
+            # Reversal patterns remember their history since completion, so a neckline break that
+            # price later reclaims reads `failed` instead of reverting to `forming`.
+            # The reclaim needs a close back through the neckline by reclaim_atr_mult × THAT bar's
+            # ATR (falling back to the bar-N ATR on warm-up/ATR-less frames).
+            after = featured_df.iloc[max(p.bars) + 1:]
+            bar_atr = (after[COL_ATR].fillna(atr) if COL_ATR in after.columns
+                       else pd.Series(atr, index=after.index))
+            p.state, reclaimed = classify_state_history(
+                p.direction, p.breakout_level, p.invalidation_level, after["close"],
+                margins=bar_atr * cfg.patterns.reclaim_atr_mult)
+            if reclaimed:
+                p.reason += " Broke the neckline, then closed back through it: failed break."
+        else:
+            p.state = classify_state(p.direction, p.breakout_level, p.invalidation_level, last_close)
         hit = _structure_hit(p.breakout_level, structure_levels, fib, round_number, cfg) if has_structure else None
         p.confirmation = build_confirmation(
             p.direction, p.breakout_level, p.invalidation_level, featured_df,

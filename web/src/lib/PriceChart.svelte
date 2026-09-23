@@ -43,14 +43,24 @@
     },
   })
 
-  function newPane(label: string, h: number, isMain = false): IChartApi {
+  // `extra` shallow-merges per section (timeScale / rightPriceScale) over the base options.
+  // An empty `label` skips the overlaid pane label (the regime strip carries its own legend).
+  function newPane(label: string, h: number, isMain = false, extra: Record<string, any> = {}): IChartApi {
     const wrap = document.createElement('div')
     wrap.className = 'pane'
-    const tag = document.createElement('span')
-    tag.className = 'pane-label'; tag.textContent = label
-    wrap.appendChild(tag)
+    if (label) {
+      const tag = document.createElement('span')
+      tag.className = 'pane-label'; tag.textContent = label
+      wrap.appendChild(tag)
+    }
     root.appendChild(wrap)
-    const c = createChart(wrap, { ...baseOpts(h, isMain), width: root.clientWidth } as any)
+    const base = baseOpts(h, isMain)
+    const opts = {
+      ...base, ...extra,
+      timeScale: { ...base.timeScale, ...(extra.timeScale ?? {}) },
+      rightPriceScale: { ...base.rightPriceScale, ...(extra.rightPriceScale ?? {}) },
+    }
+    const c = createChart(wrap, { ...opts, width: root.clientWidth } as any)
     charts.push(c)
     return c
   }
@@ -78,12 +88,20 @@
     }
   }
 
-  // TEMP (Feature 6 eyeball): regime -> strip color.
+  // Regime (Feature 6) -> strip color. Standalone context, not a vote.
   const REGIME_COLORS: Record<string, string> = {
     trending_up: '#26a641', trending_down: '#f85149', ranging: '#8b949e',
     volatile: '#d29922', quiet: '#3b6ea5',
   }
   const regimeColor = (label: string) => REGIME_COLORS[label] ?? '#484f58'
+  const regimeText = (label: string) => label.replace('_', ' ')
+  const REGIME_H = 22
+
+  const CANDLE_CODES: Record<string, string> = {
+    'morning star': 'MS', 'evening star': 'ES',
+    'three white soldiers': '3WS', 'three black crows': '3BC',
+  }
+  const candleCode = (label: string) => CANDLE_CODES[label] ?? label
 
   const patternStyle = (p: Pattern) => {
     if (p.state === 'failed') return { color: '#6e7681', width: 1, dashed: true }
@@ -181,6 +199,17 @@
           axisLabelVisible: true, title: `${p.type} target` } as any)
     }
 
+    // Two-point trendlines: support through two swing lows (teal), resistance through two swing
+    // highs (pink), drawn from the older anchor to the last candle — only while unbroken.
+    if (toggles.trendlines) for (const tl of ov.trendlines ?? []) {
+      const tln = main.addLineSeries({
+        color: tl.kind === 'support' ? '#39c5cf' : '#db61a2', lineWidth: 2, lineStyle: 0,
+        lastValueVisible: false, priceLineVisible: false, crosshairMarkerVisible: false,
+        title: `${tl.direction} ${tl.kind}`,
+      })
+      tln.setData(dedupeByTime(tl.points.map((pt) => ({ time: pt.time, value: pt.price }))) as any)
+    }
+
     const markers: any[] = []
     if (toggles.swings) for (const s of ov.swings)
       markers.push({ time: s.time, position: s.kind === 'high' ? 'aboveBar' : 'belowBar',
@@ -189,10 +218,13 @@
     // Three-candle patterns (morning/evening star, three soldiers/crows) — a labelled square at the
     // confirming candle, green below for bullish / red above for bearish. Grouped under the
     // `patterns` toggle so they can be hidden with the other pattern annotations.
-    if (toggles.patterns) for (const cp of ov.candle_patterns ?? []) {
+    // Marker text is a SHORT code (full names are in the legend under the pane): the full names
+    // ("three white soldiers") overlapped each other and clipped at the left edge when zoomed out.
+    const candlePats = toggles.patterns ? (ov.candle_patterns ?? []) : []
+    for (const cp of candlePats) {
       const bull = cp.direction === 'bullish'
       markers.push({ time: cp.time, position: bull ? 'belowBar' : 'aboveBar',
-        color: bull ? '#26a641' : '#f85149', shape: 'square', text: cp.label })
+        color: bull ? '#26a641' : '#f85149', shape: 'square', text: candleCode(cp.label) })
     }
     if (toggles.marker && ov.marker)
       markers.push({ time: ov.marker.time,
@@ -223,13 +255,61 @@
     markers.sort((a, b) => a.time - b.time)
     series.setMarkers(markers as any)
 
-    // ---- TEMP regime strip (Feature 6 eyeball): a full-height colored bar per candle ----
+    // ---- regime strip: a solid colored band per candle + an HTML legend row under it ----
+    // The strip hides its own time axis and price labels (the old 40px pane spent most of its
+    // height on an axis, leaving a sliver of color under an overlapping label). The price scale
+    // stays VISIBLE (blank labels) so its width — and the candles above — still line up.
     if (ov.regime && ov.regime.length) {
-      const c = newPane('regime', 40)
-      const strip = c.addHistogramSeries({ priceLineVisible: false, lastValueVisible: false })
+      const c = newPane('', REGIME_H, false, {
+        timeScale: { visible: false },
+        rightPriceScale: { ticksVisible: false, borderVisible: false },
+        localization: { priceFormatter: () => '' },
+        // The TradingView logo covered the left of the 22px strip; attribution stays on the other panes.
+        layout: { ...LAYOUT, attributionLogo: false },
+        crosshair: { horzLine: { visible: false, labelVisible: false } },
+      })
+      const strip = c.addHistogramSeries({ priceLineVisible: false, lastValueVisible: false, base: 0 })
+      strip.priceScale().applyOptions({ scaleMargins: { top: 0, bottom: 0 } })
       const regMap = new Map(ov.regime.map((r) => [r.time, r.label]))
       strip.setData(axis.map((t) => (regMap.has(t)
         ? { time: t, value: 1, color: regimeColor(regMap.get(t) as string) } : { time: t })) as any)
+
+      // Legend: "Regime: <label at hovered bar, else latest>" + one swatch per regime.
+      const latest = ov.regime[ov.regime.length - 1].label
+      const legend = document.createElement('div')
+      legend.className = 'chart-legend'
+      const cur = document.createElement('span')
+      cur.className = 'regime-current'
+      const setCur = (label: string, hovered: boolean) => {
+        cur.innerHTML = `Regime${hovered ? '' : ' (latest)'}: <b style="color:${regimeColor(label)}">${regimeText(label)}</b>`
+      }
+      setCur(latest, false)
+      legend.appendChild(cur)
+      for (const [label, color] of Object.entries(REGIME_COLORS)) {
+        const sw = document.createElement('span')
+        sw.className = 'legend-swatch'
+        sw.innerHTML = `<i style="background:${color}"></i>${regimeText(label)}`
+        legend.appendChild(sw)
+      }
+      c.chartElement().parentElement!.appendChild(legend)
+      const onHover = (param: any) => {
+        const lbl = param?.time != null ? regMap.get(param.time as number) : undefined
+        if (lbl) setCur(lbl, true); else setCur(latest, false)
+      }
+      main.subscribeCrosshairMove(onHover)
+      c.subscribeCrosshairMove(onHover)
+    }
+
+    // Candle-pattern legend (full names for the short marker codes) — below the regime strip,
+    // so the strip stays directly under the candles.
+    if (candlePats.length) {
+      const legend = document.createElement('div')
+      legend.className = 'chart-legend'
+      const seen = [...new Map(candlePats.map((cp) => [cp.label, cp.direction])).entries()]
+      legend.innerHTML = 'Candle patterns: ' + seen.map(([label, dir]) =>
+        `<span class="legend-swatch"><i style="background:${dir === 'bullish' ? '#26a641' : '#f85149'}"></i>`
+        + `<b>${candleCode(label)}</b>&nbsp;${label}</span>`).join('')
+      root.appendChild(legend)
     }
 
     // ---- sub-panes (all mapped onto `axis`, so their indices match the price pane) ----
@@ -339,5 +419,14 @@
     position: absolute; top: 4px; left: 8px; z-index: 3;
     font-size: 11px; letter-spacing: .04em; text-transform: uppercase;
     color: #8b949e; pointer-events: none;
+  }
+  .chart-root :global(.chart-legend) {
+    display: flex; flex-wrap: wrap; gap: 4px 14px; align-items: center;
+    padding: 4px 8px 6px; font-size: 12px; color: #8b949e;
+  }
+  .chart-root :global(.regime-current) { color: #c9d1d9; margin-right: 6px; }
+  .chart-root :global(.legend-swatch) { display: inline-flex; align-items: center; gap: 5px; }
+  .chart-root :global(.legend-swatch i) {
+    display: inline-block; width: 10px; height: 10px; border-radius: 2px;
   }
 </style>

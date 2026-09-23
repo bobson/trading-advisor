@@ -40,6 +40,10 @@ class StructureConfig(_Strict):
     sr_cluster_tolerance_pct: float = 0.5
     # Phase 18: how close (percent) price must be to a psychological round number to be "at" it.
     round_number_pct: float = 0.5
+    # Two-point trendlines (drawn on the chart): a line through two swing lows/highs is kept only
+    # while no close has crossed it by more than this × ATR; anchors come from the last N swings.
+    trendline_break_atr_mult: float = 0.25
+    trendline_max_anchors: int = 6
 
 
 class IndicatorsConfig(_Strict):
@@ -108,6 +112,10 @@ class PatternsConfig(_Strict):
     # at least `depth_atr_mult` × ATR deep. Scale-free across BTC (~80k) and EUR/USD (~1.10).
     equal_atr_mult: float = 0.6
     depth_atr_mult: float = 1.0
+    # A broken reversal pattern only counts as RECLAIMED (-> failed) when a close gets back through
+    # the neckline by at least this multiple of that bar's ATR — so a close hovering a hair past
+    # the line doesn't flip the state. A neutral prior, not tuned to any backtest.
+    reclaim_atr_mult: float = 0.25
 
 
 class TimeframesConfig(_Strict):

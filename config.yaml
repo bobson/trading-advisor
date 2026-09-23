@@ -8,6 +8,8 @@ structure:
   swing_sensitivity: 5       # bars on each side that define a pivot (higher = only major swings)
   sr_cluster_tolerance_pct: 0.5  # how close levels must be to merge into one S/R zone
   round_number_pct: 0.5      # how close (%) price must be to a round number to be "at" it (Phase 18)
+  trendline_break_atr_mult: 0.25  # a 2-point trendline is dropped once a close crosses it by this x ATR
+  trendline_max_anchors: 6        # how many recent swings the older trendline anchor may come from
 
 indicators:
   rsi_period: 14
@@ -43,6 +45,7 @@ patterns:
   price_tolerance_pct: 2.0   # how close two peaks/troughs count as "equal"
   min_trough_pct: 3.0        # min depth between peaks/valleys for a real reversal (anti over-call)
   flat_slope_pct: 1.0        # a trendline flatter than this (% across its span) counts as flat
+  reclaim_atr_mult: 0.25     # a broken neckline counts as reclaimed (-> failed) only this x ATR back through it
 
 mtf:
   enabled: true

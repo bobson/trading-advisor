@@ -65,3 +65,61 @@ def find_trendlines(swings: pd.DataFrame, num_points: int = 3) -> dict[str, Tren
         sub = highs.tail(num_points)
         result[RESISTANCE] = fit_trendline(sub["bar"].to_numpy(), sub["price"].to_numpy(), RESISTANCE)
     return result
+
+
+@dataclass
+class TwoPointTrendline:
+    """A classic hand-drawn-style trendline: a straight line through two swing lows (support) or
+    two swing highs (resistance), kept only while no close has broken it since the first anchor."""
+    kind: str                    # "support" | "resistance"
+    anchors: list[tuple[int, float]]   # [(bar, price), (bar, price)], older first
+    slope: float                 # price per bar
+
+    @property
+    def direction(self) -> str:
+        return "rising" if self.slope > 0 else "falling" if self.slope < 0 else "flat"
+
+    def value_at(self, bar: float) -> float:
+        b0, p0 = self.anchors[0]
+        return p0 + self.slope * (bar - b0)
+
+
+def find_two_point_trendlines(
+    featured_df: pd.DataFrame, swings: pd.DataFrame, *, atr_col: str,
+    break_atr_mult: float = 0.25, max_anchors: int = 6,
+) -> dict[str, TwoPointTrendline]:
+    """For each side, connect the MOST RECENT swing (low for support, high for resistance) to an
+    earlier swing of the same kind, and keep the line only if no close since the older anchor
+    went through it by more than `break_atr_mult` × that bar's ATR. Among valid lines the
+    longest (earliest older anchor, within the last `max_anchors` swings) wins — a line that has
+    held longer is the more meaningful one. A side with no valid line is omitted.
+
+    Look-ahead-safe: `swings` are confirmed pivots and only closes <= the last row are read."""
+    out: dict[str, TwoPointTrendline] = {}
+    if swings.empty or featured_df.empty:
+        return out
+    closes = featured_df["close"].to_numpy(dtype=float)
+    last_close = float(closes[-1])
+    atr = (featured_df[atr_col].to_numpy(dtype=float) if atr_col in featured_df.columns
+           else np.full(len(closes), np.nan))
+    fallback = last_close * 0.01          # ATR-less fixture: 1% of price
+    atr = np.where(np.isnan(atr) | (atr <= 0), fallback, atr)
+    n = len(closes)
+
+    for kind, swing_kind in ((SUPPORT, SWING_LOW), (RESISTANCE, SWING_HIGH)):
+        pts = swings[swings["kind"] == swing_kind].sort_values("bar").tail(max_anchors)
+        pts = pts[(pts["bar"] >= 0) & (pts["bar"] < n)]
+        if len(pts) < 2:
+            continue
+        b2, p2 = int(pts["bar"].iloc[-1]), float(pts["price"].iloc[-1])
+        for b1, p1 in zip(pts["bar"].iloc[:-1].astype(int), pts["price"].iloc[:-1].astype(float)):
+            slope = (p2 - p1) / (b2 - b1)
+            bars = np.arange(b1 + 1, n)
+            line = p1 + slope * (bars - b1)
+            margin = break_atr_mult * atr[b1 + 1:]
+            c = closes[b1 + 1:]
+            broken = (c < line - margin) if kind == SUPPORT else (c > line + margin)
+            if not broken.any():
+                out[kind] = TwoPointTrendline(kind, [(b1, p1), (b2, p2)], float(slope))
+                break                      # earliest valid anchor = the longest line
+    return out

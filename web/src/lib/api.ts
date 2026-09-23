@@ -31,12 +31,18 @@ export interface ChartData {
   overlays: {
     levels: Level[]; swings: SwingMarker[]; fibonacci: Fib | null; marker: Marker | null
     patterns: Pattern[]; divergence: Divergence | null; candle_patterns: CandlePattern[]
+    trendlines?: TrendLine[]
     regime?: { time: number; label: string }[]   // TEMP: Feature-6 eyeball strip
   }
 }
 // Which overlays/sub-panes are drawn (persisted to localStorage; see App.svelte).
+export interface TrendLine {
+  kind: 'support' | 'resistance'; direction: 'rising' | 'falling' | 'flat'
+  anchors: { time: number; price: number }[]; points: { time: number; price: number }[]
+}
+
 export interface PanelToggles {
-  levels: boolean; fib: boolean; swings: boolean; patterns: boolean; marker: boolean; ma: boolean
+  trendlines: boolean; levels: boolean; fib: boolean; swings: boolean; patterns: boolean; marker: boolean; ma: boolean
   volume: boolean; rsi: boolean; macd: boolean; adx: boolean; atr: boolean
 }
 export interface Confluence {

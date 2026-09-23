@@ -8,7 +8,7 @@ language** (via Claude). It shows an honest track record on every setup.
 machine-learning testing both confirmed it has **no predictive edge** — its value is *clarity and
 learning*, not prophecy. **Not financial advice.**
 
-See [`trading-advisor-plan.md`](trading-advisor-plan.md) for the full phased roadmap,
+See [`ROADMAP.md`](ROADMAP.md) for the full phased roadmap,
 [`CLAUDE.md`](CLAUDE.md) for the architecture at a glance, and [`DEPLOY.md`](DEPLOY.md) for
 hosting it live.
 

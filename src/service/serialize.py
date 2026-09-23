@@ -34,6 +34,7 @@ from src.service.analyze import AnalysisResult
 from src.structure.divergence import find_rsi_divergence
 from src.structure.support_resistance import RESISTANCE, SUPPORT, annotate_roles
 from src.structure.swings import SWING_HIGH, SWING_LOW
+from src.structure.trendlines import find_two_point_trendlines
 
 
 def _epoch(ts) -> int:
@@ -86,6 +87,30 @@ def _serialize_patterns(result: AnalysisResult, df: pd.DataFrame, rp) -> list[di
             "invalidation_level": None if pat.invalidation_level is None else rp(pat.invalidation_level),
             "target": None if pat.target is None else rp(pat.target),
             "confirmation": pat.confirmation.to_dict(),
+        })
+    return out
+
+
+def _serialize_trendlines(result: AnalysisResult, df: pd.DataFrame, start_ts: int, rp) -> list[dict]:
+    """Two-point trendlines (support through two swing lows / resistance through two swing highs,
+    only while unbroken), drawn from the older anchor to the last candle. Chart-only for now —
+    not in the facts dict, so it doesn't reach the explanation or the snapshot."""
+    s = result.cfg.structure
+    lines = find_two_point_trendlines(result.featured, result.swings, atr_col=COL_ATR,
+                                      break_atr_mult=s.trendline_break_atr_mult,
+                                      max_anchors=s.trendline_max_anchors)
+    last = len(df) - 1
+    out = []
+    for tl in lines.values():
+        b0 = tl.anchors[0][0]
+        while b0 < last and _epoch(df.index[b0]) < start_ts:   # clip to the visible window
+            b0 += 1
+        out.append({
+            "kind": tl.kind, "direction": tl.direction,
+            "anchors": [{"time": _epoch(df.index[b]), "price": rp(p)} for b, p in tl.anchors
+                        if _epoch(df.index[b]) >= start_ts],
+            "points": [{"time": _epoch(df.index[b0]), "price": rp(tl.value_at(b0))},
+                       {"time": _epoch(df.index[last]), "price": rp(tl.value_at(last))}],
         })
     return out
 
@@ -173,6 +198,7 @@ def serialize_chart(result: AnalysisResult, limit: int = 500, levels_per_side: i
     # divergence span (marked on the RSI sub-pane).
     patterns = _serialize_patterns(result, df, rp)
     divergence = _serialize_divergence(result, df)
+    trendlines = _serialize_trendlines(result, df, start_ts, rp)
 
     # TEMP (Feature 6 eyeball): per-bar regime label over the window, for a colored strip under
     # the candles. Warm-up bars (no label yet) are dropped. Standalone — not wired into any vote.
@@ -221,7 +247,7 @@ def serialize_chart(result: AnalysisResult, limit: int = 500, levels_per_side: i
         ],
         "overlays": {"swings": swings, "levels": levels, "fibonacci": fib, "marker": marker,
                      "patterns": patterns, "divergence": divergence, "regime": regime,
-                     "candle_patterns": candle_patterns},
+                     "candle_patterns": candle_patterns, "trendlines": trendlines},
     }
 
 

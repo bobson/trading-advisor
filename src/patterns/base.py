@@ -145,6 +145,35 @@ def classify_state(direction: str, breakout_level, invalidation_level, last_clos
     return FORMING
 
 
+def classify_state_history(
+    direction: str, breakout_level, invalidation_level, closes, margins=None,
+) -> tuple[str, bool]:
+    """State with MEMORY, from every close since the pattern completed up to bar N (look-ahead-safe:
+    the caller passes closes <= N only). Returns `(state, reclaimed)`.
+
+    Unlike `classify_state` (last close only), a break that is later RECLAIMED — price closes
+    through the breakout level, then closes back on the pattern's wrong side of it by more than
+    that bar's `margins` entry (ATR-scaled; None -> 0) — is `failed`, not silently back to
+    `forming`. A close through the invalidation level is likewise terminal. Used for reversal
+    patterns, whose breakout level is a horizontal neckline."""
+    if direction not in (BULLISH, BEARISH):
+        return FORMING, False
+    bull = direction == BULLISH
+    closes = [float(c) for c in closes]
+    margins = [0.0] * len(closes) if margins is None else [float(m) for m in margins]
+    broke = False
+    for c, m in zip(closes, margins):
+        if invalidation_level is not None and (c < invalidation_level if bull else c > invalidation_level):
+            return FAILED, False
+        if breakout_level is None:
+            continue
+        if c > breakout_level if bull else c < breakout_level:
+            broke = True
+        elif broke and (c < breakout_level - m if bull else c > breakout_level + m):
+            return FAILED, True                   # broke out, then closed back inside -> reclaimed
+    return (CONFIRMED if broke else FORMING), False
+
+
 def _last(df: pd.DataFrame, col: str):
     return df[col].iloc[-1] if col in df.columns and len(df) else float("nan")
 

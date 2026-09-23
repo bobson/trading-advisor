@@ -14,6 +14,7 @@ from src.patterns.base import BULLISH, CONFIRMED, FAILED, FORMING
 from src.patterns.chart_patterns import (
     ASCENDING_CHANNEL,
     ASCENDING_TRIANGLE,
+    DOUBLE_BOTTOM,
     DOUBLE_TOP,
     RECTANGLE,
     find_patterns,
@@ -106,6 +107,49 @@ def test_double_top_state_machine(cfg, last_close, expected):
     df, sw = _frame(_double_top_swings(), last_close=last_close)
     p = next(p for p in find_patterns(df, sw, cfg) if p.type == DOUBLE_TOP)
     assert p.state == expected
+
+
+def _with_closes(df, closes_from_bar7):
+    """Overwrite the closes after the double top's right peak (bar 6) — bars 7..N."""
+    df = df.copy()
+    df.iloc[7:7 + len(closes_from_bar7), df.columns.get_loc("close")] = closes_from_bar7
+    return df
+
+
+@pytest.mark.parametrize("closes,expected", [
+    ([95, 97, 96], CONFIRMED),     # broke below the neckline (100) and stayed below
+    ([95, 97, 105], FAILED),       # broke below, then closed back above the neckline -> reclaimed
+    ([105, 95, 103], FAILED),      # the reclaim counts even after a later re-break attempt
+    ([104, 107, 105], FORMING),    # never broke, never hit the peaks
+    ([115, 105, 105], FAILED),     # closed above the peaks once -> stays failed
+])
+def test_double_top_state_remembers_history(cfg, closes, expected):
+    df, sw = _frame(_double_top_swings(), last_close=closes[-1], n=10)
+    df = _with_closes(df, closes)
+    p = next(p for p in find_patterns(df, sw, cfg) if p.type == DOUBLE_TOP)
+    assert p.state == expected
+    assert ("failed break" in p.reason) == (expected == FAILED and closes[0] != 115)
+
+
+@pytest.mark.parametrize("reclaim_close,expected", [
+    (100.3, CONFIRMED),   # back above the neckline (100) but inside 0.25 x ATR(2) = 0.5 -> not a reclaim
+    (100.6, FAILED),      # beyond the margin -> reclaimed
+])
+def test_reclaim_needs_atr_margin(cfg, reclaim_close, expected):
+    assert cfg.patterns.reclaim_atr_mult == 0.25
+    df, sw = _frame(_double_top_swings(), last_close=reclaim_close, n=10)
+    df = _with_closes(df, [95, 97, reclaim_close])
+    p = next(p for p in find_patterns(df, sw, cfg) if p.type == DOUBLE_TOP)
+    assert p.state == expected
+
+
+def test_double_bottom_reclaimed_breakout_fails(cfg):
+    """Mirror: a double bottom that closes above its neckline, then back below it, reads failed."""
+    sw = [(2, 90.0, SWING_LOW), (4, 100.0, SWING_HIGH), (6, 90.0, SWING_LOW)]
+    df, sw = _frame(sw, last_close=97, n=10)
+    df = _with_closes(df, [105, 103, 97])
+    p = next(p for p in find_patterns(df, sw, cfg) if p.type == DOUBLE_BOTTOM)
+    assert p.state == FAILED
 
 
 def test_neutral_rectangle_resolves_direction_on_break(cfg):

@@ -1,0 +1,27 @@
+{
+  "permissions": {
+    "ask": [
+      "Bash(git commit *)",
+      "Bash(git merge *)",
+      "Bash(git push *)",
+      "Bash(git rebase *)",
+      "Bash(git reset *)",
+      "Bash(git checkout *)",
+      "Bash(git switch *)",
+      "Bash(git branch -d *)",
+      "Bash(git branch -D *)",
+      "Bash(git tag *)",
+      "Bash(git remote *)",
+      "Bash(git stash drop *)"
+    ],
+    "deny": [
+      "Read(**/.env)",
+      "Bash(* .env)",
+      "Bash(* .env *)",
+      "Bash(* ./.env)",
+      "Bash(* ./.env *)",
+      "Bash(* */.env)",
+      "Bash(* */.env *)"
+    ]
+  }
+}
