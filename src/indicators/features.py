@@ -55,6 +55,11 @@ COL_HAMMER = "hammer"
 COL_SHOOTING_STAR = "shooting_star"
 COL_BULLISH_ENGULFING = "bullish_engulfing"
 COL_BEARISH_ENGULFING = "bearish_engulfing"
+# Three-candle patterns (facts-only — surfaced + charted, NOT fed into any confluence vote).
+COL_MORNING_STAR = "morning_star"
+COL_EVENING_STAR = "evening_star"
+COL_THREE_WHITE_SOLDIERS = "three_white_soldiers"
+COL_THREE_BLACK_CROWS = "three_black_crows"
 
 INDICATOR_COLUMNS = [
     COL_SMA_FAST,
@@ -81,6 +86,20 @@ PATTERN_COLUMNS = [
     COL_SHOOTING_STAR,
     COL_BULLISH_ENGULFING,
     COL_BEARISH_ENGULFING,
+    COL_MORNING_STAR,
+    COL_EVENING_STAR,
+    COL_THREE_WHITE_SOLDIERS,
+    COL_THREE_BLACK_CROWS,
+]
+
+# The three-candle patterns marked on the chart (label + direction). Deliberately ONLY the
+# three-candle set — single/two-candle patterns (doji/hammer/engulfing) are too frequent to mark
+# without carpeting the chart; they already surface via the candlestick vote + facts read.
+THREE_CANDLE_PATTERNS = [
+    (COL_MORNING_STAR, "morning star", "bullish"),
+    (COL_EVENING_STAR, "evening star", "bearish"),
+    (COL_THREE_WHITE_SOLDIERS, "three white soldiers", "bullish"),
+    (COL_THREE_BLACK_CROWS, "three black crows", "bearish"),
 ]
 
 # MACD parameters — TradingView defaults, not currently exposed in config.
@@ -88,6 +107,11 @@ MACD_FAST, MACD_SLOW, MACD_SIGNAL = 12, 26, 9
 
 # How small a body counts as a doji, as a fraction of the candle's full range.
 DOJI_BODY_MAX_FRACTION = 0.1
+
+# Three-candle pattern thresholds (module constants, like DOJI_BODY_MAX_FRACTION — not config).
+STRONG_BODY_MIN_FRACTION = 0.5   # candles 1 & 3 of a star must be "real-bodied" (body >= half range)
+STAR_BODY_MAX_RATIO = 0.5        # the star (middle) body is at most half of candle 1's body
+SOLDIER_WICK_MAX_FRACTION = 0.3  # soldiers/crows close near their extreme (small opposing wick)
 
 
 def add_indicators(df: pd.DataFrame, cfg: Config) -> pd.DataFrame:
@@ -200,7 +224,91 @@ def add_candlestick_patterns(df: pd.DataFrame) -> pd.DataFrame:
     out[COL_BEARISH_ENGULFING] = (
         prev_bullish & curr_bearish & (o >= prev_c) & (c <= prev_o)
     )
+
+    # Three-candle patterns: candle A = two bars back (shift 2), candle B = one bar back (shift 1),
+    # candle C = current. Gaps are NOT required (24/7 crypto rarely gaps) — the reversal is proven by
+    # candle C closing beyond the MIDPOINT of candle A's body instead.
+    oA, hA, lA, cA = o.shift(2), h.shift(2), l.shift(2), c.shift(2)
+    oB, hB, lB, cB = o.shift(1), h.shift(1), l.shift(1), c.shift(1)
+    bodyA, bodyB, bodyC = (cA - oA).abs(), (cB - oB).abs(), body
+    rngA, rngB = (hA - lA), (hB - lB)
+    midA = (oA + cA) / 2.0
+    strongA = bodyA >= STRONG_BODY_MIN_FRACTION * rngA
+    strongC = bodyC >= STRONG_BODY_MIN_FRACTION * rng
+    small_star = bodyB <= STAR_BODY_MAX_RATIO * bodyA          # middle body dwarfed by candle A
+
+    # Morning star: strong DOWN candle -> small-bodied star -> strong UP candle closing above the
+    # midpoint of candle A's body (bullish reversal). Evening star is the mirror.
+    out[COL_MORNING_STAR] = (
+        has_range & (cA < oA) & strongA & small_star & (c > o) & strongC & (c > midA)
+    )
+    out[COL_EVENING_STAR] = (
+        has_range & (cA > oA) & strongA & small_star & (c < o) & strongC & (c < midA)
+    )
+
+    # Three white soldiers: three rising green candles, each opening inside the prior real body and
+    # closing progressively higher AND near its own high (small upper shadow). Three black crows mirror.
+    not_doji = (
+        (bodyA > DOJI_BODY_MAX_FRACTION * rngA)
+        & (bodyB > DOJI_BODY_MAX_FRACTION * rngB)
+        & (bodyC > DOJI_BODY_MAX_FRACTION * rng)
+    )
+    up_A, up_B, up_C = (cA > oA), (cB > oB), (c > o)
+    close_near_high = (
+        ((hA - cA) <= SOLDIER_WICK_MAX_FRACTION * rngA)
+        & ((hB - cB) <= SOLDIER_WICK_MAX_FRACTION * rngB)
+        & ((h - c) <= SOLDIER_WICK_MAX_FRACTION * rng)
+    )
+    out[COL_THREE_WHITE_SOLDIERS] = (
+        has_range & up_A & up_B & up_C & not_doji
+        & (cB > cA) & (c > cB)                                 # progressively higher closes
+        & (oB > oA) & (oB < cA) & (o > oB) & (o < cB)          # each opens within the prior body
+        & close_near_high
+    )
+    dn_A, dn_B, dn_C = (cA < oA), (cB < oB), (c < o)
+    close_near_low = (
+        ((cA - lA) <= SOLDIER_WICK_MAX_FRACTION * rngA)
+        & ((cB - lB) <= SOLDIER_WICK_MAX_FRACTION * rngB)
+        & ((c - l) <= SOLDIER_WICK_MAX_FRACTION * rng)
+    )
+    out[COL_THREE_BLACK_CROWS] = (
+        has_range & dn_A & dn_B & dn_C & not_doji
+        & (cB < cA) & (c < cB)                                 # progressively lower closes
+        & (oB < oA) & (oB > cA) & (o < oB) & (o > cB)          # each opens within the prior body
+        & close_near_low
+    )
     return out
+
+
+# Precedence for naming the ONE most-significant candlestick pattern on a bar: three-candle first
+# (rarest/strongest), then two-candle, then single-candle. Facts-only — never feeds a vote.
+_CANDLE_READ_ORDER = [
+    (COL_MORNING_STAR, "morning star", "bullish"),
+    (COL_EVENING_STAR, "evening star", "bearish"),
+    (COL_THREE_WHITE_SOLDIERS, "three white soldiers", "bullish"),
+    (COL_THREE_BLACK_CROWS, "three black crows", "bearish"),
+    (COL_BULLISH_ENGULFING, "bullish engulfing", "bullish"),
+    (COL_BEARISH_ENGULFING, "bearish engulfing", "bearish"),
+    (COL_HAMMER, "hammer", "bullish"),
+    (COL_SHOOTING_STAR, "shooting star", "bearish"),
+    (COL_DOJI, "doji", "neutral"),
+]
+
+
+def candlestick_read(featured_df: pd.DataFrame) -> dict | None:
+    """Name the strongest candlestick pattern on the LAST closed bar (three-candle patterns take
+    precedence), or None. Facts-only: this does NOT feed any confluence vote. A morning/evening star
+    whose middle bar is doji-sized is labelled a 'doji star' (the classic named variant)."""
+    if len(featured_df) == 0:
+        return None
+    last = featured_df.iloc[-1]
+    for col, label, direction in _CANDLE_READ_ORDER:
+        if col in featured_df.columns and bool(last.get(col, False)):
+            if col in (COL_MORNING_STAR, COL_EVENING_STAR) and len(featured_df) >= 2 \
+                    and bool(featured_df.iloc[-2].get(COL_DOJI, False)):
+                label = f"{label} (doji star)"
+            return {"pattern": label, "direction": direction}
+    return None
 
 
 def add_features(df: pd.DataFrame, cfg: Config) -> pd.DataFrame:

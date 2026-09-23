@@ -339,6 +339,7 @@
           <div class="row"><span>ATR</span><b>{result.volatility.atr_pct ?? '—'}%</b></div>
         {/if}
         {#if result.divergence}<div class="row"><span>Divergence</span><b class={result.divergence.kind}>{result.divergence.kind}</b></div>{/if}
+        {#if result.candlestick}<div class="row"><span>Candlestick</span><b class={result.candlestick.direction}>{result.candlestick.pattern}</b></div>{/if}
       </section>
 
       <section class="panel">

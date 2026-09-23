@@ -14,6 +14,7 @@ export interface Pattern {
   breakout_level: number | null; invalidation_level: number | null; target: number | null
 }
 export interface Divergence { kind: string; reason: string; times: number[] }
+export interface CandlePattern { time: number; direction: string; label: string }
 export interface Point { time: number; value: number }
 export interface Indicators {
   volume_ma: Point[]; rsi: Point[]; adx: Point[]; atr: Point[]
@@ -29,7 +30,7 @@ export interface ChartData {
   mas: MovingAverage[]
   overlays: {
     levels: Level[]; swings: SwingMarker[]; fibonacci: Fib | null; marker: Marker | null
-    patterns: Pattern[]; divergence: Divergence | null
+    patterns: Pattern[]; divergence: Divergence | null; candle_patterns: CandlePattern[]
     regime?: { time: number; label: string }[]   // TEMP: Feature-6 eyeball strip
   }
 }

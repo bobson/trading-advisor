@@ -32,6 +32,33 @@ percent fields are kept for `config.yaml` compat). Defaults apply if `config.yam
 
 ## Log (newest first)
 
+### Three-candle candlestick patterns — morning/evening star, three soldiers/crows (facts-only)
+- **Built:** 2026-09-23 · **branch:** `feature/three-candle-patterns`
+- **Why:** on BTC/USDT 1h the user spotted a doji-in-the-middle 3-candle shape the app couldn't
+  name — we only detected 1- and 2-candle patterns (doji/hammer/shooting-star/engulfing).
+- **Done-when:** each pattern fires on its textbook fixture; the last closed bar's read shows in the
+  facts + a UI panel row; 3-candle markers draw on the chart; and the exact real bars the user was
+  looking at detect **nothing** (all up, doji middle → read stays "doji"). All verified.
+- **Design (advisor-reviewed): FACTS-ONLY, not a vote.** Making the existing candlestick vote fire
+  in new situations would change confluence → the backtest → an unvalidated vote-path change (the
+  Phase 9/18/22 facts-first ethos). Proof it's untouched: snapshot diff is the **single new
+  `candlestick` key**, `confluence.signals` is **byte-identical**, `len(signals)==7`.
+- **Build:** `features.py` — 4 boolean columns (`morning_star`/`evening_star`/
+  `three_white_soldiers`/`three_black_crows`) via shift(1)/shift(2) (causal → look-ahead-safe),
+  module-constant thresholds (`STRONG_BODY_MIN_FRACTION`/`STAR_BODY_MAX_RATIO`/
+  `SOLDIER_WICK_MAX_FRACTION`), gaps NOT required (24/7 crypto) — reversal proven by close beyond
+  candle-A's body midpoint. `candlestick_read()` names the strongest pattern (3-candle first, then
+  2- then 1-candle) and labels a doji-middle star a "doji star". Wired into `facts.py`
+  (`candlestick` block + prompt render), `serialize.py` (`candle_patterns` overlay — 3-candle set
+  ONLY, too-frequent singles excluded), `api.ts` + `PriceChart.svelte` (labelled squares, green
+  below/red above, under the `patterns` toggle), and an App.svelte panel row.
+- **Tests:** `tests/test_candlesticks.py` — 8 (each pattern fires, doji-star naming, 3-candle
+  precedence, causality guard, and the real-BTC no-false-positive tied to the user's exact bars).
+  **284 green, ruff + svelte-check clean.** Browser-verified markers on a mock; real BTC 1h → 11
+  markers / last 500 bars (~2%), current bar reads doji.
+- **Deferred:** promoting any 3-candle pattern to a *vote* is a separate, backtested step — not done
+  on faith. Density is fine now; if stars ever feel noisy, tighten to "close beyond candle-A open".
+
 ### Paper-trading simulator — Buy/Sell, position + PnL, chart markers
 - **Built:** 2026-09-22 · **branch:** `feature/paper-trading` (spec: `paper-trading-spec.md`)
 - **Done-when:** enter a `$` amount, click Buy/Sell, see it recorded (time/price/amount + on-screen

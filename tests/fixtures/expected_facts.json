@@ -1,4 +1,8 @@
 {
+  "candlestick": {
+    "direction": "bearish",
+    "pattern": "shooting star"
+  },
   "chart_patterns": [
     {
       "bars": [

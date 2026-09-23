@@ -33,6 +33,7 @@ from src.indicators.features import (
     COL_STOCH_K,
     COL_VOLUME,
     COL_VOLUME_MA,
+    candlestick_read,
 )
 from src.patterns.chart_patterns import find_patterns
 from src.signals.confluence import (
@@ -281,6 +282,7 @@ def build_facts(featured_df: pd.DataFrame, swings: pd.DataFrame, cfg: Config) ->
             "significant_move_pct": mc.significant_move_pct,
         },
         "volume": volume_facts,
+        "candlestick": candlestick_read(featured_df),
         "support_resistance": _nearest_levels(levels, last_close),
         "chart_patterns": chart_patterns,
         "fibonacci": fib_facts,
@@ -393,6 +395,15 @@ def facts_to_prompt(facts: dict) -> str:
         f"  - Resistance: {res['price']} ({res['touches']} touches)" if res else "  - Resistance: none detected above price"
     )
     lines.append("")
+
+    candle = facts.get("candlestick")
+    if candle:
+        lines.append(
+            f"CANDLESTICK (last closed bar): {candle['pattern']} ({candle['direction']}). "
+            "Three-candle patterns (stars, soldiers/crows) are noted here for context but are NOT "
+            "part of the confluence score."
+        )
+        lines.append("")
 
     patterns = facts.get("chart_patterns", [])
     lines.append("CHART PATTERNS (best-effort geometry — approximate; NOT part of the confluence score):")

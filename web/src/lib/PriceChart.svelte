@@ -185,6 +185,15 @@
     if (toggles.swings) for (const s of ov.swings)
       markers.push({ time: s.time, position: s.kind === 'high' ? 'aboveBar' : 'belowBar',
         color: '#8b949e', shape: 'circle' })
+
+    // Three-candle patterns (morning/evening star, three soldiers/crows) — a labelled square at the
+    // confirming candle, green below for bullish / red above for bearish. Grouped under the
+    // `patterns` toggle so they can be hidden with the other pattern annotations.
+    if (toggles.patterns) for (const cp of ov.candle_patterns ?? []) {
+      const bull = cp.direction === 'bullish'
+      markers.push({ time: cp.time, position: bull ? 'belowBar' : 'aboveBar',
+        color: bull ? '#26a641' : '#f85149', shape: 'square', text: cp.label })
+    }
     if (toggles.marker && ov.marker)
       markers.push({ time: ov.marker.time,
         position: ov.marker.bias === 'bullish' ? 'belowBar' : 'aboveBar',

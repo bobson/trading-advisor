@@ -26,6 +26,7 @@ from src.indicators.features import (
     COL_SMA_LONG,
     COL_SMA_SLOW,
     COL_VOLUME_MA,
+    THREE_CANDLE_PATTERNS,
 )
 from src.market.regime import classify_regime
 from src.patterns.chart_patterns import find_patterns
@@ -184,6 +185,15 @@ def serialize_chart(result: AnalysisResult, limit: int = 500, levels_per_side: i
 
     # Feature 1 — synchronised sub-pane series (volume MA, RSI, MACD, ADX, ATR) over the window.
     fw = result.featured.loc[window.index]
+
+    # Three-candle patterns (morning/evening star, three soldiers/crows) marked at the confirming
+    # (third) candle. Facts-only — these do NOT feed any vote; they're annotations. Only the
+    # three-candle set is drawn (single/two-candle patterns are too frequent to mark).
+    candle_patterns = [
+        {"time": _epoch(idx), "direction": direction, "label": label}
+        for col, label, direction in THREE_CANDLE_PATTERNS
+        for idx, hit in fw[col].items() if bool(hit)
+    ]
     indicators = {
         "volume_ma": _series(fw, COL_VOLUME_MA, 2),
         "rsi": _series(fw, COL_RSI, 2),
@@ -210,7 +220,8 @@ def serialize_chart(result: AnalysisResult, limit: int = 500, levels_per_side: i
             {"key": "long", "period": result.cfg.indicators.long_ma, "values": _series(fw, COL_SMA_LONG, prec)},
         ],
         "overlays": {"swings": swings, "levels": levels, "fibonacci": fib, "marker": marker,
-                     "patterns": patterns, "divergence": divergence, "regime": regime},
+                     "patterns": patterns, "divergence": divergence, "regime": regime,
+                     "candle_patterns": candle_patterns},
     }
 
 
