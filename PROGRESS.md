@@ -3,36 +3,40 @@
 A state file for the "learning instrument" build. Source of truth for what's next: `ROADMAP.md`
 (steps A1…D6; prompts in `PROMPTS.md`). Older plans are in `docs/archive/`. See `CLAUDE.md` for conventions.
 
-**ROADMAP progress:** A1 ✓, A2 ✓ (see log). **Next: A3** (situation tier in Layer 1).
+**ROADMAP progress:** A1 ✓ (merged, `645231c`), A2 ✓ (done-when passed; merge pending — see
+log). **Next: A3** (situation tier in Layer 1).
 
 ## Current state
 
-**6 of 12 numbered features done — exactly halfway. Built (all merged to `main`):** Feature 1
-(pattern visualization + research view, `d7c0dc9`), Feature 2 (pattern confirmation states,
-`6b8dfd5`), Feature 6 (market regime, `dce3906`), Feature 8 (exit-rule laboratory, `2f4667a`),
-Feature 9 (risk of ruin, `41232b4`), Feature 10 (honest cost model, `53e37df`) — plus the
-hardening pass (`fix/explanation-and-chart`: chart panning fixes, analyst guide wired in as the
-real system prompt with brief/teaching modes, signal classification moved into the facts payload).
-**Two user-requested extras merged this session (not in the numbered specs):** the paper-trading
-simulator (`d3a3b2b`) and three-candle candlestick patterns (`ea0294c`). **284 tests green, ruff +
-svelte-check clean.** Regime is still standalone infrastructure (not in any vote/facts); patterns
-carry state/quality/confirmation but stay OUT of the confluence score; three-candle patterns are
-facts-only (surfaced + charted, never a vote).
+**Direction:** honest learning instrument, not a signal generator — the backtest and the ML harness
+found no predictive edge. `ROADMAP.md` is the plan (Phase A hardening → B measure detectors →
+C integrity → D learning loop); the old Tier-1 feature numbering lives on inside it.
+
+**Built and on `main`:** the core engine + FastAPI + Svelte app (original Phases 0–26); the ML "is
+there an edge?" harness (no edge); Features 1 (pattern viz + research view), 2 (pattern confirmation
+states), 6 (market regime), 8 (exit-rule lab), 9 (risk of ruin), 10 (honest cost model); the
+hardening pass (guide wired in, brief/teaching modes); paper trading; three-candle patterns; and
+**ROADMAP A1** (verification pass: chart label/regime fixes, reclaimed-neckline → `failed`,
+two-point trendlines). **A2** (verdict as a category count, neutral styling, no-edge disclosure)
+is done on `feature/verdict-reframe`, not yet merged. **300 tests green, ruff + svelte-check clean.**
+
+**Standing facts:** patterns and 3-candle candlesticks stay OUT of the confidence score (facts
+only); regime is standalone (not a vote); two-point trendlines are chart-only (not in facts); the
+0–1 confluence `confidence` is internal — the UI shows "N of M categories agree", never a %.
+
+**Known open items:** channel detector over-calls (SOL 1d eye-check FAIL → B1/B2); phone-width
+right-axis price-label pile-up; the disclosure panel's evidence numbers are hard-coded from past
+runs (update by hand if re-run).
 
 **Explanation layer:** driven by `src/advisor/analyst-guide-system-prompt.md` (loaded at startup,
 cached prompt prefix). Default mode `brief` (enforces the guide's §8 word budgets); `teaching`
 for long-form; toggle in the UI.
 
-**Next (revised order — 1 ✓, 6 ✓, 9 ✓, 10 ✓, 2 ✓, 8 ✓):** **Feature 3 (empirical pattern
-encyclopedia ★)** → Feature 4 (prediction journal + calibration ★) → 11 (pre-registration) →
-12 (behavioural circuit breaker) → 5 (blind mode) → 7 (integrity guard). Feature specs live in
-`tier1-build-spec.md` (1–7) and `survival-spec.md` (8–12).
-
 **Default config:** symbol `BTC/USDT`, timeframe `1h`, exchange `binance`, history 4320 bars.
 Selectable timeframes: `15m, 30m, 1h, 4h, 1d`. Registered pairs: BTC/ETH/SOL/XRP (USDT) +
-EUR/USD, GBP/USD (forex via Twelve Data). **Feature 10** adds a `costs:` block (`CostsConfig`);
-**Feature 2** adds `patterns.equal_atr_mult` / `depth_atr_mult` (ATR-scaled tolerances; the old
-percent fields are kept for `config.yaml` compat). Defaults apply if `config.yaml` omits them.
+EUR/USD, GBP/USD (forex via Twelve Data). New in A1: `patterns.reclaim_atr_mult` (0.25),
+`structure.trendline_break_atr_mult` (0.25), `structure.trendline_max_anchors` (6). Defaults
+apply if `config.yaml` omits them.
 
 ---
 
@@ -40,6 +44,9 @@ percent fields are kept for `config.yaml` compat). Defaults apply if `config.yam
 
 ### ROADMAP A2 — Verdict reframe + no-edge disclosure
 - **Done:** 2026-09-23 · **branch:** `feature/verdict-reframe` · frontend + one guide sentence.
+  **Merge pending** (not yet on `main` when this entry was written).
+- **Done-when → PASS:** no percentage labelled "confidence" anywhere in the UI, no green/red verdict
+  styling, disclosure visible — checked in headless Chromium at 1400px and 400px.
 - **Verdict:** "confidence NN%" → a count ("2 of 4 categories agree · 1 opposes · 1 neutral";
   denominator = categories that voted). "SETUP FLAGGED" → "categories aligned". Green/red border and
   badge removed; the chart's verdict arrow is now neutral grey. The 0–1 `confidence` stays in the
@@ -56,9 +63,20 @@ percent fields are kept for `config.yaml` compat). Defaults apply if `config.yam
   disclosure visible on Analysis and Risk views. 300 green, svelte-check clean.
 - **Kept on purpose:** the track-record line ("right NN% of the time") — a base rate shown with its
   count, not a confidence. P&L green/red and per-category vote colours (facts, not the verdict).
+- **Deviations from ROADMAP.md:** (1) the count's denominator is the categories that actually voted
+  (4 today: trend/momentum/structure/volume — volatility has no voter), so it reads "of 4", not the
+  roadmap's "of 5" example; showing a category that can't vote would understate agreement.
+  (2) The "link to the evidence" is an expandable panel under the disclosure, not a separate page —
+  one click, no routing, visible on every view. (3) Went slightly wider than asked: the chart's
+  verdict arrow and the paper-trade log's bias are also neutral now (same verdict, same leak).
+- **Findings:** the verdict now also shows how many categories OPPOSE — the old % hid disagreement.
+  The evidence figures are historical (backtest 51.3% is the Phase-17 run); no test re-run in A2.
 
 ### ROADMAP A1 — Human verification pass (+ rendering fixes, reclaim rule, 2-point trendlines)
-- **Done:** 2026-09-23 · **branch:** `feature/a1-verification-fixes`
+- **Done:** 2026-09-23 · **branch:** `feature/a1-verification-fixes` · **merged to `main`: `645231c`**
+  (the `fix/verification-pass` branch holds no A1 commits).
+- **Done-when → PASS:** boundaries and labels render correctly in the browser (headless Chromium,
+  1400px + 400px), and each eye-check is recorded pass/fail below.
 - **Rendering fixes (browser-verified, desktop + 400px phone):** pattern boundary lines were already
   drawn since `32da1e5` (the review predated it) — confirmed on SOL 1d. The garbled top-left labels
   were the full-name 3-candle marker texts from `ea0294c` overlapping/clipping → markers now use
@@ -86,6 +104,18 @@ percent fields are kept for `config.yaml` compat). Defaults apply if `config.yam
     trendline "unbroken" test.
 - **Tests:** +7 reclaim/state-history, +8 two-point trendlines. **300 green, ruff + svelte-check clean.**
 - **Not done here:** phone-width right-axis label pile-up (many price-line labels cover the chart).
+- **Deviations from ROADMAP.md:** (1) "pattern boundary lines not drawn" was already fixed in
+  `32da1e5` — the design review predated it — so A1 verified it instead of rebuilding it. (2) The
+  top-left garble had a different cause than the one fixed earlier: the full-name 3-candle markers
+  from `ea0294c`. (3) PROMPTS.md expected the double top to be `failed` because price broke *above
+  the neckline*; the rule fails it only on a close above the *peaks* (82,300) — or, since A1, on a
+  reclaim of the neckline beyond 0.25×ATR. (4) Scope added at the user's request: the reclaim rule
+  and two-point trendlines (both Layer 1, tested, snapshot unchanged).
+- **Findings worth remembering:** pattern state was MEMORYLESS (last close only), so a confirmed break
+  that price later reclaimed silently went back to `forming` — fixed for reversal patterns only;
+  continuation patterns still work that way. The channel detector's least-squares rails don't have to
+  be respected by price, which is why it over-calls. A running dev backend can be older than the
+  code (the user's predated `ea0294c`), so a UI bug may not reproduce until the server restarts.
 
 ### Three-candle candlestick patterns — morning/evening star, three soldiers/crows (facts-only)
 - **Built:** 2026-09-23 · **branch:** `feature/three-candle-patterns`
