@@ -3,8 +3,7 @@
 A state file for the "learning instrument" build. Source of truth for what's next: `ROADMAP.md`
 (steps A1…D6; prompts in `PROMPTS.md`). Older plans are in `docs/archive/`. See `CLAUDE.md` for conventions.
 
-**ROADMAP progress:** A1 ✓ (human verification pass — see log). **Next: A2** (verdict reframe +
-no-edge disclosure).
+**ROADMAP progress:** A1 ✓, A2 ✓ (see log). **Next: A3** (situation tier in Layer 1).
 
 ## Current state
 
@@ -38,6 +37,25 @@ percent fields are kept for `config.yaml` compat). Defaults apply if `config.yam
 ---
 
 ## Log (newest first)
+
+### ROADMAP A2 — Verdict reframe + no-edge disclosure
+- **Done:** 2026-09-23 · **branch:** `feature/verdict-reframe` · frontend + one guide sentence.
+- **Verdict:** "confidence NN%" → a count ("2 of 4 categories agree · 1 opposes · 1 neutral";
+  denominator = categories that voted). "SETUP FLAGGED" → "categories aligned". Green/red border and
+  badge removed; the chart's verdict arrow is now neutral grey. The 0–1 `confidence` stays in the
+  API/facts, never displayed.
+- **Other "confidence" displays found:** the paper-trade log showed "NN% conf" per read → replaced
+  with "N categories agreed", bias no longer colour-coded. None left in `web/src`.
+- **Disclosure:** persistent line under the title on every view — "Tested: no predictive edge. This
+  tool is for reading charts, not forecasting them." — expands to a plain-language evidence panel
+  (backtest 51.3% of 429, cross-coin 40–61% unstable, ML AUC 0.51 / broken calibration, funding no edge).
+  The numbers are hard-coded from the documented runs; update them if the tests are re-run.
+- **Guide:** removed "If asked whether it works, say so plainly." (rule 6 keeps "do not imply
+  predictive power").
+- **Verified in the browser** (desktop + 400px): no percentage labelled confidence, neutral verdict,
+  disclosure visible on Analysis and Risk views. 300 green, svelte-check clean.
+- **Kept on purpose:** the track-record line ("right NN% of the time") — a base rate shown with its
+  count, not a confidence. P&L green/red and per-category vote colours (facts, not the verdict).
 
 ### ROADMAP A1 — Human verification pass (+ rendering fixes, reclaim rule, 2-point trendlines)
 - **Done:** 2026-09-23 · **branch:** `feature/a1-verification-fixes`

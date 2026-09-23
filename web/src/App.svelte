@@ -91,6 +91,21 @@
   })
 
   const conf = $derived(result?.confluence)
+  // Verdict as a COUNT of categories, never a percentage: "2 of 4 categories agree · 1 opposes".
+  // The 0–1 confidence stays in the API/facts for internal use; it is not displayed.
+  const catCount = $derived.by(() => {
+    const votes = Object.values(conf?.categories ?? {})
+    const bias = conf?.bias
+    const opposite = bias === 'bullish' ? 'bearish' : bias === 'bearish' ? 'bullish' : null
+    return {
+      total: votes.length,
+      agree: conf?.agreeing_categories ?? 0,
+      oppose: opposite ? votes.filter((v) => v === opposite).length : 0,
+      neutral: votes.filter((v) => v === 'neutral').length,
+      bullish: votes.filter((v) => v === 'bullish').length,
+      bearish: votes.filter((v) => v === 'bearish').length,
+    }
+  })
 
   // ---- paper-trading simulator (per-pair; live spot fills server-side) ----
   let tradeAmount = $state(500)
@@ -153,6 +168,30 @@
   <h1>🧙 Trading Wizard</h1>
   <p class="tag">Reads the chart, explains its reasoning — not financial advice.</p>
 
+  <!-- Persistent no-edge disclosure (ROADMAP A2). Shown on every view; the summary line is always
+       visible, the evidence opens underneath. Numbers are from the documented runs (PROGRESS.md /
+       CLAUDE.md) — update them here if the tests are re-run. -->
+  <details class="disclosure">
+    <summary>Tested: no predictive edge. This tool is for reading charts, not forecasting them.
+      <span class="more">What was tested</span></summary>
+    <div class="evidence">
+      <p>Several tests asked one question: <b>does the engine's read tell you where price goes
+        next?</b> All said no, so treat every verdict here as a description of the chart, not odds.</p>
+      <ul>
+        <li><b>Backtest</b> (look-ahead-safe replay, BTC/USDT 1h, 24 bars ahead): when categories
+          aligned, price moved the implied way in <b>51.3% of 429 cases</b>, about a coin flip.</li>
+        <li><b>Across coins and time</b> (BTC, ETH, SOL, XRP; first half vs second half of the history):
+          results ranged from about 40% to 61% and did not hold from one half to the other.</li>
+        <li><b>Machine learning</b> (walk-forward on BTC/USDT 1h, 3,545 out-of-sample predictions):
+          accuracy 52.2% vs 51.5% for always guessing the more common direction; AUC 0.51, where 0.50
+          is guessing. Its confidence was meaningless: when it said 91%, it was right 51% of the time.</li>
+        <li><b>Funding rates</b> (a common "crowded trade" signal): no contrarian edge found.</li>
+      </ul>
+      <p class="muted">What the tool is good for: seeing structure clearly (trend, levels, patterns),
+        learning what each signal means, and checking your own reads against what happened.</p>
+    </div>
+  </details>
+
   <nav class="views">
     <button class:active={view === 'analysis'} onclick={() => (view = 'analysis')}>Analysis</button>
     <button class:active={view === 'risk'} onclick={() => (view = 'risk')}>Risk calculator</button>
@@ -180,11 +219,17 @@
   {#if error}<p class="error">{error}</p>{/if}
 
   {#if result}
-    <div class="verdict" class:bull={conf?.bias === 'bullish'} class:bear={conf?.bias === 'bearish'}>
+    <!-- Neutral styling on purpose: green/red + a percentage read as odds to a beginner. -->
+    <div class="verdict">
       <span>Bias: <b>{conf?.bias}</b></span>
-      <span>confidence <b>{((conf?.confidence ?? 0) * 100).toFixed(0)}%</b></span>
-      <span>{conf?.agreeing_categories} categories agree</span>
-      {#if conf?.triggered}<span class="flag">SETUP FLAGGED</span>{/if}
+      {#if conf?.bias === 'bullish' || conf?.bias === 'bearish'}
+        <span><b>{catCount.agree} of {catCount.total}</b> categories agree{catCount.oppose
+          ? ` · ${catCount.oppose} ${catCount.oppose === 1 ? 'opposes' : 'oppose'}` : ''}{catCount.neutral
+          ? ` · ${catCount.neutral} neutral` : ''}</span>
+      {:else}
+        <span>categories: {catCount.bullish} bullish · {catCount.bearish} bearish · {catCount.neutral} neutral</span>
+      {/if}
+      {#if conf?.triggered}<span class="flag">categories aligned</span>{/if}
     </div>
 
     {#if result.base_rate}
@@ -251,9 +296,8 @@
                    Claude's write-up only if explain was ticked. This is the journaling payoff. -->
               {#if t.snapshot?.bias}
                 <div class="log-snap">
-                  read: <b class={t.snapshot.bias}>{t.snapshot.bias}</b>
-                  {#if t.snapshot.confidence != null}· {(t.snapshot.confidence * 100).toFixed(0)}% conf{/if}
-                  {#if t.snapshot.agreeing_categories != null}· {t.snapshot.agreeing_categories} cats{/if}
+                  read: <b>{t.snapshot.bias}</b>
+                  {#if t.snapshot.agreeing_categories != null}· {t.snapshot.agreeing_categories} categories agreed{/if}
                   {#if t.snapshot.explanation}
                     <details><summary>explanation</summary><pre>{t.snapshot.explanation}</pre></details>
                   {/if}
@@ -387,7 +431,14 @@
     font: 15px/1.5 -apple-system, system-ui, sans-serif; }
   main { max-width: 1000px; margin: 0 auto; padding: 24px; }
   h1 { margin: 0 0 4px; }
-  .tag { color: #8b949e; margin: 0 0 20px; }
+  .tag { color: #8b949e; margin: 0 0 8px; }
+  .disclosure { color: #8b949e; font-size: 13px; margin: 0 0 18px; }
+  .disclosure summary { cursor: pointer; }
+  .disclosure .more { text-decoration: underline; margin-left: 6px; }
+  .disclosure .evidence { margin-top: 8px; padding: 10px 14px; border: 1px solid #30363d;
+    border-radius: 8px; color: #c9d1d9; line-height: 1.5; }
+  .disclosure .evidence ul { margin: 6px 0; padding-left: 20px; }
+  .disclosure .evidence .muted { color: #8b949e; }
   .views { display: flex; gap: 8px; margin-bottom: 18px; }
   .views button { background: #161b22; border: 1px solid #30363d; font-weight: 500; }
   .views button.active { background: #238636; border-color: #238636; }
@@ -401,9 +452,7 @@
   .hint { color: #8b949e; }
   .verdict { display: flex; gap: 18px; align-items: center; flex-wrap: wrap;
     padding: 10px 14px; border: 1px solid #30363d; border-radius: 8px; margin-bottom: 12px; }
-  .verdict.bull { border-color: #26a641; }
-  .verdict.bear { border-color: #f85149; }
-  .flag { background: #238636; color: #fff; padding: 2px 8px; border-radius: 999px; font-size: 12px; }
+  .flag { border: 1px solid #484f58; color: #c9d1d9; padding: 2px 8px; border-radius: 999px; font-size: 12px; }
   .track { color: #8b949e; font-size: 13px; margin: 0 0 12px; }
   .panels { display: grid; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); gap: 12px; margin: 14px 0; }
   .panel h3 { margin: 0 0 8px; font-size: 13px; color: #8b949e; text-transform: uppercase; letter-spacing: .04em; }
@@ -451,8 +500,6 @@
   .log-entry { border-bottom: 1px solid #161b22; padding: 5px 0; }
   .log-row { display: flex; align-items: center; gap: 10px; font-size: 13px; }
   .log-snap { font-size: 12px; color: #8b949e; margin: 3px 0 0 44px; }
-  .log-snap b.bullish { color: #26a641; } .log-snap b.bearish { color: #f85149; }
-  .log-snap b.neutral { color: #8b949e; }
   .log-snap details { display: inline-block; margin-left: 6px; }
   .log-snap summary { cursor: pointer; color: #58a6ff; }
   .log-snap pre { white-space: pre-wrap; margin: 6px 0 0; color: #c9d1d9; font-size: 12px; }

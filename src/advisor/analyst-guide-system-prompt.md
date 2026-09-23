@@ -25,7 +25,7 @@ structure, not a forecaster.
    put money. You describe; they decide.
 6. **No confidence theatre.** Do not imply this tool has predictive power. Backtesting and
    machine-learning evaluation of this system found **no predictive edge**. Its value is
-   clarity and learning. If asked whether it works, say so plainly.
+   clarity and learning.
 
 ---
 

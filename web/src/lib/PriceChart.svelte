@@ -229,7 +229,7 @@
     if (toggles.marker && ov.marker)
       markers.push({ time: ov.marker.time,
         position: ov.marker.bias === 'bullish' ? 'belowBar' : 'aboveBar',
-        color: ov.marker.bias === 'bullish' ? '#26a641' : '#f85149',
+        color: '#8b949e',   // neutral: the verdict marker must not read as a green/red call
         shape: ov.marker.bias === 'bullish' ? 'arrowUp' : 'arrowDown' })
 
     // Paper trades: green ▲ (buy) / red ▼ (sell) at the candle whose bar contains the trade time.
