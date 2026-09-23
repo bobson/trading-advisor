@@ -1,10 +1,16 @@
 <script lang="ts">
   import { onMount } from 'svelte'
   import { createChart, type IChartApi, type ISeriesApi } from 'lightweight-charts'
-  import type { ChartData, PanelToggles, Pattern, Trade } from './api'
+  import type { ChartData, GoldLabels, PanelToggles, Pattern, Trade } from './api'
 
-  let { data, toggles, trades = [] }:
-    { data: ChartData | null; toggles: PanelToggles; trades?: Trade[] } = $props()
+  // ROADMAP B1: `labelMode` hides EVERY detector overlay (levels, fib, patterns, trendlines, swings,
+  // candle patterns, verdict marker, regime strip), draws the user's own `draft` labels instead, and
+  // forwards clicks on the price pane to `onChartClick(time, price)`.
+  let { data, toggles, trades = [], labelMode = false, draft = null, pending = null, onChartClick }:
+    { data: ChartData | null; toggles: PanelToggles; trades?: Trade[]; labelMode?: boolean
+      draft?: GoldLabels | null
+      pending?: { kind: string; points: { time: number; price: number }[] } | null
+      onChartClick?: (time: number, price: number) => void } = $props()
 
   let root: HTMLDivElement
   let charts: IChartApi[] = []
@@ -120,10 +126,19 @@
   })
 
   // Rebuild whenever the data or the toggles change (simple + robust vs incremental updates).
-  $effect(() => { data; toggles; trades; render() })
+  // Deep-read the label draft so adding a point re-renders; JSON keeps the dependency simple.
+  $effect(() => { data; toggles; trades; labelMode; JSON.stringify(draft); JSON.stringify(pending); render() })
+
+  // Keep the user's zoom/scroll across re-renders of the SAME candles (e.g. each labelling click).
+  let savedRange: { key: string; range: any } | null = null
+  const dataKey = (d: ChartData) => `${d.candles.length}:${d.candles[d.candles.length - 1]?.time}`
 
   function render() {
     if (!root) return
+    if (charts[0] && data) {
+      const r = charts[0].timeScale().getVisibleLogicalRange()
+      if (r) savedRange = { key: dataKey(data), range: { from: r.from, to: r.to } }
+    }
     teardown()
     if (!data) return
     const prec = data.price_precision ?? 2
@@ -168,7 +183,7 @@
     // Support/resistance ZONES (A4): a shaded band per zone, drawn under the candles, plus an
     // axis tag at its centre (no line — a single line is the false precision zones replace).
     // Stale zones (no reversal for a long time) are fainter and tagged "stale".
-    if (toggles.levels && ov.levels.length) {
+    if (!labelMode && toggles.levels && ov.levels.length) {
       series.attachPrimitive(new ZoneBands(ov.levels.map((lv) => ({
         lower: lv.lower, upper: lv.upper,
         color: (lv.role === 'support' ? '#26a641' : '#f85149') + (lv.stale ? '14' : '30'),
@@ -181,7 +196,7 @@
         } as any)
     }
 
-    if (toggles.fib && ov.fibonacci)
+    if (!labelMode && toggles.fib && ov.fibonacci)
       for (const [ratio, price] of Object.entries(ov.fibonacci.levels)) {
         if (![0.382, 0.5, 0.618].includes(Number(ratio))) continue   // key retracements only, less clutter
         series.createPriceLine({
@@ -194,7 +209,7 @@
     // as a line series, styled by state. The boundaries ARE the breakout/invalidation levels, so we
     // don't also draw horizontal lines for those (that was redundant clutter) — only the projected
     // target gets a single tag.
-    if (toggles.patterns) for (const p of ov.patterns) {
+    if (!labelMode && toggles.patterns) for (const p of ov.patterns) {
       const st = patternStyle(p)
       for (const ln of p.lines ?? []) {
         if (ln.length < 2) continue
@@ -211,7 +226,7 @@
 
     // Two-point trendlines: support through two swing lows (teal), resistance through two swing
     // highs (pink), drawn from the older anchor to the last candle — only while unbroken.
-    if (toggles.trendlines) for (const tl of ov.trendlines ?? []) {
+    if (!labelMode && toggles.trendlines) for (const tl of ov.trendlines ?? []) {
       const tln = main.addLineSeries({
         color: tl.kind === 'support' ? '#39c5cf' : '#db61a2', lineWidth: 2, lineStyle: 0,
         lastValueVisible: false, priceLineVisible: false, crosshairMarkerVisible: false,
@@ -221,7 +236,7 @@
     }
 
     const markers: any[] = []
-    if (toggles.swings) for (const s of ov.swings)
+    if (!labelMode && toggles.swings) for (const s of ov.swings)
       markers.push({ time: s.time, position: s.kind === 'high' ? 'aboveBar' : 'belowBar',
         color: '#8b949e', shape: 'circle' })
 
@@ -230,13 +245,13 @@
     // `patterns` toggle so they can be hidden with the other pattern annotations.
     // Marker text is a SHORT code (full names are in the legend under the pane): the full names
     // ("three white soldiers") overlapped each other and clipped at the left edge when zoomed out.
-    const candlePats = toggles.patterns ? (ov.candle_patterns ?? []) : []
+    const candlePats = toggles.patterns && !labelMode ? (ov.candle_patterns ?? []) : []
     for (const cp of candlePats) {
       const bull = cp.direction === 'bullish'
       markers.push({ time: cp.time, position: bull ? 'belowBar' : 'aboveBar',
         color: bull ? '#26a641' : '#f85149', shape: 'square', text: candleCode(cp.label) })
     }
-    if (toggles.marker && ov.marker)
+    if (!labelMode && toggles.marker && ov.marker)
       markers.push({ time: ov.marker.time,
         position: ov.marker.bias === 'bullish' ? 'belowBar' : 'aboveBar',
         color: '#8b949e',   // neutral: the verdict marker must not read as a green/red call
@@ -245,7 +260,11 @@
     // Paper trades: green ▲ (buy) / red ▼ (sell) at the candle whose bar contains the trade time.
     // A close is the OPPOSITE action, so a closed long draws a buy at entry AND a sell at close
     // ("green when I bought, red when I sold"). Trades before the loaded window are skipped.
+    // A trade after the last loaded candle (e.g. while scrubbed back in history) is NOT snapped onto
+    // that candle — it didn't happen yet at this bar — so it's skipped.
+    const lastCandle = cTimes[cTimes.length - 1]
     const snap = (ts: number): number | null => {
+      if (ts >= lastCandle + step) return null
       let best: number | null = null
       for (const t of cTimes) { if (t <= ts) best = t; else break }
       return best
@@ -254,7 +273,7 @@
       side === 'buy'
         ? { time, position: 'belowBar', color: '#26a641', shape: 'arrowUp', text: `Buy $${amount}` }
         : { time, position: 'aboveBar', color: '#f85149', shape: 'arrowDown', text: `Sell $${amount}` }
-    for (const tr of trades) {
+    for (const tr of labelMode ? [] : trades) {        // labelling: your trades would anchor you too
       const et = snap(tr.opened_at)
       if (et != null) markers.push(tradeMarker(tr.side, et, tr.amount_usd))
       if (tr.status === 'closed' && tr.closed_at != null) {
@@ -262,14 +281,44 @@
         if (xt != null) markers.push(tradeMarker(tr.side === 'buy' ? 'sell' : 'buy', xt, tr.amount_usd))
       }
     }
+    // ---- B1: the user's own labels (purple) + the point/zone being drawn (orange) ----
+    if (labelMode && draft) {
+      const GOLD = '#a371f7', PEND = '#f0883e'
+      if (draft.zones.length)
+        series.attachPrimitive(new ZoneBands(draft.zones.map((z) => ({ lower: z.lower, upper: z.upper, color: GOLD + '38' }))) as any)
+      for (const z of draft.zones)
+        series.createPriceLine({ price: (z.lower + z.upper) / 2, color: GOLD, lineVisible: false,
+          axisLabelVisible: true, title: `your ${z.role}` } as any)
+      const drawPts = (pts: { time: number; price: number }[], color: string, dashed: boolean, label: string) => {
+        const line = main.addLineSeries({ color, lineWidth: 2, lineStyle: dashed ? 2 : 0,
+          lastValueVisible: false, priceLineVisible: false, crosshairMarkerVisible: false })
+        line.setData(dedupeByTime(pts.map((q) => ({ time: q.time, value: q.price }))) as any)
+        pts.forEach((q, i) => markers.push({ time: q.time, position: 'inBar', color, shape: 'circle',
+          text: i === 0 ? label : '' }))
+      }
+      for (const p of draft.patterns) drawPts(p.points, GOLD, false, p.type)
+      if (pending?.points.length) {
+        if (pending.kind === 'pattern') drawPts(pending.points, PEND, true, 'drawing…')
+        else series.createPriceLine({ price: pending.points[0].price, color: PEND, lineWidth: 1,
+          lineStyle: 2, axisLabelVisible: true, title: 'zone edge 1' } as any)
+      }
+    }
     markers.sort((a, b) => a.time - b.time)
     series.setMarkers(markers as any)
+    if (labelMode && onChartClick) {
+      const lastTime = cTimes[cTimes.length - 1]
+      main.subscribeClick((param: any) => {
+        if (!param?.point || param.time == null || param.time > lastTime) return
+        const price = series.coordinateToPrice(param.point.y)
+        if (price != null) onChartClick(param.time as number, price as number)
+      })
+    }
 
     // ---- regime strip: a solid colored band per candle + an HTML legend row under it ----
     // The strip hides its own time axis and price labels (the old 40px pane spent most of its
     // height on an axis, leaving a sliver of color under an overlapping label). The price scale
     // stays VISIBLE (blank labels) so its width — and the candles above — still line up.
-    if (ov.regime && ov.regime.length) {
+    if (!labelMode && ov.regime && ov.regime.length) {
       const c = newPane('', REGIME_H, false, {
         timeScale: { visible: false },
         rightPriceScale: { ticksVisible: false, borderVisible: false },
@@ -405,11 +454,14 @@
     // the whole history — thousands of bars hit lightweight-charts' minimum bar-spacing and the
     // view collapses/loses the gap. You can still pan all the way back to bar 0 (fixLeftEdge).
     const view = Math.min(data.candles.length, 200)
-    main.timeScale().setVisibleLogicalRange({ from: data.candles.length - view, to: maxRight })
+    if (savedRange && savedRange.key === dataKey(data)) main.timeScale().setVisibleLogicalRange(savedRange.range)
+    else main.timeScale().setVisibleLogicalRange({ from: data.candles.length - view, to: maxRight })
 
     // Opt-in test hook (only when the URL carries ?__verify) so a headless browser can read the
     // real chart's range. No-op in normal use.
-    if (typeof location !== 'undefined' && location.search.includes('__verify')) (window as any).__mainChart = main
+    if (typeof location !== 'undefined' && location.search.includes('__verify')) {
+      (window as any).__mainChart = main; (window as any).__mainSeries = series
+    }
   }
 
   // Shaded horizontal bands (series primitive): each zone fills lower..upper across the pane.

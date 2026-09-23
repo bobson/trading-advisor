@@ -2,11 +2,12 @@
   import { onMount } from 'svelte'
   import PriceChart from './lib/PriceChart.svelte'
   import RiskCalculator from './lib/RiskCalculator.svelte'
+  import LabelPanel from './lib/LabelPanel.svelte'
   import {
     getPairs, getTimeframes, getAnalysis, getTrades, getPosition, postTrade, deleteTrade,
     getTradesBaseline,
     type Pair, type Analysis, type PanelToggles, type Trade, type TradePnl, type Position,
-    type TradeBaseline,
+    type TradeBaseline, type GoldLabels,
   } from './lib/api'
 
   let view = $state<'analysis' | 'risk'>('analysis')
@@ -49,6 +50,22 @@
     scrubTimer = setTimeout(() => run(false), 180)    // debounce; per-bar responses are cached
   }
   function stepScrub(delta: number) { scrubTo((asOfBar ?? scrubMax) + delta) }
+
+  // ---- ROADMAP B1: labelling mode (your own gold labels at the scrub bar) ----
+  let labelMode = $state(false)
+  let draft = $state<GoldLabels>({ patterns: [], zones: [], nothing: false, note: '' })
+  let pending = $state<{ kind: 'pattern' | 'zone'; points: { time: number; price: number }[] } | null>(null)
+  let labelPanel: any = $state(null)
+  // The bar the chart is ACTUALLY showing (from the API), never the slider value — the two can
+  // differ while a scrub request is in flight, and a label must match the candles you saw.
+  const labelBar = $derived(result?.bar_index ?? scrubMax)
+  const labelBarTime = $derived(result?.chart.candles.at(-1)?.time ?? null)
+  function toggleLabelMode() { labelMode = !labelMode; pending = null }
+  async function jumpToLabel(s: string, tf: string, bar: number) {
+    symbol = s; timeframe = tf; asOfBar = bar
+    await run(false)
+    labelMode = true
+  }
   function goLive() { asOfBar = null; run() }
   function onScrubKey(e: KeyboardEvent) {
     const step = e.shiftKey ? 10 : 1
@@ -67,20 +84,25 @@
     }
   })
 
+  // A request made while another is loading is QUEUED (the latest one wins), not dropped —
+  // dropping it left the chart showing an older bar than the scrub slider (B1 finding).
+  let rerun: boolean | null = null
   async function run(useExplain = explain) {
-    if (loading) return
+    if (loading) { rerun = useExplain; return }
     loading = true
     error = null
     try {
       // Skip context/explain while scrubbing (current-state context is anachronistic on a past bar).
       const scrubbing = asOfBar != null
-      result = await getAnalysis(symbol, timeframe, scrubbing ? false : useExplain, !scrubbing, asOfBar, 5000, explanationStyle)
+      // Labelling never spends API credit: no explanation while labelMode is on.
+      result = await getAnalysis(symbol, timeframe, scrubbing || labelMode ? false : useExplain, !scrubbing, asOfBar, 5000, explanationStyle)
     } catch (e: any) {
       error = e.message
       result = null
     } finally {
       loading = false
     }
+    if (rerun !== null) { const again = rerun; rerun = null; return run(again) }
     if (result) loadTrades()
   }
 
@@ -251,6 +273,7 @@
   {#if error}<p class="error">{error}</p>{/if}
 
   {#if result}
+    {#if !labelMode}
     <!-- Neutral styling on purpose: green/red + a percentage read as odds to a beginner. -->
     <div class="verdict">
       <span>Bias: <b>{conf?.bias}</b></span>
@@ -371,6 +394,7 @@
         </div>
       {/if}
     </section>
+    {/if}
 
     <!-- Research controls: scrub back through history + choose which overlays/panes to draw. -->
     <div class="research">
@@ -384,6 +408,9 @@
           {#if asOfBar == null}bar {scrubMax} · <b>live</b>{:else}bar {asOfBar} / {scrubMax}{/if}
         </span>
         {#if asOfBar != null}<button class="mini live" onclick={goLive}>⤒ live</button>{/if}
+        <button class="mini label-btn" class:on={labelMode} onclick={toggleLabelMode}
+                title="mark what your eye sees at this bar (detector overlays hidden)">
+          {labelMode ? '✓ Labelling — exit' : '🏷 Label this bar'}</button>
       </div>
       <details class="toggles">
         <summary>overlays &amp; panes</summary>
@@ -402,7 +429,7 @@
       </details>
     </div>
 
-    {#if result.chart.overlays.patterns.length}
+    {#if !labelMode && result.chart.overlays.patterns.length}
       <div class="patterns">
         {#each result.chart.overlays.patterns as p}
           <span class="pchip {p.state}">{p.type} · {p.state}</span>
@@ -410,8 +437,13 @@
       </div>
     {/if}
 
-    <PriceChart data={result.chart} {toggles} {trades} />
+    <PriceChart data={result.chart} {toggles} {trades} {labelMode} {draft} {pending}
+                onChartClick={(t, p) => labelPanel?.handleClick(t, p)} />
 
+    {#if labelMode}
+      <LabelPanel bind:this={labelPanel} {symbol} {timeframe} bar={labelBar} barTime={labelBarTime}
+                  candles={result.chart.candles} bind:draft bind:pending onJump={jumpToLabel} />
+    {:else}
     <div class="panels">
       <section class="panel">
         <h3>Confluence by category</h3>
@@ -481,6 +513,7 @@
     {:else}
       <p class="hint">Tick “explain” and Analyze again for Claude’s plain-language write-up.</p>
     {/if}
+    {/if}
   {:else if !error}
     <p class="hint">Pick a pair and timeframe, then press Analyze.</p>
   {/if}
@@ -496,6 +529,8 @@
   h1 { margin: 0 0 4px; }
   .tag { color: #8b949e; margin: 0 0 8px; }
   .disclosure { color: #8b949e; font-size: 13px; margin: 0 0 18px; }
+  .label-btn { margin-left: 8px; }
+  .label-btn.on { background: #6e40c9; border-color: #6e40c9; color: #fff; }
   .disclosure summary { cursor: pointer; }
   .disclosure .more { text-decoration: underline; margin-left: 6px; }
   .disclosure .evidence { margin-top: 8px; padding: 10px 14px; border: 1px solid #30363d;

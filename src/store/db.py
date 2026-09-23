@@ -45,6 +45,20 @@ CREATE TABLE IF NOT EXISTS trades (
     snapshot     TEXT,                    -- JSON: {bias, confidence, agreeing_categories, explanation?}
     note         TEXT
 );
+
+-- ROADMAP B1: the detector GOLD SET — what the user's eye sees at a chosen bar, labelled with the
+-- detector overlays hidden. One row per (symbol, timeframe, bar); re-saving the same bar updates it.
+CREATE TABLE IF NOT EXISTS gold_labels (
+    id         INTEGER PRIMARY KEY AUTOINCREMENT,
+    symbol     TEXT    NOT NULL,
+    timeframe  TEXT    NOT NULL,
+    bar        INTEGER NOT NULL,          -- bar index in the full history (the as-of / scrub bar)
+    bar_time   INTEGER,                   -- that bar's timestamp, epoch seconds UTC
+    labels     TEXT    NOT NULL,          -- JSON: {patterns:[{type, points:[{time,price}]}], zones:[{lower,upper,role}], nothing: bool, note}
+    created_at INTEGER NOT NULL,          -- epoch seconds UTC
+    updated_at INTEGER NOT NULL,
+    UNIQUE (symbol, timeframe, bar)
+);
 """
 
 

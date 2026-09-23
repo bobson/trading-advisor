@@ -69,7 +69,8 @@ instructing it better. So **the guide shrinks as Layer 1 grows.**
 | A5 Facts payload hardening | ✅ Done (merged, 2026-09-24) |
 | A6 Analyst guide revision | ✅ Done (merged, 2026-09-24) |
 | A7 Honest baselines | ✅ Done (merged, 2026-09-24) |
-| Tests | 367 green, ruff + svelte-check clean |
+| B1 Detector gold set — labelling mode | ✅ Tooling merged (2026-09-24); ≥30 labelled charts pending (user) |
+| Tests | 382 green, ruff + svelte-check clean |
 
 **Remaining, in order:**
 

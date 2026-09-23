@@ -39,7 +39,9 @@ app = FastAPI(title="Trading Advisor API", version="1.0")
 app.add_middleware(
     CORSMiddleware,
     allow_origins=cfg.allowed_origins,
-    allow_methods=["GET"],
+    # GET for reads; POST/PUT/DELETE for paper trades and gold labels (was GET-only, which made the
+    # browser's preflight fail for every write). Origins stay restricted to `allowed_origins`.
+    allow_methods=["GET", "POST", "PUT", "DELETE"],
     allow_headers=["*"],
 )
 
@@ -134,6 +136,9 @@ def analysis(
 
     payload = serialize_analysis(result, limit=limit)
     payload["as_of_bar"] = as_of_bar        # echo so the scrub UI knows the current position
+    # The bar index this payload was ACTUALLY computed at (as_of_bar is clamped up to a warm-up
+    # floor, and None means the latest bar). Labels are keyed to this, never to the slider value.
+    payload["bar_index"] = len(result.df) - 1
     _CACHE[key] = (now, payload)
     return payload
 
@@ -286,5 +291,65 @@ def delete_trade(trade_id: int) -> dict:
     try:
         paper.delete_trade(conn, trade_id)
         return {"deleted": trade_id}
+    finally:
+        conn.close()
+
+
+# --- ROADMAP B1: detector gold set (SQLite `gold_labels`; the user's own labels) -------------------
+class GoldLabelIn(BaseModel):
+    symbol: str
+    timeframe: str
+    bar: int
+    bar_time: int | None = None
+    labels: dict
+
+
+@app.get("/labels/types", dependencies=_GUARDS)
+def label_types() -> dict:
+    from src.labels.gold import DETECTOR_TYPES, EXTRA_TYPES, ZONE_ROLES
+    return {"detector_types": DETECTOR_TYPES, "extra_types": EXTRA_TYPES, "zone_roles": list(ZONE_ROLES)}
+
+
+@app.get("/labels", dependencies=_GUARDS)
+def get_labels() -> dict:
+    """Every labelled chart (newest first) + the counts summary."""
+    from src.labels import gold
+    conn = _trades_conn()
+    try:
+        return {"labels": gold.list_all(conn), "summary": gold.summary(conn)}
+    finally:
+        conn.close()
+
+
+@app.get("/labels/one", dependencies=_GUARDS)
+def get_label(symbol: str = Query(...), timeframe: str = Query(...), bar: int = Query(...)) -> dict:
+    from src.labels import gold
+    conn = _trades_conn()
+    try:
+        return {"label": gold.load(conn, symbol, timeframe, bar)}
+    finally:
+        conn.close()
+
+
+@app.put("/labels", dependencies=_GUARDS)
+def put_label(body: GoldLabelIn) -> dict:
+    from src.labels import gold
+    conn = _trades_conn()
+    try:
+        row = gold.save(conn, body.symbol, body.timeframe, body.bar, body.labels, bar_time=body.bar_time)
+        return {"label": row, "summary": gold.summary(conn)}
+    except (ValueError, KeyError, TypeError) as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
+    finally:
+        conn.close()
+
+
+@app.delete("/labels/{label_id}", dependencies=_GUARDS)
+def delete_label(label_id: int) -> dict:
+    from src.labels import gold
+    conn = _trades_conn()
+    try:
+        gold.delete(conn, label_id)
+        return {"deleted": label_id, "summary": gold.summary(conn)}
     finally:
         conn.close()

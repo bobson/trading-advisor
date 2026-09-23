@@ -68,6 +68,7 @@ export interface Analysis {
   explanation: string | null
   chart: ChartData
   as_of_bar: number | null
+  bar_index?: number          // the bar this payload was actually computed at (B1)
   [k: string]: any
 }
 
@@ -177,3 +178,24 @@ export const getAnalysis = (
       `&context=${context}&limit=${limit}&explanation_style=${explanationStyle}` +
       (asOfBar != null ? `&as_of_bar=${asOfBar}` : ''),
   )
+
+// --- ROADMAP B1: detector gold set (your own labels) ---
+export interface GoldPattern { type: string; points: { time: number; price: number }[] }
+export interface GoldZone { lower: number; upper: number; role: 'support' | 'resistance' }
+export interface GoldLabels { patterns: GoldPattern[]; zones: GoldZone[]; nothing: boolean; note?: string }
+export interface GoldRow {
+  id: number; symbol: string; timeframe: string; bar: number; bar_time: number | null
+  labels: GoldLabels; created_at: number; updated_at: number
+}
+export interface GoldSummary {
+  charts: number; patterns: number; by_type: Record<string, number>; zones: number; nothing: number
+  by_symbol_tf: Record<string, number>
+}
+export const getLabelTypes = () =>
+  get<{ detector_types: string[]; extra_types: string[]; zone_roles: string[] }>('/labels/types')
+export const getLabels = () => get<{ labels: GoldRow[]; summary: GoldSummary }>('/labels')
+export const getLabel = (symbol: string, timeframe: string, bar: number) =>
+  get<{ label: GoldRow | null }>(`/labels/one?symbol=${encodeURIComponent(symbol)}&timeframe=${timeframe}&bar=${bar}`)
+export const putLabel = (body: { symbol: string; timeframe: string; bar: number; bar_time: number | null; labels: GoldLabels }) =>
+  send<{ label: GoldRow; summary: GoldSummary }>('PUT', '/labels', body)
+export const deleteLabel = (id: number) => send<{ deleted: number; summary: GoldSummary }>('DELETE', `/labels/${id}`)

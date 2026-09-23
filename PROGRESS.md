@@ -3,8 +3,9 @@
 A state file for the "learning instrument" build. Source of truth for what's next: `ROADMAP.md`
 (steps A1…D6; prompts in `PROMPTS.md`). Older plans are in `docs/archive/`. See `CLAUDE.md` for conventions.
 
-**ROADMAP progress:** A1 ✓ (merged, `645231c`), A2 ✓ (merged, `800e12a`; docs `1003735`), A3 ✓ (merged), A4 ✓ (merged), A5 ✓ (merged), A6 ✓ (merged), A7 ✓ (merged). **Next: A8**
-(morning report — the forward record).
+**ROADMAP progress:** A1 ✓ (merged, `645231c`), A2 ✓ (merged, `800e12a`; docs `1003735`), A3 ✓ (merged), A4 ✓ (merged), A5 ✓ (merged), A6 ✓ (merged), A7 ✓ (merged), B1 ✓ (merged — labelling mode
+built; the ≥30 labelled charts are the user's ongoing work). **Next: A8** (morning report — the forward
+record), with gold-set labelling continuing alongside.
 
 ## Current state
 
@@ -21,7 +22,8 @@ two-point trendlines). **ROADMAP A2** (verdict as a category count, neutral styl
 disclosure; `800e12a`). **ROADMAP A3** (situation tier decided in Layer 1) and **ROADMAP A4** (support/resistance as
 ATR-scaled zones) and **ROADMAP A5** (facts payload hardening) and **ROADMAP A6** (analyst guide revision +
 instrument price precision) and **ROADMAP A7** (honest baselines: luck band + zero-edge calculator
-default). **367 tests green, ruff + svelte-check clean.**
+default) and **ROADMAP B1** (gold-set labelling mode — `gold_labels` table). **382 tests green, ruff +
+svelte-check clean.**
 
 **Standing facts:** patterns and 3-candle candlesticks stay OUT of the confidence score (facts
 only); regime is standalone (not a vote); two-point trendlines are chart-only (not in facts); the
@@ -55,6 +57,36 @@ apply if `config.yaml` omits them.
 ---
 
 ## Log (newest first)
+
+### ROADMAP B1 — Detector gold set: labelling mode
+- **Done:** 2026-09-24 · **branch:** `feature/gold-set` · **merged to `main`.** Tooling done; the
+  done-when's second half — **≥30 charts labelled — is the user's work and is still open (0 so far).**
+- **Done-when (tooling) → PASS:** labelling mode works with the detector overlays hidden — checked in
+  headless Chromium on BTC/USDT 1d at a scrubbed bar: verdict, pattern chips, facts panels, paper
+  trade, S/R zones, Fibonacci, patterns, trendlines, swings, candle patterns, the verdict marker and
+  the regime strip all hidden; a double top (3 wick-snapped points) + a support zone drawn, saved,
+  reloaded when returning to the bar, and the detectors restored on exit. Tested against a SCRATCH
+  DB (the real `data/wizard.db` untouched). 15 new tests, **382 green**.
+- **Build:** `gold_labels` table (symbol, timeframe, bar, bar_time, labels JSON, created/updated;
+  UNIQUE per bar → re-saving updates). `src/labels/gold.py`: `validate` (known type, ≥2 points,
+  lower<upper, role; "nothing here" is a real label and can't coexist with patterns), `save` (upsert),
+  `load`, `list_all`, `delete`, `summary` (charts, patterns by type, zones, "nothing here",
+  per market). Vocabulary = the detector's own type names + a few it doesn't detect yet (wedges,
+  flags, other) so recall can be measured on them. API: `GET /labels/types`, `GET /labels`,
+  `GET /labels/one`, `PUT /labels`, `DELETE /labels/{id}`. UI: "🏷 Label this bar" in the scrub row →
+  `LabelPanel.svelte` (pattern type + clicks on key points with snap-to-wick, "Add pattern"; S/R zone =
+  two clicks + role; "nothing here"; note; save/update; the gold-set list with counts by type, and
+  click a row to jump to that chart/bar). `PriceChart` label mode draws your labels in purple, keeps
+  zoom/scroll across clicks, and ignores clicks after the labelling bar. Labelling never calls Claude.
+- **Bugs found and fixed on the way:** (1) **CORS allowed only GET** since Phase 24 — every browser
+  write (paper Buy/Sell/undo, label save) failed its preflight ("Failed to fetch"); now GET/POST/PUT/
+  DELETE, origins still restricted (test added). (2) **Scrub race:** a request made while one was
+  loading was silently dropped, so the chart could show an older bar than the slider — a label would
+  have been saved to the wrong bar. Requests now queue; the API returns `bar_index` (the bar actually
+  computed) and labels key to that (test added). (3) While scrubbed back, paper trades from the future
+  were snapped onto the last candle; they're now skipped, and hidden entirely while labelling.
+- **Deviations from ROADMAP.md:** none in substance. Labels are keyed by bar index AND bar_time, so
+  B2 can match either way.
 
 ### ROADMAP A7 — Honest baselines
 - **Done:** 2026-09-24 · **branch:** `feature/honest-baselines` · **merged to `main`.**
