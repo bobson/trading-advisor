@@ -31,7 +31,7 @@ from src.config import Config
 from src.data.registry import get_candles
 from src.indicators.features import add_features
 from src.structure.fibonacci import FibRetracement, fib_retracement
-from src.structure.support_resistance import find_support_resistance
+from src.structure.support_resistance import sr_zones
 from src.structure.swings import find_swings
 from src.structure.trendlines import find_trendlines
 
@@ -156,7 +156,7 @@ def advise(
     facts_text = facts_to_prompt(facts)
 
     # Same swings + params as build_facts used internally -> byte-identical geometry.
-    levels = find_support_resistance(swings, req.structure.sr_cluster_tolerance_pct)
+    levels = sr_zones(featured, swings, req)      # A4: the same zones that voted
     trendlines = find_trendlines(swings)
     fib = fib_retracement(swings)
 

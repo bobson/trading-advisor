@@ -10,6 +10,10 @@ structure:
   round_number_pct: 0.5      # how close (%) price must be to a round number to be "at" it (Phase 18)
   trendline_break_atr_mult: 0.25  # a 2-point trendline is dropped once a close crosses it by this x ATR
   trendline_max_anchors: 6        # how many recent swings the older trendline anchor may come from
+  sr_zone_atr_mult: 0.5      # S/R zones: swings within this x ATR merge; also the min band width (A4)
+  sr_near_atr_mult: 0.25     # price within this x ATR of a zone edge counts as "at" the zone
+  sr_stale_bars: 120         # a zone untouched for this many bars is marked stale
+  sr_strength_halflife_bars: 60  # recency weighting: a touch counts half as much after this many bars
 
 indicators:
   rsi_period: 14

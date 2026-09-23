@@ -150,27 +150,29 @@ def test_pattern_votes():
     assert signal_from_patterns(_pattern_row()).direction == NEUTRAL
 
 
-def _levels(records):
-    return pd.DataFrame(records, columns=["price", "touches"])
+def _zones(records):
+    """(lower, upper) bands; centre is the midpoint. Other zone columns get neutral defaults."""
+    rows = [{"price": (lo + hi) / 2, "lower": lo, "upper": hi, "touches": 3, "first_touch": 0,
+             "last_touch": 10, "bars_since_touch": 5, "strength": 1.0, "stale": False}
+            for lo, hi in records]
+    return pd.DataFrame(rows)
 
 
-def test_sr_votes_bullish_on_support():
-    # a level at 99.8 sits below last_close (support), 0.2% away -> within 0.5% -> bullish
-    levels = _levels([(99.8, 3), (90.0, 2)])
-    sig = signal_from_support_resistance(levels, last_close=100.0, proximity_pct=0.5)
-    assert sig.direction == BULLISH
+def test_sr_votes_bullish_inside_support_zone():
+    # price 100 sits in the upper half of the 99.0–100.6 band (centre 99.8 < price) -> support
+    sig = signal_from_support_resistance(_zones([(99.0, 100.6), (90.0, 91.0)]), 100.0, atr=2.0, near_atr_mult=0.25)
+    assert sig.direction == BULLISH and "inside the support zone" in sig.reason
 
 
-def test_sr_votes_bearish_on_resistance():
-    # a level above last_close is resistance -> bearish
-    levels = _levels([(100.3, 3)])
-    sig = signal_from_support_resistance(levels, last_close=100.0, proximity_pct=0.5)
-    assert sig.direction == BEARISH
+def test_sr_votes_bearish_near_resistance_zone():
+    # band 100.4–101.0 is 0.4 above price; 0.25 × ATR(2) = 0.5 -> "at the edge of" resistance
+    sig = signal_from_support_resistance(_zones([(100.4, 101.0)]), 100.0, atr=2.0, near_atr_mult=0.25)
+    assert sig.direction == BEARISH and "edge of the resistance zone" in sig.reason
 
 
-def test_sr_neutral_when_far():
-    levels = _levels([(120.0, 3)])
-    sig = signal_from_support_resistance(levels, last_close=100.0, proximity_pct=0.5)
+def test_sr_neutral_when_beyond_the_atr_margin():
+    # 0.6 from the band edge > 0.5 margin -> not at the zone
+    sig = signal_from_support_resistance(_zones([(100.6, 101.0)]), 100.0, atr=2.0, near_atr_mult=0.25)
     assert sig.direction == NEUTRAL
 
 

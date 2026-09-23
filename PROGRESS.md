@@ -3,8 +3,8 @@
 A state file for the "learning instrument" build. Source of truth for what's next: `ROADMAP.md`
 (steps A1…D6; prompts in `PROMPTS.md`). Older plans are in `docs/archive/`. See `CLAUDE.md` for conventions.
 
-**ROADMAP progress:** A1 ✓ (merged, `645231c`), A2 ✓ (merged, `800e12a`; docs `1003735`), A3 ✓ (merged). **Next: A4**
-(support/resistance as zones + level freshness).
+**ROADMAP progress:** A1 ✓ (merged, `645231c`), A2 ✓ (merged, `800e12a`; docs `1003735`), A3 ✓ (merged), A4 ✓ (merged). **Next: A5** (facts
+payload hardening).
 
 ## Current state
 
@@ -18,14 +18,16 @@ states), 6 (market regime), 8 (exit-rule lab), 9 (risk of ruin), 10 (honest cost
 hardening pass (guide wired in, brief/teaching modes); paper trading; three-candle patterns; and
 **ROADMAP A1** (verification pass: chart label/regime fixes, reclaimed-neckline → `failed`,
 two-point trendlines). **ROADMAP A2** (verdict as a category count, neutral styling, no-edge
-disclosure; `800e12a`). **ROADMAP A3** (situation tier decided in Layer 1). **326 tests green, ruff + svelte-check clean.**
+disclosure; `800e12a`). **ROADMAP A3** (situation tier decided in Layer 1) and **ROADMAP A4** (support/resistance as
+ATR-scaled zones). **333 tests green, ruff + svelte-check clean.**
 
 **Standing facts:** patterns and 3-candle candlesticks stay OUT of the confidence score (facts
 only); regime is standalone (not a vote); two-point trendlines are chart-only (not in facts); the
 0–1 confluence `confidence` is internal — the UI shows "N of M categories agree", never a %. The
 situation tier (`facts["situation"]`: no_setup / notable / confirmed, + mtf_synthesis for the
 synthesis) is Layer 1's decision; it sets the explanation's format and word budget, and Claude may
-not change it.
+not change it. Support/resistance are ZONES (bands with touches, strength, stale flag) built by one
+shared `sr_zones()`; "at support" = inside the band or within 0.25×ATR of its edge.
 
 **Known open items:** channel detector over-calls (SOL 1d eye-check FAIL → B1/B2); phone-width
 right-axis price-label pile-up; the disclosure panel's evidence numbers are hard-coded from past
@@ -38,12 +40,47 @@ for long-form; toggle in the UI.
 **Default config:** symbol `BTC/USDT`, timeframe `1h`, exchange `binance`, history 4320 bars.
 Selectable timeframes: `15m, 30m, 1h, 4h, 1d`. Registered pairs: BTC/ETH/SOL/XRP (USDT) +
 EUR/USD, GBP/USD (forex via Twelve Data). New in A1: `patterns.reclaim_atr_mult` (0.25),
-`structure.trendline_break_atr_mult` (0.25), `structure.trendline_max_anchors` (6). Defaults
+`structure.trendline_break_atr_mult` (0.25), `structure.trendline_max_anchors` (6). New in A4:
+`structure.sr_zone_atr_mult` (0.5), `sr_near_atr_mult` (0.25), `sr_stale_bars` (120),
+`sr_strength_halflife_bars` (60). Defaults
 apply if `config.yaml` omits them.
 
 ---
 
 ## Log (newest first)
+
+### ROADMAP A4 — Support/resistance as zones + level freshness
+- **Done:** 2026-09-23 · **branch:** `feature/sr-zones` · **merged to `main`.**
+- **Done-when → PASS:** zones render as shaded bands in the browser (headless Chromium: BTC 1d,
+  SOL 1d zoomed); stale zones are marked (fainter band + "stale" axis tag + in facts/prompt);
+  snapshot regenerated after the user reviewed and approved the diff; tests for width scaling and
+  staleness (13 new; **333 green**, ruff + svelte-check clean).
+- **Build:** `support_resistance.py` — `find_sr_zones()` clusters swings within `sr_zone_atr_mult`
+  (0.5) × ATR of the running centroid; band = centred on the touches' mean, ≥ 0.5×ATR wide, always
+  covering every touch; `touches` / `first_touch` / `last_touch` / `bars_since_touch` (touch =
+  a swing REVERSAL in the zone); `strength` = Σ 0.5^(age/60 bars); `stale` = no reversal for 120
+  bars. `sr_zones(featured, swings, cfg)` is the ONE builder used by facts, confluence, the service
+  and the chart; `zone_distance()` = 0 inside the band. `price` stays the band centre, so every old
+  consumer (roles, chart-pattern structure hits, PNG chart) still works.
+- **Vote:** `signal_from_support_resistance(zones, close, atr, near_atr_mult)` — at a zone = inside
+  or within 0.25×ATR of its edge (was: within 0.5% of a single line). Role from the centre vs price.
+  Facts `nearest_support/resistance` now carry lower/upper/touches/bars_since_touch/strength/stale/
+  inside; the prompt renders them as bands ("last reversal N bars ago", STALE flag).
+- **Chart:** a lightweight-charts series primitive (`ZoneBands`) fills each band under the candles;
+  an axis tag at the centre (no line). Fibonacci and round numbers stay exact lines.
+- **Backtest (vote-path change, BTC/USDT 1h, h=24, step=4):** **51.6% of 438 → 50.5% of 440** —
+  within noise, slightly worse; NOT tuned. Still no edge.
+- **Snapshot diff (approved):** the old 7-touch line at 64,166 (0.5% clustering ≈ 1.4×ATR on 1h) split
+  under 0.5×ATR clustering; price is now INSIDE a 2-touch support zone 63,829–63,944 → S/R vote
+  bearish→bullish → structure nets neutral → 1 agreeing category, not triggered → tier confirmed→notable.
+- **Deviations from ROADMAP.md:** clustering itself also moved from a fixed 0.5% to ATR (the roadmap
+  asked only for ATR-scaled *width*, but the conventions ban fixed-% thresholds and %-clusters with
+  ATR-wide bands would overlap). `sr_cluster_tolerance_pct` is now used only by chart-pattern
+  structure hits and the old `find_support_resistance` (kept for `show_structure.py`/tests).
+- **Findings:** ATR clustering is TIGHTER than 0.5% on 1h and WIDER on daily — zones fragment on
+  intraday charts. "Touch" = reversal, so a zone price is trading in right now can still be stale
+  (SOL 1d: inside a zone last reversed ~270 bars ago). Not changed here: the Fibonacci vote still uses
+  the percent `proximity_pct`; the PNG chart (`viz/chart.py`) still draws centre lines.
 
 ### ROADMAP A3 — Situation tier in Layer 1
 - **Done:** 2026-09-23 · **branch:** `feature/situation-tier` · **merged to `main`.**

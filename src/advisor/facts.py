@@ -57,7 +57,9 @@ from src.structure.support_resistance import (
     RESISTANCE,
     SUPPORT,
     annotate_roles,
-    find_support_resistance,
+    current_atr,
+    sr_zones,
+    zone_distance,
 )
 from src.structure.trend import classify_trend
 
@@ -116,19 +118,29 @@ def _rsi_zone(rsi: float | None, cfg: Config) -> str:
     return "neutral"
 
 
-def _nearest_levels(levels: pd.DataFrame, last_close: float) -> dict:
-    """Nearest support (below price) and resistance (above price), by distance."""
+def _nearest_levels(zones: pd.DataFrame, last_close: float) -> dict:
+    """Nearest support ZONE (centre below price) and resistance zone (centre above), by distance
+    to the band (0 when price is inside it). ROADMAP A4: each is a band, not a single line."""
     out: dict[str, dict | None] = {"nearest_support": None, "nearest_resistance": None}
-    if levels.empty:
+    if zones.empty:
         return out
-    roled = annotate_roles(levels, last_close)
+    roled = annotate_roles(zones, last_close)
+    roled = roled.assign(distance=zone_distance(roled, last_close))
     for role, key in ((SUPPORT, "nearest_support"), (RESISTANCE, "nearest_resistance")):
-        side = roled[roled["role"] == role].copy()
+        side = roled[roled["role"] == role]
         if side.empty:
             continue
-        side["distance"] = (side["price"] - last_close).abs()
-        row = side.sort_values("distance").iloc[0]
-        out[key] = {"price": round(float(row["price"]), 2), "touches": int(row["touches"])}
+        row = side.sort_values(["distance", "strength"], ascending=[True, False]).iloc[0]
+        out[key] = {
+            "price": round(float(row["price"]), 2),          # band centre
+            "lower": round(float(row["lower"]), 2),
+            "upper": round(float(row["upper"]), 2),
+            "touches": int(row["touches"]),
+            "bars_since_touch": int(row["bars_since_touch"]),
+            "strength": float(row["strength"]),
+            "stale": bool(row["stale"]),
+            "inside": bool(row["distance"] == 0),
+        }
     return out
 
 
@@ -139,7 +151,6 @@ def build_facts(featured_df: pd.DataFrame, swings: pd.DataFrame, cfg: Config) ->
     trend detector's SMA lookup lines up with the swing bars.
     """
     m = cfg.market
-    tol = cfg.structure.sr_cluster_tolerance_pct
     prox = cfg.confluence.proximity_pct
 
     last_close = float(featured_df["close"].iloc[-1])
@@ -147,7 +158,7 @@ def build_facts(featured_df: pd.DataFrame, swings: pd.DataFrame, cfg: Config) ->
 
     # --- detectors: compute ONCE, share with both confluence and display ---
     trend = classify_trend(featured_df, swings)
-    levels = find_support_resistance(swings, tol)
+    levels = sr_zones(featured_df, swings, cfg)          # A4: zones (centre in `price`)
     fib = fib_retracement(swings)
 
     signals = [
@@ -155,7 +166,8 @@ def build_facts(featured_df: pd.DataFrame, swings: pd.DataFrame, cfg: Config) ->
         signal_from_rsi(featured_df, cfg),
         signal_from_macd(featured_df),
         signal_from_patterns(featured_df),
-        signal_from_support_resistance(levels, last_close, prox),
+        signal_from_support_resistance(levels, last_close, current_atr(featured_df),
+                                       cfg.structure.sr_near_atr_mult),
         signal_from_fibonacci(fib, last_close, prox),
         signal_from_volume(featured_df, cfg),
     ]
@@ -397,14 +409,16 @@ def facts_to_prompt(facts: dict) -> str:
         lines.append("")
 
     sr = facts["support_resistance"]
-    lines.append("NEAREST SUPPORT/RESISTANCE (by distance from price):")
-    sup, res = sr["nearest_support"], sr["nearest_resistance"]
-    lines.append(
-        f"  - Support: {sup['price']} ({sup['touches']} touches)" if sup else "  - Support: none detected below price"
-    )
-    lines.append(
-        f"  - Resistance: {res['price']} ({res['touches']} touches)" if res else "  - Resistance: none detected above price"
-    )
+    lines.append("NEAREST SUPPORT/RESISTANCE ZONES (bands, not exact lines; by distance from price):")
+
+    def _zone(z: dict) -> str:
+        where = " — price is INSIDE this zone" if z.get("inside") else ""
+        stale = ", STALE — no reversal here for a long time" if z.get("stale") else ""
+        return (f"{z['lower']}–{z['upper']} (centre {z['price']}; {z['touches']} swing reversals, "
+                f"last one {z['bars_since_touch']} bars ago, recency-weighted strength "
+                f"{z['strength']}{stale}){where}")
+    lines.append(f"  - Support: {_zone(sup)}" if (sup := sr["nearest_support"]) else "  - Support: none detected below price")
+    lines.append(f"  - Resistance: {_zone(res)}" if (res := sr["nearest_resistance"]) else "  - Resistance: none detected above price")
     lines.append("")
 
     candle = facts.get("candlestick")

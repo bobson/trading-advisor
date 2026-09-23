@@ -136,3 +136,70 @@ def test_mixed_swings_are_sideways():
 def test_insufficient_swings_is_sideways():
     result = classify_trend(_featured(list(range(20))), _swings([(1, 100.0, SWING_HIGH)]), slope_window=3)
     assert result.label == SIDEWAYS
+
+
+# --- ROADMAP A4: support/resistance zones ----------------------------------------------------
+
+from src.structure.support_resistance import find_sr_zones, zone_distance  # noqa: E402
+
+
+def _sw(rows):
+    return pd.DataFrame(rows, columns=["bar", "price", "kind"])
+
+
+def test_zone_width_scales_with_atr():
+    """Same swings, double the ATR -> double the minimum band width (ATR-scaled, not %)."""
+    sw = _sw([(10, 100.0, "high"), (20, 100.1, "high")])
+    narrow = find_sr_zones(sw, atr=2.0, n_bars=50, zone_atr_mult=0.5)
+    wide = find_sr_zones(sw, atr=4.0, n_bars=50, zone_atr_mult=0.5)
+    w1 = float(narrow["upper"][0] - narrow["lower"][0])
+    w2 = float(wide["upper"][0] - wide["lower"][0])
+    assert w1 == pytest.approx(1.0) and w2 == pytest.approx(2.0)
+
+
+def test_zone_is_scale_free_across_markets():
+    """A BTC-sized and an FX-sized market with proportional swings + ATR get proportional bands."""
+    btc = find_sr_zones(_sw([(10, 80000.0, "high"), (20, 80040.0, "high")]), atr=800.0, n_bars=50)
+    fx = find_sr_zones(_sw([(10, 1.1000, "high"), (20, 1.10055, "high")]), atr=0.011, n_bars=50)
+    rel = lambda z: float((z["upper"][0] - z["lower"][0]) / z["price"][0])  # noqa: E731
+    assert rel(btc) == pytest.approx(rel(fx), rel=1e-3)
+
+
+def test_zone_covers_every_touch_and_merges_by_atr():
+    sw = _sw([(5, 100.0, "low"), (15, 101.2, "low"), (25, 110.0, "high")])
+    z = find_sr_zones(sw, atr=4.0, n_bars=40, zone_atr_mult=0.5, min_touches=1)
+    first = z.iloc[0]
+    assert first["touches"] == 2                           # 100 and 101.2 are within 0.5×ATR=2
+    assert first["lower"] <= 100.0 and first["upper"] >= 101.2
+    assert len(z) == 2                                     # 110 is its own zone
+
+
+def test_touch_history_and_staleness():
+    sw = _sw([(5, 100.0, "low"), (30, 100.2, "high")])
+    z = find_sr_zones(sw, atr=2.0, n_bars=200, stale_bars=120).iloc[0]
+    assert (z["first_touch"], z["last_touch"], z["bars_since_touch"]) == (5, 30, 169)
+    assert bool(z["stale"])                                # 169 >= 120 bars without a reversal
+    fresh = find_sr_zones(sw, atr=2.0, n_bars=100, stale_bars=120).iloc[0]
+    assert fresh["bars_since_touch"] == 69 and not bool(fresh["stale"])
+
+
+def test_strength_is_recency_weighted():
+    old = find_sr_zones(_sw([(0, 100.0, "low"), (10, 100.1, "low")]), atr=2.0, n_bars=200,
+                        halflife_bars=60).iloc[0]
+    recent = find_sr_zones(_sw([(180, 100.0, "low"), (190, 100.1, "low")]), atr=2.0, n_bars=200,
+                           halflife_bars=60).iloc[0]
+    assert recent["touches"] == old["touches"] and recent["strength"] > 5 * old["strength"]
+
+
+def test_zone_distance_is_zero_inside_the_band():
+    z = pd.DataFrame({"lower": [99.0, 105.0], "upper": [101.0, 106.0]})
+    assert list(zone_distance(z, 100.0)) == [0.0, 5.0]
+
+
+def test_zones_are_look_ahead_safe():
+    """Zones built from bars <= N don't change when later bars change: they only read confirmed
+    swings at or before N and the ATR/length of the slice."""
+    sw = _sw([(5, 100.0, "low"), (15, 100.3, "low")])
+    a = find_sr_zones(sw[sw["bar"] <= 20], atr=2.0, n_bars=21)
+    b = find_sr_zones(pd.concat([sw, _sw([(30, 100.1, "low")])]).query("bar <= 20"), atr=2.0, n_bars=21)
+    pd.testing.assert_frame_equal(a, b)

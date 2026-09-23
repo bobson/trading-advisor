@@ -143,15 +143,15 @@
     }
   ],
   "confluence": {
-    "agreeing_categories": 2,
+    "agreeing_categories": 1,
     "bias": "bearish",
     "categories": {
       "momentum": "bearish",
-      "structure": "bearish",
+      "structure": "neutral",
       "trend": "neutral",
       "volume": "neutral"
     },
-    "confidence": 0.55,
+    "confidence": 0.25,
     "mtf_alignment": "neutral",
     "mtf_trends": {
       "4h": "sideways"
@@ -184,9 +184,9 @@
       },
       {
         "category": "structure",
-        "direction": "bearish",
+        "direction": "bullish",
         "name": "support_resistance",
-        "reason": "Price is testing resistance near 64166.59."
+        "reason": "Price is inside the support zone 63828.92\u201363944.10."
       },
       {
         "category": "structure",
@@ -201,7 +201,7 @@
         "reason": "Volume is 0.6x its average \u2014 below the 1.2x bar, so the move is not confirmed by participation."
       }
     ],
-    "triggered": true
+    "triggered": false
   },
   "divergence": null,
   "fibonacci": {
@@ -247,20 +247,33 @@
   },
   "situation": {
     "reasons": [
-      "confirmed_pattern:double top"
+      "confirmed_pattern:double top",
+      "at_level"
     ],
-    "template": "Four lines: Read. Why (2\u20133 named facts). Invalidation. What to watch.",
-    "tier": "confirmed",
-    "word_budget": 130
+    "template": "Three lines: Read. Why (2\u20133 named facts). Invalidation.",
+    "tier": "notable",
+    "word_budget": 70
   },
   "support_resistance": {
     "nearest_resistance": {
-      "price": 64166.59,
-      "touches": 7
+      "bars_since_touch": 9,
+      "inside": false,
+      "lower": 64158.64,
+      "price": 64216.23,
+      "stale": false,
+      "strength": 1.242,
+      "touches": 3,
+      "upper": 64273.82
     },
     "nearest_support": {
-      "price": 63400.47,
-      "touches": 4
+      "bars_since_touch": 39,
+      "inside": true,
+      "lower": 63828.92,
+      "price": 63886.51,
+      "stale": false,
+      "strength": 1.088,
+      "touches": 2,
+      "upper": 63944.1
     }
   },
   "trend": {

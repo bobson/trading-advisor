@@ -3,7 +3,11 @@ const API_BASE = (import.meta as any).env?.VITE_API_BASE ?? 'http://127.0.0.1:80
 
 export interface Pair { symbol: string; asset_class: string; label: string }
 export interface Candle { time: number; open: number; high: number; low: number; close: number; volume: number | null }
-export interface Level { price: number; role: string; touches: number }
+// A4: support/resistance ZONES — a band (lower..upper) around a centre (`price`).
+export interface Level {
+  price: number; lower: number; upper: number; role: string; touches: number
+  bars_since_touch: number; strength: number; stale: boolean
+}
 export interface SwingMarker { time: number; price: number; kind: string }
 export interface Fib { direction: string; levels: Record<string, number> }
 export interface Marker { time: number; bias: string }

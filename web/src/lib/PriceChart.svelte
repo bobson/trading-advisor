@@ -165,11 +165,21 @@
       maLine.setData(align(ma.values) as any)
     }
 
-    if (toggles.levels) for (const lv of ov.levels)
-      series.createPriceLine({
-        price: lv.price, color: lv.role === 'support' ? '#26a641' : '#f85149',
-        lineWidth: 1, lineStyle: 0, axisLabelVisible: true, title: `${lv.role} (${lv.touches})`,
-      } as any)
+    // Support/resistance ZONES (A4): a shaded band per zone, drawn under the candles, plus an
+    // axis tag at its centre (no line — a single line is the false precision zones replace).
+    // Stale zones (no reversal for a long time) are fainter and tagged "stale".
+    if (toggles.levels && ov.levels.length) {
+      series.attachPrimitive(new ZoneBands(ov.levels.map((lv) => ({
+        lower: lv.lower, upper: lv.upper,
+        color: (lv.role === 'support' ? '#26a641' : '#f85149') + (lv.stale ? '14' : '30'),
+      }))) as any)
+      for (const lv of ov.levels)
+        series.createPriceLine({
+          price: lv.price, color: lv.role === 'support' ? '#26a641' : '#f85149',
+          lineVisible: false, axisLabelVisible: true,
+          title: `${lv.role} zone (${lv.touches})${lv.stale ? ' stale' : ''}`,
+        } as any)
+    }
 
     if (toggles.fib && ov.fibonacci)
       for (const [ratio, price] of Object.entries(ov.fibonacci.levels)) {
@@ -400,6 +410,37 @@
     // Opt-in test hook (only when the URL carries ?__verify) so a headless browser can read the
     // real chart's range. No-op in normal use.
     if (typeof location !== 'undefined' && location.search.includes('__verify')) (window as any).__mainChart = main
+  }
+
+  // Shaded horizontal bands (series primitive): each zone fills lower..upper across the pane.
+  class ZoneBands {
+    series: any = null
+    zones: { lower: number; upper: number; color: string }[]
+    constructor(zones: { lower: number; upper: number; color: string }[]) { this.zones = zones }
+    attached({ series }: any) { this.series = series }
+    detached() { this.series = null }
+    updateAllViews() {}
+    paneViews() {
+      const self = this
+      return [{
+        zOrder: () => 'bottom',
+        renderer: () => ({
+          draw: (target: any) => target.useBitmapCoordinateSpace((scope: any) => {
+            if (!self.series) return
+            const ctx = scope.context
+            for (const z of self.zones) {
+              const y1 = self.series.priceToCoordinate(z.upper)
+              const y2 = self.series.priceToCoordinate(z.lower)
+              if (y1 == null || y2 == null) continue
+              const top = Math.round(Math.min(y1, y2) * scope.verticalPixelRatio)
+              const h = Math.max(1, Math.round(Math.abs(y2 - y1) * scope.verticalPixelRatio))
+              ctx.fillStyle = z.color
+              ctx.fillRect(0, top, scope.bitmapSize.width, h)
+            }
+          }),
+        }),
+      }]
+    }
   }
 
   // lightweight-charts requires strictly-increasing unique times.

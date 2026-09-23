@@ -32,7 +32,7 @@ from src.market.regime import classify_regime
 from src.patterns.chart_patterns import find_patterns
 from src.service.analyze import AnalysisResult
 from src.structure.divergence import find_rsi_divergence
-from src.structure.support_resistance import RESISTANCE, SUPPORT, annotate_roles
+from src.structure.support_resistance import RESISTANCE, SUPPORT, annotate_roles, zone_distance
 from src.structure.swings import SWING_HIGH, SWING_LOW
 from src.structure.trendlines import find_two_point_trendlines
 
@@ -173,16 +173,22 @@ def serialize_chart(result: AnalysisResult, limit: int = 500, levels_per_side: i
                 swings.append({"time": t, "price": rp(s["price"]),
                                "kind": "high" if s["kind"] == SWING_HIGH else "low"})
 
-    # Support/resistance as horizontal price lines — only the NEAREST few per side, so the
-    # chart isn't buried under every detected level (mirrors the PNG chart's selection).
+    # Support/resistance ZONES (ROADMAP A4) — only the NEAREST few per side, so the chart isn't
+    # buried. Each is a band (lower/upper) around its centre (`price`), drawn shaded; stale ones
+    # are flagged so the chart can fade them.
     levels = []
     if not result.levels.empty:
         roled = annotate_roles(result.levels, last_close)
-        roled = roled.assign(_dist=(roled["price"] - last_close).abs())
+        roled = roled.assign(_dist=zone_distance(roled, last_close))
         for role in (SUPPORT, RESISTANCE):
             side = roled[roled["role"] == role].sort_values("_dist").head(levels_per_side)
             for _, lv in side.iterrows():
-                levels.append({"price": rp(lv["price"]), "role": str(lv["role"]), "touches": int(lv["touches"])})
+                levels.append({
+                    "price": rp(lv["price"]), "lower": rp(lv["lower"]), "upper": rp(lv["upper"]),
+                    "role": str(lv["role"]), "touches": int(lv["touches"]),
+                    "bars_since_touch": int(lv["bars_since_touch"]),
+                    "strength": float(lv["strength"]), "stale": bool(lv["stale"]),
+                })
 
     fib = None
     if result.fib is not None:

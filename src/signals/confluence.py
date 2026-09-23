@@ -47,7 +47,9 @@ from src.structure.fibonacci import UP, FibRetracement, fib_retracement
 from src.structure.support_resistance import (
     SUPPORT,
     annotate_roles,
-    find_support_resistance,
+    current_atr,
+    sr_zones,
+    zone_distance,
 )
 from src.structure.trend import (
     DOWNTREND,
@@ -220,25 +222,29 @@ def signal_from_volume(featured_df: pd.DataFrame, cfg: Config) -> Signal:
 
 
 def signal_from_support_resistance(
-    levels: pd.DataFrame, last_close: float, proximity_pct: float
+    zones: pd.DataFrame, last_close: float, atr: float, near_atr_mult: float
 ) -> Signal:
-    """Vote bullish if price is sitting on a support level (potential bounce), bearish if
-    pressed against a resistance level. Uses the nearest level within `proximity_pct`.
+    """Vote bullish if price is at a support ZONE (potential bounce), bearish if at a resistance
+    zone. "At" = inside the band, or within `near_atr_mult` × ATR of its edge (ROADMAP A4 — was a
+    fixed percent around a single line). The zone's role comes from its centre vs price; with
+    several in reach, the nearest wins (ties → the stronger, recency-weighted zone).
     """
-    if levels.empty:
-        return Signal("support_resistance", NEUTRAL, "No support/resistance levels detected.")
+    if zones.empty:
+        return Signal("support_resistance", NEUTRAL, "No support/resistance zones detected.")
 
-    roled = annotate_roles(levels, last_close)
-    roled = roled.assign(distance_pct=(roled["price"] - last_close).abs() / last_close * 100.0)
-    near = roled[roled["distance_pct"] <= proximity_pct]
+    roled = annotate_roles(zones, last_close)
+    roled = roled.assign(dist=zone_distance(roled, last_close))
+    near = roled[roled["dist"] <= near_atr_mult * atr]
     if near.empty:
-        return Signal("support_resistance", NEUTRAL, "Price is not near a support/resistance level.")
+        return Signal("support_resistance", NEUTRAL, "Price is not at a support/resistance zone.")
 
-    nearest = near.sort_values("distance_pct").iloc[0]
-    price = float(nearest["price"])
-    if nearest["role"] == SUPPORT:
-        return Signal("support_resistance", BULLISH, f"Price is testing support near {price:.2f}.")
-    return Signal("support_resistance", BEARISH, f"Price is testing resistance near {price:.2f}.")
+    z = near.sort_values(["dist", "strength"], ascending=[True, False]).iloc[0]
+    band = f"{float(z['lower']):.2f}–{float(z['upper']):.2f}"
+    where = "inside" if z["dist"] == 0 else "at the edge of"
+    stale = " (stale — no reversal there for a long time)" if bool(z["stale"]) else ""
+    if z["role"] == SUPPORT:
+        return Signal("support_resistance", BULLISH, f"Price is {where} the support zone {band}{stale}.")
+    return Signal("support_resistance", BEARISH, f"Price is {where} the resistance zone {band}{stale}.")
 
 
 def signal_from_fibonacci(
@@ -331,11 +337,10 @@ def evaluate_confluence(
 def gather_signals(featured_df: pd.DataFrame, swings: pd.DataFrame, cfg: Config) -> list[Signal]:
     """Run every detector on the featured frame + swings and collect their votes."""
     last_close = float(featured_df["close"].iloc[-1])
-    tol = cfg.structure.sr_cluster_tolerance_pct
     prox = cfg.confluence.proximity_pct
 
     trend = classify_trend(featured_df, swings)
-    levels = find_support_resistance(swings, tol)
+    zones = sr_zones(featured_df, swings, cfg)
     fib = fib_retracement(swings)
 
     return [
@@ -343,7 +348,8 @@ def gather_signals(featured_df: pd.DataFrame, swings: pd.DataFrame, cfg: Config)
         signal_from_rsi(featured_df, cfg),
         signal_from_macd(featured_df),
         signal_from_patterns(featured_df),
-        signal_from_support_resistance(levels, last_close, prox),
+        signal_from_support_resistance(zones, last_close, current_atr(featured_df),
+                                       cfg.structure.sr_near_atr_mult),
         signal_from_fibonacci(fib, last_close, prox),
         signal_from_volume(featured_df, cfg),
     ]

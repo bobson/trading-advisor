@@ -43,6 +43,11 @@ class StructureConfig(_Strict):
     # Two-point trendlines (drawn on the chart): a line through two swing lows/highs is kept only
     # while no close has crossed it by more than this × ATR; anchors come from the last N swings.
     trendline_break_atr_mult: float = 0.25
+    # ROADMAP A4 — support/resistance ZONES (all ATR/bar-scaled, no fixed percent):
+    sr_zone_atr_mult: float = 0.5        # swings within this × ATR cluster; also the minimum band width
+    sr_near_atr_mult: float = 0.25       # price within this × ATR of a band edge counts as "at" it
+    sr_stale_bars: int = 120             # untouched for this many bars -> stale
+    sr_strength_halflife_bars: int = 60  # a touch's weight halves every this many bars
     trendline_max_anchors: int = 6
 
 
