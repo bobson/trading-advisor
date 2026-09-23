@@ -3,8 +3,8 @@
 A state file for the "learning instrument" build. Source of truth for what's next: `ROADMAP.md`
 (steps A1…D6; prompts in `PROMPTS.md`). Older plans are in `docs/archive/`. See `CLAUDE.md` for conventions.
 
-**ROADMAP progress:** A1 ✓ (merged, `645231c`), A2 ✓ (merged, `800e12a`; docs `1003735`), A3 ✓ (merged), A4 ✓ (merged), A5 ✓ (merged), A6 ✓ (merged). **Next: A7**
-(honest baselines).
+**ROADMAP progress:** A1 ✓ (merged, `645231c`), A2 ✓ (merged, `800e12a`; docs `1003735`), A3 ✓ (merged), A4 ✓ (merged), A5 ✓ (merged), A6 ✓ (merged), A7 ✓ (merged). **Next: A8**
+(morning report — the forward record).
 
 ## Current state
 
@@ -20,7 +20,8 @@ hardening pass (guide wired in, brief/teaching modes); paper trading; three-cand
 two-point trendlines). **ROADMAP A2** (verdict as a category count, neutral styling, no-edge
 disclosure; `800e12a`). **ROADMAP A3** (situation tier decided in Layer 1) and **ROADMAP A4** (support/resistance as
 ATR-scaled zones) and **ROADMAP A5** (facts payload hardening) and **ROADMAP A6** (analyst guide revision +
-instrument price precision). **354 tests green, ruff + svelte-check clean.**
+instrument price precision) and **ROADMAP A7** (honest baselines: luck band + zero-edge calculator
+default). **367 tests green, ruff + svelte-check clean.**
 
 **Standing facts:** patterns and 3-candle candlesticks stay OUT of the confidence score (facts
 only); regime is standalone (not a vote); two-point trendlines are chart-only (not in facts); the
@@ -54,6 +55,33 @@ apply if `config.yaml` omits them.
 ---
 
 ## Log (newest first)
+
+### ROADMAP A7 — Honest baselines
+- **Done:** 2026-09-24 · **branch:** `feature/honest-baselines` · **merged to `main`.**
+- **Done-when → PASS:** baseline band visible beside the paper P&L; calculator defaults to the
+  cost-adjusted coin flip, backtest only on an explicit click labelled "Backtest — no edge found";
+  checked in headless Chromium at 1400px + 400px (against a SCRATCH trades DB with 5 seeded closed
+  BTC trades — the real `data/wizard.db` was never touched). 13 new tests, **367 green**.
+- **Paper-trading luck band:** `src/trading/baseline.py` — `random_entry_baseline()` (pure, seeded)
+  replays your k closed trades as many "monkey" records: random historical bar, random side, SAME
+  holding time (in bars of the trades' timeframe) and SAME size; reports the 5th/50th/95th percentile
+  of total P&L and wins, your percentile, and `inside_luck_band`. `GET /trades/baseline` (1000 runs).
+  UI: range + median + a bar with your marker + a verdict ("inside the luck band — this record can't
+  tell skill from luck, especially with only 5 trades"). No costs on either side (like-for-like with
+  paper P&L). Refreshes after a close / undo.
+- **Calculator default:** `src/risk/coin_flip.py` + `GET /risk/coin_flip` — round-trip cost from the
+  Feature-10 cost model (spread, fees, ATR slippage, funding/financing over a 24-bar hold), in units
+  of the risk (entry→stop), then **p = (1 − c)/(1 + R)**: the zero-edge win rate at your payoff, net of
+  costs (expectancy exactly −c). Win-rate source buttons: "Coin flip, cost-adjusted (default)" /
+  "Backtest — no edge found"; typing your own number is labelled as such. BTC 1h at 1.5:1 → 37.8%
+  (ruin 99.7%, Kelly "don't bet").
+- **Deviation / correction:** "coin flip" taken literally as 50% is only zero-edge at a 1:1 payoff.
+  My first version used 0.5 − c/(1+R), which at 1.5:1 showed 47.8% — a hidden +0.2R edge that made
+  ruin read 0.0% in green (caught in the browser). Replaced with the zero-edge rate 1/(1+R) net of
+  costs; a test pins "expectancy = −cost at every payoff".
+- **Findings:** crypto funding dominates daily holds (24-bar hold on 1d = 24 days of funding → BTC 1d
+  cost ~1.1% round trip vs ~0.22% on 1h). Paper trades held minutes are rounded up to 1 bar of their
+  timeframe in the luck band (overstates the monkeys' holding time for very short trades).
 
 ### ROADMAP A6 — Analyst guide revision (+ forex price-precision fix)
 - **Done:** 2026-09-24 · **branch:** `feature/guide-revision` · **merged to `main`.**

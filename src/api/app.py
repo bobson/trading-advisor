@@ -182,6 +182,29 @@ def risk_measured(symbol: str = Query(...), timeframe: str = Query("1h")) -> dic
     return asdict(gather_measured_stats(symbol, timeframe, base_rates=BASE_RATES))
 
 
+@app.get("/risk/coin_flip", dependencies=_GUARDS)
+def risk_coin_flip(
+    symbol: str = Query(...), timeframe: str = Query("1h"),
+    entry: float = Query(..., gt=0.0), stop: float = Query(..., gt=0.0),
+    payoff_ratio: float = Query(1.0, gt=0.0),
+) -> dict:
+    """ROADMAP A7 — the calculator's DEFAULT win rate: a coin flip minus this instrument's
+    round-trip costs (Feature-10 cost model; slippage from its current ATR), in units of the risk.
+    Cache-first candles; no Claude call."""
+    from src.data.registry import get_candles
+    from src.indicators.features import COL_ATR, add_features
+    from src.risk.coin_flip import cost_adjusted_coin_flip
+
+    feat = add_features(get_candles(symbol, timeframe, cfg), cfg)
+    atr, close = feat[COL_ATR].iloc[-1], float(feat["close"].iloc[-1])
+    atr_pct = 0.0 if atr != atr else float(atr) / close
+    try:
+        return cost_adjusted_coin_flip(symbol, timeframe, cfg, entry=entry, stop=stop,
+                                       payoff_ratio=payoff_ratio, atr_pct=atr_pct)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
+
+
 # --- Paper-trading simulator (SQLite `trades`; live spot fills; NO Claude call) ----------------
 _TRADES_DB = None   # None -> default data/wizard.db; tests point this at a tmp path
 
@@ -240,6 +263,18 @@ def get_position(symbol: str = Query(...), last_close: float | None = Query(None
         pos = paper.position(conn, symbol, price=price)
         pos["price_source"] = source
         return pos
+    finally:
+        conn.close()
+
+
+@app.get("/trades/baseline", dependencies=_GUARDS)
+def get_trades_baseline(symbol: str = Query(...)) -> dict:
+    """ROADMAP A7 — what luck alone produces with your exposure: 1000 random-entry records (random
+    time, random side, your holding times and sizes) on the same instrument."""
+    from src.trading.baseline import baseline_for_symbol
+    conn = _trades_conn()
+    try:
+        return baseline_for_symbol(conn, symbol, cfg)
     finally:
         conn.close()
 

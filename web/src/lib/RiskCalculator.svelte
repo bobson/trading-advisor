@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { getRisk, getMeasured, type RiskResult } from './api'
+  import { getRisk, getMeasured, getCoinFlip, type RiskResult } from './api'
 
   let { symbol = 'BTC/USDT', timeframe = '1h' }: { symbol?: string; timeframe?: string } = $props()
 
@@ -9,6 +9,10 @@
   let stop = $state(96)
   let riskPct = $state(1) // % of account risked per trade
   let winPct = $state(50)
+  // A7: where the win rate came from. Default = a cost-adjusted coin flip (the testing found no
+  // edge); 'backtest' only when explicitly chosen; 'manual' once the user types their own.
+  let winSource = $state<'coin' | 'backtest' | 'manual'>('coin')
+  let coinNote = $state<string | null>(null)
   let payoff = $state(1.5)
 
   let result = $state<RiskResult | null>(null)
@@ -33,14 +37,34 @@
   }
   $effect(() => { winPct; payoff; riskPct; account; entry; stop; scheduleFetch() })
 
+  // Default win rate: coin flip minus this instrument's round-trip costs (in units of the risk).
+  async function useCoinFlip() {
+    if (!(entry > 0 && stop > 0 && entry !== stop && payoff > 0)) return
+    try {
+      const c = await getCoinFlip(symbol, timeframe, entry, stop, payoff)
+      if (winSource !== 'coin') return          // user switched away while this was in flight
+      winPct = Math.round(c.win_rate * 1000) / 10
+      coinNote = `Coin flip, cost-adjusted: with no edge, a ${payoff}:1 target is hit before the stop ` +
+        `${(c.fair_win_rate * 100).toFixed(1)}% of the time; ${symbol} costs of ${c.cost_pct}% round trip ` +
+        `(${c.cost_in_r}× your risk, ${c.horizon_bars}-bar hold on ${timeframe}) bring it to ${winPct}% — ` +
+        `an expected loss of exactly those costs per trade.`
+      measuredNote = null
+    } catch (e: any) { coinNote = e.message }
+  }
+  $effect(() => { symbol; timeframe; entry; stop; payoff; if (winSource === 'coin') useCoinFlip() })
+  function chooseCoin() { winSource = 'coin'; useCoinFlip() }
+
   async function useMeasured() {
     try {
       const m = await getMeasured(symbol, timeframe)
-      if (m.win_rate == null) { measuredNote = `No measured win rate for ${symbol} yet (run the backtest).`; return }
+      if (m.win_rate == null) { measuredNote = `No backtest win rate for ${symbol} yet (run the backtest).`; return }
+      winSource = 'backtest'
+      coinNote = null
       winPct = Math.round(m.win_rate * 1000) / 10
       const ci = m.win_rate_ci ? ` (95% CI ${(m.win_rate_ci[0] * 100).toFixed(0)}–${(m.win_rate_ci[1] * 100).toFixed(0)}%)` : ''
       const thin = m.thin ? ' — THIN SAMPLE, treat as a wide range' : ''
-      measuredNote = `From ${m.source}: ${(m.win_rate * 100).toFixed(0)}% over ${m.n} cases${ci}${thin}. ` +
+      measuredNote = `Backtest — no edge found: ${(m.win_rate * 100).toFixed(0)}% over ${m.n} cases${ci}${thin}, ` +
+        'about a coin flip before costs. ' +
         (m.payoff_ratio == null ? 'Payoff ratio not measured yet — set it yourself.' : '')
     } catch (e: any) { measuredNote = e.message }
   }
@@ -60,13 +84,18 @@
     <label>Entry <input type="number" bind:value={entry} step="0.01" /></label>
     <label>Stop <input type="number" bind:value={stop} step="0.01" /></label>
     <label>Risk %/trade <input type="number" bind:value={riskPct} min="0.05" max="99" step="0.05" /></label>
-    <label>Win rate % <input type="number" bind:value={winPct} min="1" max="99" step="1" /></label>
+    <label>Win rate % <input type="number" bind:value={winPct} min="1" max="99" step="0.1"
+      oninput={() => { winSource = 'manual'; coinNote = null; measuredNote = null }} /></label>
     <label>Payoff (win/loss) <input type="number" bind:value={payoff} min="0.1" step="0.1" /></label>
   </div>
   <div class="row-btn">
-    <button onclick={useMeasured}>use measured win rate ({symbol})</button>
-    {#if measuredNote}<span class="note">{measuredNote}</span>{/if}
+    <span class="src-label">Win rate source:</span>
+    <button class:active={winSource === 'coin'} onclick={chooseCoin}>Coin flip, cost-adjusted (default)</button>
+    <button class:active={winSource === 'backtest'} onclick={useMeasured}>Backtest — no edge found</button>
+    {#if winSource === 'manual'}<span class="note">Your own number — the testing found no edge to justify more than the coin flip.</span>{/if}
   </div>
+  {#if coinNote && winSource === 'coin'}<p class="note src-note">{coinNote}</p>{/if}
+  {#if measuredNote && winSource === 'backtest'}<p class="note src-note">{measuredNote}</p>{/if}
 
   {#if error}<p class="error">{error}</p>{/if}
 
@@ -128,6 +157,9 @@
   .row-btn { display: flex; gap: 10px; align-items: center; margin: 10px 0; flex-wrap: wrap; }
   button { background: #21262d; color: #c9d1d9; border: 1px solid #30363d; border-radius: 6px; padding: 7px 12px; cursor: pointer; }
   .note { color: #8b949e; font-size: 12px; }
+  .src-label { color: #8b949e; font-size: 12px; }
+  .row-btn button.active { border-color: #8b949e; background: #30363d; font-weight: 600; }
+  .src-note { margin: 0 0 10px; }
   .error { color: #f85149; }
   .cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 12px; margin: 14px 0; }
   .card { border: 1px solid #30363d; border-radius: 8px; padding: 14px; }

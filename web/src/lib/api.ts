@@ -119,6 +119,15 @@ export const getRisk = (p: {
 export const getMeasured = (symbol: string, timeframe: string) =>
   get<MeasuredStats>(`/risk/measured?symbol=${encodeURIComponent(symbol)}&timeframe=${timeframe}`)
 
+// A7: the calculator's default win rate — a coin flip minus this instrument's trading costs.
+export interface CoinFlip {
+  win_rate: number; fair_win_rate: number; cost_pct: number; risk_pct: number; cost_in_r: number
+  payoff_ratio: number; horizon_bars: number; source: string
+}
+export const getCoinFlip = (symbol: string, timeframe: string, entry: number, stop: number, payoff: number) =>
+  get<CoinFlip>(`/risk/coin_flip?symbol=${encodeURIComponent(symbol)}&timeframe=${timeframe}` +
+    `&entry=${entry}&stop=${stop}&payoff_ratio=${payoff}`)
+
 // --- Paper-trading simulator ---
 export interface Trade {
   id: number; symbol: string; timeframe: string | null; side: string
@@ -144,6 +153,16 @@ export const postTrade = (body: {
   timeframe?: string; last_close?: number | null; snapshot?: Record<string, any> | null
 }) => send<{ result: any } & TradeState>('POST', '/trades', body)
 export const deleteTrade = (id: number) => send<{ deleted: number }>('DELETE', `/trades/${id}`)
+
+// A7: random-entry baseline — the range of total P&L luck alone produces with your exposure.
+export interface TradeBaseline {
+  n_trades: number; n_runs: number; timeframe?: string; history_bars?: number; note?: string
+  total_p05?: number; total_p50?: number; total_p95?: number
+  wins_p05?: number; wins_p50?: number; wins_p95?: number
+  your_total?: number; your_percentile?: number; inside_luck_band?: boolean
+}
+export const getTradesBaseline = (symbol: string) =>
+  get<TradeBaseline>(`/trades/baseline?symbol=${encodeURIComponent(symbol)}`)
 
 export const getPairs = () => get<Pair[]>('/pairs')
 export const getTimeframes = () => get<string[]>('/timeframes')

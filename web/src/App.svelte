@@ -4,7 +4,9 @@
   import RiskCalculator from './lib/RiskCalculator.svelte'
   import {
     getPairs, getTimeframes, getAnalysis, getTrades, getPosition, postTrade, deleteTrade,
+    getTradesBaseline,
     type Pair, type Analysis, type PanelToggles, type Trade, type TradePnl, type Position,
+    type TradeBaseline,
   } from './lib/api'
 
   let view = $state<'analysis' | 'risk'>('analysis')
@@ -131,6 +133,13 @@
   let tradeAmount = $state(500)
   let trades = $state<Trade[]>([])
   let tradePnl = $state<TradePnl | null>(null)
+  // A7: the random-entry baseline — the P&L range luck alone produces with the same exposure.
+  let baseline = $state<TradeBaseline | null>(null)
+  // Where a value sits on the band's axis (for the little bar), as a 0–100% left offset.
+  const bandPos = (b: TradeBaseline, v: number) => {
+    const lo = Math.min(b.total_p05!, v), hi = Math.max(b.total_p95!, v)
+    return hi === lo ? 50 : ((v - lo) / (hi - lo)) * 100
+  }
   let position = $state<Position | null>(null)
   let tradeMsg = $state<string | null>(null)
   let tradeBusy = $state(false)
@@ -142,6 +151,7 @@
       trades = st.trades
       tradePnl = st.pnl
       position = await getPosition(symbol, result?.market?.last_close ?? null)
+      baseline = st.pnl.closed ? await getTradesBaseline(symbol) : null
     } catch { /* trades are non-critical — never block the analysis view */ }
   }
 
@@ -161,6 +171,8 @@
       })
       trades = r.trades
       tradePnl = r.pnl
+      if (r.result?.action === 'closed' || !r.pnl.closed)
+        baseline = r.pnl.closed ? await getTradesBaseline(symbol).catch(() => null) : null
       tradeMsg = r.result.action === 'closed'
         ? `Closed — realized ${fmtUsd(r.result.realized_pnl)}`
         : `Opened ${side === 'buy' ? 'LONG' : 'SHORT'} @ ${r.result.price.toLocaleString()}`
@@ -219,7 +231,7 @@
 
   {#if view === 'analysis'}
   <div class="controls">
-    <select bind:value={symbol} onchange={() => { asOfBar = null; trades = []; position = null; tradePnl = null; tradeMsg = null }}>
+    <select bind:value={symbol} onchange={() => { asOfBar = null; trades = []; position = null; tradePnl = null; baseline = null; tradeMsg = null }}>
       {#each pairs as p}<option value={p.symbol}>{p.label} ({p.symbol})</option>{/each}
     </select>
     <select bind:value={timeframe} onchange={() => (asOfBar = null)}>
@@ -300,6 +312,31 @@
           realized <b class={tradePnl.realized_total >= 0 ? 'bullish' : 'bearish'}>{fmtUsd(tradePnl.realized_total)}</b>
           <span class="muted">(paper, {tradePnl.closed} closed)</span>
         </div>
+        {#if baseline && baseline.n_runs}
+          <!-- A7: luck band. 5th–95th percentile of total P&L over many random-entry records
+               (random time + side, same holding times and sizes, same instrument). -->
+          <div class="luck">
+            <div class="luck-head">
+              Luck alone ({baseline.n_runs.toLocaleString()} random-entry runs, same holding times &amp; sizes):
+              <b>{fmtUsd(baseline.total_p05)}</b> to <b>{fmtUsd(baseline.total_p95)}</b>
+              <span class="muted">(90% of runs; median {fmtUsd(baseline.total_p50)}; wins {baseline.wins_p05}–{baseline.wins_p95} of {baseline.n_trades})</span>
+            </div>
+            <div class="luck-bar" aria-hidden="true">
+              <span class="luck-range" style="left:{bandPos(baseline, baseline.total_p05!)}%;right:{100 - bandPos(baseline, baseline.total_p95!)}%"></span>
+              <span class="luck-you" style="left:{bandPos(baseline, baseline.your_total!)}%" title="your realized P&L"></span>
+            </div>
+            <div class="luck-verdict">
+              {#if baseline.inside_luck_band}
+                Your {fmtUsd(baseline.your_total)} is <b>inside the luck band</b> ({baseline.your_percentile}th percentile) —
+                this record can't tell skill from luck{baseline.n_trades < 30 ? `, especially with only ${baseline.n_trades} trades` : ''}.
+              {:else}
+                Your {fmtUsd(baseline.your_total)} is <b>outside the luck band</b> ({baseline.your_percentile}th percentile) —
+                unusual for luck alone, but {baseline.n_trades} trades is {baseline.n_trades < 30 ? 'a very small sample' : 'still one sample'}.
+              {/if}
+              <span class="muted">No costs on either side.</span>
+            </div>
+          </div>
+        {/if}
       {/if}
       {#if trades.length}
         <div class="trade-log">
@@ -524,6 +561,12 @@
   .trade-row button:disabled { opacity: .4; cursor: not-allowed; }
   .trade-msg { color: #8b949e; font-size: 13px; }
   .trade-summary { font-size: 13px; color: #8b949e; margin: 6px 0; }
+  .luck { font-size: 13px; color: #c9d1d9; margin: 4px 0 8px; }
+  .luck .muted { color: #8b949e; }
+  .luck-bar { position: relative; height: 10px; margin: 6px 0; background: #161b22; border-radius: 5px; }
+  .luck-range { position: absolute; top: 0; bottom: 0; background: #484f58; border-radius: 5px; }
+  .luck-you { position: absolute; top: -3px; width: 3px; height: 16px; margin-left: -1px; background: #c9d1d9; }
+  .luck-verdict { color: #8b949e; }
   .trade-log { margin-top: 8px; border-top: 1px solid #21262d; }
   .log-entry { border-bottom: 1px solid #161b22; padding: 5px 0; }
   .log-row { display: flex; align-items: center; gap: 10px; font-size: 13px; }
