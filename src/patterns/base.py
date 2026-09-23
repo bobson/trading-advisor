@@ -103,6 +103,10 @@ class Pattern:
     quality: float = 0.0            # geometry cleanliness in [0, 1] (orthogonal to confirmation)
     confirmation: ConfirmationProfile = field(default_factory=ConfirmationProfile)
     reason: str = ""
+    # ROADMAP A5 — staleness: bars from the last defining swing to bar N, and bars since the
+    # current confirmed/failed state began (None while forming). Set by `find_patterns`.
+    bars_since_completion: int | None = None
+    bars_since_state_change: int | None = None
 
     @property
     def span(self) -> tuple:
@@ -123,6 +127,8 @@ class Pattern:
             "quality": round(float(self.quality), 3),
             "confirmation": self.confirmation.to_dict(),
             "reason": self.reason,
+            "bars_since_completion": self.bars_since_completion,
+            "bars_since_state_change": self.bars_since_state_change,
         }
 
 
@@ -147,9 +153,10 @@ def classify_state(direction: str, breakout_level, invalidation_level, last_clos
 
 def classify_state_history(
     direction: str, breakout_level, invalidation_level, closes, margins=None,
-) -> tuple[str, bool]:
+) -> tuple[str, bool, int | None]:
     """State with MEMORY, from every close since the pattern completed up to bar N (look-ahead-safe:
-    the caller passes closes <= N only). Returns `(state, reclaimed)`.
+    the caller passes closes <= N only). Returns `(state, reclaimed, since)` — `since` is the
+    position in `closes` where the current confirmed/failed state began (None while forming).
 
     Unlike `classify_state` (last close only), a break that is later RECLAIMED — price closes
     through the breakout level, then closes back on the pattern's wrong side of it by more than
@@ -157,21 +164,22 @@ def classify_state_history(
     `forming`. A close through the invalidation level is likewise terminal. Used for reversal
     patterns, whose breakout level is a horizontal neckline."""
     if direction not in (BULLISH, BEARISH):
-        return FORMING, False
+        return FORMING, False, None
     bull = direction == BULLISH
     closes = [float(c) for c in closes]
     margins = [0.0] * len(closes) if margins is None else [float(m) for m in margins]
-    broke = False
-    for c, m in zip(closes, margins):
+    broke_at = None
+    for i, (c, m) in enumerate(zip(closes, margins)):
         if invalidation_level is not None and (c < invalidation_level if bull else c > invalidation_level):
-            return FAILED, False
+            return FAILED, False, i
         if breakout_level is None:
             continue
         if c > breakout_level if bull else c < breakout_level:
-            broke = True
-        elif broke and (c < breakout_level - m if bull else c > breakout_level + m):
-            return FAILED, True                   # broke out, then closed back inside -> reclaimed
-    return (CONFIRMED if broke else FORMING), False
+            if broke_at is None:
+                broke_at = i
+        elif broke_at is not None and (c < breakout_level - m if bull else c > breakout_level + m):
+            return FAILED, True, i                # broke out, then closed back inside -> reclaimed
+    return (CONFIRMED, False, broke_at) if broke_at is not None else (FORMING, False, None)
 
 
 def _last(df: pd.DataFrame, col: str):

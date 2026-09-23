@@ -334,6 +334,7 @@ def find_patterns(
     patterns = dedupe_patterns([p for p in raw if p is not None])
 
     last_close = float(featured_df["close"].iloc[-1])
+    n_bars = len(featured_df)
     has_structure = structure_levels is not None or fib is not None or round_number is not None
     for p in patterns:
         # neutral coils (symmetric triangle / rectangle) resolve direction on a close beyond an edge
@@ -352,13 +353,25 @@ def find_patterns(
             after = featured_df.iloc[max(p.bars) + 1:]
             bar_atr = (after[COL_ATR].fillna(atr) if COL_ATR in after.columns
                        else pd.Series(atr, index=after.index))
-            p.state, reclaimed = classify_state_history(
+            p.state, reclaimed, since = classify_state_history(
                 p.direction, p.breakout_level, p.invalidation_level, after["close"],
                 margins=bar_atr * cfg.patterns.reclaim_atr_mult)
             if reclaimed:
                 p.reason += " Broke the neckline, then closed back through it: failed break."
+            if since is not None:
+                p.bars_since_state_change = len(after) - 1 - since
         else:
             p.state = classify_state(p.direction, p.breakout_level, p.invalidation_level, last_close)
+            if p.state != FORMING and p.bars:
+                # memoryless state: it began where the current unbroken run of same-state closes began
+                run, closes = 0, featured_df["close"].iloc[max(p.bars) + 1:].to_numpy(dtype=float)
+                for c in closes[::-1]:
+                    if classify_state(p.direction, p.breakout_level, p.invalidation_level, c) != p.state:
+                        break
+                    run += 1
+                p.bars_since_state_change = run - 1 if run else None
+        if p.bars:
+            p.bars_since_completion = n_bars - 1 - max(p.bars)
         hit = _structure_hit(p.breakout_level, structure_levels, fib, round_number, cfg) if has_structure else None
         p.confirmation = build_confirmation(
             p.direction, p.breakout_level, p.invalidation_level, featured_df,

@@ -1,4 +1,9 @@
 {
+  "absences": [
+    "no RSI divergence detected",
+    "no failed chart pattern",
+    "no category votes against the read"
+  ],
   "candlestick": {
     "direction": "bearish",
     "pattern": "shooting star"
@@ -13,6 +18,8 @@
         340,
         343
       ],
+      "bars_since_completion": 6,
+      "bars_since_state_change": null,
       "breakout_level": 64762.77,
       "confirmation": {
         "candlestick": "contradicts",
@@ -24,6 +31,20 @@
         "volume": "contradicts"
       },
       "direction": "bullish",
+      "distances": {
+        "breakout": {
+          "distance_atr": 3.56,
+          "distance_pct": 1.28
+        },
+        "invalidation": {
+          "distance_atr": -2.36,
+          "distance_pct": -0.85
+        },
+        "target": {
+          "distance_atr": 9.48,
+          "distance_pct": 3.41
+        }
+      },
       "invalidation_level": 63400.0,
       "kind": "continuation",
       "lines": [
@@ -86,6 +107,8 @@
         340,
         343
       ],
+      "bars_since_completion": 6,
+      "bars_since_state_change": 2,
       "breakout_level": 64214.0,
       "confirmation": {
         "candlestick": "supports",
@@ -97,6 +120,20 @@
         "volume": "contradicts"
       },
       "direction": "bearish",
+      "distances": {
+        "breakout": {
+          "distance_atr": 1.18,
+          "distance_pct": 0.42
+        },
+        "invalidation": {
+          "distance_atr": 3.56,
+          "distance_pct": 1.28
+        },
+        "target": {
+          "distance_atr": -0.78,
+          "distance_pct": -0.28
+        }
+      },
       "invalidation_level": 64762.77,
       "kind": "reversal",
       "lines": [
@@ -203,11 +240,81 @@
     ],
     "triggered": false
   },
+  "detector_reliability": {
+    "chart_patterns": {
+      "ascending triangle": {
+        "n": 0,
+        "precision": null,
+        "status": "unmeasured"
+      },
+      "double top": {
+        "n": 0,
+        "precision": null,
+        "status": "unmeasured"
+      }
+    },
+    "detectors": {
+      "candlestick": {
+        "n": 0,
+        "precision": null,
+        "status": "unmeasured"
+      },
+      "fibonacci": {
+        "n": 0,
+        "precision": null,
+        "status": "unmeasured"
+      },
+      "macd": {
+        "n": 0,
+        "precision": null,
+        "status": "unmeasured"
+      },
+      "rsi": {
+        "n": 0,
+        "precision": null,
+        "status": "unmeasured"
+      },
+      "support_resistance": {
+        "n": 0,
+        "precision": null,
+        "status": "unmeasured"
+      },
+      "trend": {
+        "n": 0,
+        "precision": null,
+        "status": "unmeasured"
+      },
+      "volume": {
+        "n": 0,
+        "precision": null,
+        "status": "unmeasured"
+      }
+    },
+    "status": "unmeasured \u2014 detector precision is filled in by ROADMAP B2"
+  },
   "divergence": null,
   "fibonacci": {
     "direction": "up",
     "impulse_high": 64664.0,
     "impulse_low": 64214.0,
+    "key_level_distances": {
+      "0.382": {
+        "distance_atr": 2.39,
+        "distance_pct": 0.86
+      },
+      "0.5": {
+        "distance_atr": 2.15,
+        "distance_pct": 0.78
+      },
+      "0.618": {
+        "distance_atr": 1.92,
+        "distance_pct": 0.69
+      },
+      "0.786": {
+        "distance_atr": 1.6,
+        "distance_pct": 0.57
+      }
+    },
     "key_levels": {
       "0.382": 64492.1,
       "0.5": 64439.0,
@@ -240,10 +347,76 @@
     "stochastic_k": 14.4,
     "stochastic_zone": "oversold"
   },
+  "moving_averages": {
+    "long": {
+      "distance_atr": -4.86,
+      "distance_pct": -1.75,
+      "period": 200,
+      "value": 62822.82
+    },
+    "slow": {
+      "distance_atr": 0.47,
+      "distance_pct": 0.17,
+      "period": 50,
+      "value": 64051.03
+    }
+  },
+  "mtf_signals": {
+    "signals": {
+      "candlestick": {
+        "1h": "bearish",
+        "4h": "bearish"
+      },
+      "fibonacci": {
+        "1h": "neutral",
+        "4h": "neutral"
+      },
+      "macd": {
+        "1h": "bearish",
+        "4h": "bullish"
+      },
+      "rsi": {
+        "1h": "neutral",
+        "4h": "neutral"
+      },
+      "support_resistance": {
+        "1h": "bullish",
+        "4h": "neutral"
+      },
+      "trend": {
+        "1h": "neutral",
+        "4h": "neutral"
+      },
+      "volume": {
+        "1h": "neutral",
+        "4h": "neutral"
+      }
+    },
+    "timeframes": [
+      "1h",
+      "4h"
+    ]
+  },
+  "nearest_levels": {
+    "above": {
+      "distance_atr": 0.01,
+      "distance_pct": 0.0,
+      "price": 63944.1,
+      "source": "S/R zone 63828.92\u201363944.10 (upper edge)"
+    },
+    "below": {
+      "distance_atr": -0.49,
+      "distance_pct": -0.18,
+      "price": 63828.92,
+      "source": "S/R zone 63828.92\u201363944.10 (lower edge)"
+    }
+  },
   "round_number": {
     "distance_pct": 0.09,
     "is_near": true,
-    "nearest": 64000.0
+    "nearest": 64000.0,
+    "signed_distance_atr": 0.25,
+    "signed_distance_pct": 0.09
   },
   "situation": {
     "reasons": [
@@ -254,9 +427,12 @@
     "tier": "notable",
     "word_budget": 70
   },
+  "strongest_opposing_fact": null,
   "support_resistance": {
     "nearest_resistance": {
       "bars_since_touch": 9,
+      "distance_atr": 0.94,
+      "distance_pct": 0.34,
       "inside": false,
       "lower": 64158.64,
       "price": 64216.23,
@@ -267,6 +443,8 @@
     },
     "nearest_support": {
       "bars_since_touch": 39,
+      "distance_atr": 0.0,
+      "distance_pct": 0.0,
       "inside": true,
       "lower": 63828.92,
       "price": 63886.51,

@@ -3,8 +3,8 @@
 A state file for the "learning instrument" build. Source of truth for what's next: `ROADMAP.md`
 (steps A1…D6; prompts in `PROMPTS.md`). Older plans are in `docs/archive/`. See `CLAUDE.md` for conventions.
 
-**ROADMAP progress:** A1 ✓ (merged, `645231c`), A2 ✓ (merged, `800e12a`; docs `1003735`), A3 ✓ (merged), A4 ✓ (merged). **Next: A5** (facts
-payload hardening).
+**ROADMAP progress:** A1 ✓ (merged, `645231c`), A2 ✓ (merged, `800e12a`; docs `1003735`), A3 ✓ (merged), A4 ✓ (merged), A5 ✓ (merged). **Next: A6**
+(analyst guide revision).
 
 ## Current state
 
@@ -19,7 +19,8 @@ hardening pass (guide wired in, brief/teaching modes); paper trading; three-cand
 **ROADMAP A1** (verification pass: chart label/regime fixes, reclaimed-neckline → `failed`,
 two-point trendlines). **ROADMAP A2** (verdict as a category count, neutral styling, no-edge
 disclosure; `800e12a`). **ROADMAP A3** (situation tier decided in Layer 1) and **ROADMAP A4** (support/resistance as
-ATR-scaled zones). **333 tests green, ruff + svelte-check clean.**
+ATR-scaled zones) and **ROADMAP A5** (facts payload hardening). **351 tests green, ruff +
+svelte-check clean.**
 
 **Standing facts:** patterns and 3-candle candlesticks stay OUT of the confidence score (facts
 only); regime is standalone (not a vote); two-point trendlines are chart-only (not in facts); the
@@ -27,7 +28,11 @@ only); regime is standalone (not a vote); two-point trendlines are chart-only (n
 situation tier (`facts["situation"]`: no_setup / notable / confirmed, + mtf_synthesis for the
 synthesis) is Layer 1's decision; it sets the explanation's format and word budget, and Claude may
 not change it. Support/resistance are ZONES (bands with touches, strength, stale flag) built by one
-shared `sr_zones()`; "at support" = inside the band or within 0.25×ATR of its edge.
+shared `sr_zones()`; "at support" = inside the band or within 0.25×ATR of its edge. The facts
+carry pre-computed distances (ATR + %, + above / − below) to every level, the nearest structural
+level above/below, pattern ages, per-signal higher-timeframe votes (`mtf.facts_from`, incl. 1w —
+information only), the strongest opposing fact, an unmeasured reliability field and an explicit
+`absences` list; the prompt follows the guide's §3 order.
 
 **Known open items:** channel detector over-calls (SOL 1d eye-check FAIL → B1/B2); phone-width
 right-axis price-label pile-up; the disclosure panel's evidence numbers are hard-coded from past
@@ -42,12 +47,58 @@ Selectable timeframes: `15m, 30m, 1h, 4h, 1d`. Registered pairs: BTC/ETH/SOL/XRP
 EUR/USD, GBP/USD (forex via Twelve Data). New in A1: `patterns.reclaim_atr_mult` (0.25),
 `structure.trendline_break_atr_mult` (0.25), `structure.trendline_max_anchors` (6). New in A4:
 `structure.sr_zone_atr_mult` (0.5), `sr_near_atr_mult` (0.25), `sr_stale_bars` (120),
-`sr_strength_halflife_bars` (60). Defaults
+`sr_strength_halflife_bars` (60). New in A5: `mtf.facts_from` ([4h, 1d, 1w]) — per-signal
+higher-timeframe votes shown to Claude; the veto still uses `mtf.context_from` ([4h, 1d]). Defaults
 apply if `config.yaml` omits them.
 
 ---
 
 ## Log (newest first)
+
+### ROADMAP A5 — Facts payload hardening
+- **Done:** 2026-09-24 · **branch:** `feature/facts-hardening` · **merged to `main`.**
+- **Done-when → PASS:** every field present (test per field); absences explicit in both the facts
+  dict (`absences`) and the prompt ("NOT PRESENT…", "RSI divergence: none detected", "not fetched",
+  "not available"); distances present on every level (tests); snapshot regenerated after the user
+  reviewed the diff. 18 new tests, **351 green**, ruff + svelte-check clean. No UI change → no
+  browser check needed.
+- **Build:** new `src/advisor/facts_detail.py` (pure helpers) + `facts._harden()`:
+  - **Distances** `{distance_atr, distance_pct}`, signed (+ above / − below): S/R zones (to the nearer
+    edge, 0 inside), each key Fibonacci level, the round number, each pattern's breakout /
+    invalidation / target, and the 50/200 SMAs (new `moving_averages` block).
+  - **`nearest_levels.above/below`**: nearest structural level (zone edges, key Fibonacci, round
+    numbers either side, pattern breakout/invalidation) with its source. MAs excluded (dynamic).
+  - **Pattern ages**: `bars_since_completion` and `bars_since_state_change` (None while forming).
+    `classify_state_history` now also returns where the state began; memoryless (continuation)
+    patterns use the start of the current same-state run.
+  - **`detector_reliability`**: every detector + pattern type `{precision: None, n: 0, status:
+    unmeasured}` until B2.
+  - **`mtf_signals`**: each detector's vote on the base TF and each higher TF in `mtf.facts_from`,
+    resampled from the base candles, dormant below `slow_ma` bars. Base votes are reused, not recomputed.
+  - **`strongest_opposing_fact`**: the opposing category with the highest configured weight, its
+    detector and reason; None when nothing opposes or the read is neutral (stated either way).
+  - **`absences`**: divergence, confirmed/failed/any pattern, candlestick, support/resistance zone,
+    Fibonacci leg, volume, higher timeframe, opposing category, nearest level above/below.
+  - **Prompt** rewritten in §3 order: 1 trend & regime (+ MAs, ADX, HTF, per-signal TF votes) →
+    2 structure (nearest levels, zones, Fibonacci, round number) → 3 patterns (+ candlestick) →
+    4 momentum → 5 volatility → 6 volume → 7 context/derivatives → verdict, opposing fact, track
+    record, per-detector votes, reliability, NOT PRESENT. Old labels kept inside the sections.
+- **Snapshot diff (approved):** purely additive (179 lines added, no existing value changed; tier
+  still notable) — the new keys above plus distance fields.
+- **Deviations from ROADMAP.md:** (1) the roadmap's "1d / 1w" example needed a weekly timeframe
+  that wasn't configured; with the user's OK, `mtf.facts_from` [4h, 1d, 1w] was added for the
+  per-signal votes ONLY — the veto (`context_from` [4h, 1d]) is unchanged, since adding 1w there
+  would change daily/4h verdicts and needs a daily backtest first. 1w weeks run Mon–Sun (`W-SUN`).
+  (2) Opposing fact is category-based as specified; an opposing CONFIRMED PATTERN (e.g. SOL 1d's
+  bullish double bottom vs a bearish read, before A4) is not yet surfaced as the opposing fact.
+- **Prompt wording fixes (after reading the real BTC 1d facts):** the verdict count now reads
+  "1 of 4 voting categories agree; 2 needed to align" (was "1 of 2", i.e. agreeing-of-required);
+  the veto line is labelled "Higher-timeframe veto check" and, when none applies, says so and points
+  to the per-timeframe votes (it used to say "no higher timeframe available" right above the 1w
+  votes); "1 bar ago" singular. Wording only — snapshot unchanged.
+- **Findings:** on 1h, 1w stays dormant (~26 weeks of history < 50); on daily and 4h it is active
+  (e.g. BTC 1d: trend 1d neutral / 1w bearish). The prompt still shows the internal "confidence NN%"
+  to Claude — A2 removed it from the UI only; A6/C1 should decide whether Claude may see it.
 
 ### ROADMAP A4 — Support/resistance as zones + level freshness
 - **Done:** 2026-09-23 · **branch:** `feature/sr-zones` · **merged to `main`.**

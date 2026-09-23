@@ -144,6 +144,10 @@ class MultiTimeframeConfig(_Strict):
     # conflicts with the higher-TF trend is downgraded (not flagged).
     enabled: bool = True
     context_from: list[str] = Field(default_factory=lambda: ["4h", "1d"])
+    # ROADMAP A5: higher timeframes shown to Claude as per-signal votes (INFORMATION ONLY — never
+    # gates or changes a verdict). Includes 1w so daily/4h charts get the weekly picture; the
+    # veto above stays on `context_from` until a daily backtest justifies adding 1w there.
+    facts_from: list[str] = Field(default_factory=lambda: ["4h", "1d", "1w"])
 
 
 class AlertsConfig(_Strict):

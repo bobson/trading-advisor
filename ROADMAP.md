@@ -66,11 +66,12 @@ instructing it better. So **the guide shrinks as Layer 1 grows.**
 | A2 Verdict reframe + no-edge disclosure | ✅ Done (merged `800e12a`, 2026-09-23) |
 | A3 Situation tier in Layer 1 | ✅ Done (merged, 2026-09-23) |
 | A4 Support/resistance as zones + level freshness | ✅ Done (merged, 2026-09-23) |
-| Tests | 333 green, ruff + svelte-check clean |
+| A5 Facts payload hardening | ✅ Done (merged, 2026-09-24) |
+| Tests | 351 green, ruff + svelte-check clean |
 
 **Remaining, in order:**
 
-~~`A1`~~ ✅ `→` ~~`A2`~~ ✅ `→` ~~`A3`~~ ✅ `→` ~~`A4`~~ ✅ `→ A5 → A5 → A6 → A7 → A8` *(honesty & precision hardening, then start the forward record)*
+~~`A1`~~ ✅ `→` ~~`A2`~~ ✅ `→` ~~`A3`~~ ✅ `→` ~~`A4`~~ ✅ `→` ~~`A5`~~ ✅ `→ A6 → A5 → A6 → A7 → A8` *(honesty & precision hardening, then start the forward record)*
 `→ B1 → B2 → B3 → B4 → B5` *(measure the detectors, then the patterns)*
 `→ C1` *(integrity, enforced)*
 `→ D1 → D2 → D3 → D4 → D5 → D6` *(the learning loop)*

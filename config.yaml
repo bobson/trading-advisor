@@ -54,6 +54,7 @@ patterns:
 mtf:
   enabled: true
   context_from: [4h, 1d]     # higher timeframes that gate the base-timeframe setup (Phase 16)
+  facts_from: [4h, 1d, 1w]   # higher timeframes shown as per-signal votes — information only, never a veto (A5)
 
 market_adaptation:
   significant_move_atr_mult: 1.5  # a "significant move" = this x ATR, volatility-relative (Phase 19)

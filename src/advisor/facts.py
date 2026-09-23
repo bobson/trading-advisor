@@ -29,6 +29,8 @@ from src.indicators.features import (
     COL_MACD_SIGNAL,
     COL_OBV,
     COL_RSI,
+    COL_SMA_LONG,
+    COL_SMA_SLOW,
     COL_STOCH_D,
     COL_STOCH_K,
     COL_VOLUME,
@@ -46,6 +48,14 @@ from src.signals.confluence import (
     signal_from_support_resistance,
     signal_from_trend,
     signal_from_volume,
+)
+from src.advisor.facts_detail import (
+    distance,
+    mtf_signal_alignment,
+    nearest_structural_levels,
+    reliability_placeholder,
+    strongest_opposing_fact,
+    zone_edge_distance,
 )
 from src.market.adaptation import market_context
 from src.signals.situation import classify_situation
@@ -142,6 +152,74 @@ def _nearest_levels(zones: pd.DataFrame, last_close: float) -> dict:
             "inside": bool(row["distance"] == 0),
         }
     return out
+
+
+def _harden(facts: dict, featured_df: pd.DataFrame, zones: pd.DataFrame, confluence, last_close: float,
+            atr: float | None, cfg: Config) -> None:
+    """ROADMAP A5 — make the facts complete enough that Claude never guesses or calculates:
+    distances (ATR + %) to every level, the nearest structural level above/below, per-signal
+    higher-timeframe votes, the strongest opposing fact, a reliability field, and an explicit
+    list of what was NOT found. Mutates `facts` in place (all values JSON-safe)."""
+    # distances to every level
+    for key in ("nearest_support", "nearest_resistance"):
+        z = facts["support_resistance"][key]
+        if z:
+            z.update(zone_edge_distance(z["lower"], z["upper"], last_close, atr))
+    fib = facts["fibonacci"]
+    if fib:
+        fib["key_level_distances"] = {r: distance(v, last_close, atr) for r, v in fib["key_levels"].items()}
+    rn = facts["round_number"]
+    if rn:
+        rn.update({f"signed_{k}": v for k, v in distance(rn["nearest"], last_close, atr).items()})
+    for p in facts["chart_patterns"]:
+        p["distances"] = {k: distance(p.get(f"{k}_level" if k != "target" else k), last_close, atr)
+                          for k in ("breakout", "invalidation", "target")}
+    mas = {}
+    for key, col, period in (("slow", COL_SMA_SLOW, cfg.indicators.slow_ma),
+                             ("long", COL_SMA_LONG, cfg.indicators.long_ma)):
+        v = _num(_last(featured_df, col))
+        mas[key] = None if v is None else {"period": period, "value": v, **distance(v, last_close, atr)}
+    facts["moving_averages"] = mas
+
+    facts["nearest_levels"] = nearest_structural_levels(
+        last_close, atr, zones=zones, fib_levels=fib["key_levels"] if fib else None,
+        patterns=facts["chart_patterns"])
+    facts["strongest_opposing_fact"] = strongest_opposing_fact(facts["confluence"], cfg)
+    facts["mtf_signals"] = mtf_signal_alignment(
+        featured_df, {s.name: s.direction for s in confluence.signals}, cfg)
+    facts["detector_reliability"] = reliability_placeholder(
+        [s.name for s in confluence.signals], [p["type"] for p in facts["chart_patterns"]])
+
+    # explicit absences — never a silent omission
+    pats = facts["chart_patterns"]
+    absent = []
+    if facts["divergence"] is None:
+        absent.append("no RSI divergence detected")
+    if not any(p["state"] == "confirmed" for p in pats):
+        absent.append("no confirmed chart pattern")
+    if not any(p["state"] == "failed" for p in pats):
+        absent.append("no failed chart pattern")
+    if not pats:
+        absent.append("no chart pattern detected at all (not even forming)")
+    if (facts["candlestick"] or {}).get("pattern") in (None, "none"):
+        absent.append("no candlestick pattern on the last closed bar")
+    if facts["support_resistance"]["nearest_support"] is None:
+        absent.append("no support zone below price")
+    if facts["support_resistance"]["nearest_resistance"] is None:
+        absent.append("no resistance zone above price")
+    if facts["fibonacci"] is None:
+        absent.append("no clean price leg for Fibonacci")
+    if facts["volume"] is None:
+        absent.append("no volume data")
+    if not facts["confluence"].get("mtf_trends"):
+        absent.append("no higher-timeframe veto applies to this chart (the veto timeframes are not above it, or lack enough history yet)")
+    if facts["confluence"]["bias"] in ("bullish", "bearish") and facts["strongest_opposing_fact"] is None:
+        absent.append("no category votes against the read")
+    if facts["nearest_levels"]["above"] is None:
+        absent.append("no structural level above price")
+    if facts["nearest_levels"]["below"] is None:
+        absent.append("no structural level below price")
+    facts["absences"] = absent
 
 
 def build_facts(featured_df: pd.DataFrame, swings: pd.DataFrame, cfg: Config) -> dict:
@@ -322,6 +400,8 @@ def build_facts(featured_df: pd.DataFrame, swings: pd.DataFrame, cfg: Config) ->
             "mtf_trends": confluence.mtf_trends,
         },
     }
+    _harden(facts, featured_df, levels, confluence, last_close, atr, cfg)
+
     # ROADMAP A3: the situation tier is decided HERE (Layer 1), from the finished facts — it picks
     # the explanation's template and word budget, and Layer 2 may not change it.
     facts["situation"] = classify_situation(facts, cfg)
@@ -343,206 +423,268 @@ def _fear_greed_read(value) -> str:
     return "mid-range — no directional information (only the <20 / >80 extremes are read contrarily)"
 
 
+def _bars(n) -> str:
+    """'1 bar' / 'N bars' (and 'n/a' when unknown)."""
+    return "n/a bars" if n is None else f"{n} bar" if n == 1 else f"{n} bars"
+
+
+def _d(dist: dict | None) -> str:
+    """Render a pre-computed distance: '+1.34 ATR / +0.91%' (+ = above price, − = below)."""
+    if not dist:
+        return "distance n/a"
+    atr = "n/a ATR" if dist.get("distance_atr") is None else f"{dist['distance_atr']:+.2f} ATR"
+    return f"{atr} / {dist['distance_pct']:+.2f}%"
+
+
 def facts_to_prompt(facts: dict) -> str:
-    """Render the facts dict as a readable text block for the model (and for debugging)."""
+    """Render the facts dict as a readable text block for the model (and for debugging).
+
+    ROADMAP A5: sections follow the analyst guide's §3 priority order — (1) trend & regime,
+    (2) structure, (3) patterns, (4) momentum, (5) volatility, (6) volume, (7) context — then the
+    confluence verdict. Every distance is pre-computed (ATR units and %, + above / − below price)
+    and every absence is stated, so the model never calculates or infers what is missing."""
     m = facts["market"]
     lines: list[str] = []
+    add = lines.append
     sit = facts.get("situation")
     if sit:
-        lines.append(f"SITUATION TIER: {sit['tier']} — decided by Layer 1; use it, never change it.")
-        lines.append(f"  Word budget: {sit['word_budget']}. Format: {sit['template']}")
-        lines.append(f"  Why this tier: {', '.join(sit['reasons']) or 'n/a'}")
-        lines.append("")
-    lines.append(f"MARKET: {m['symbol']} on {m['exchange']}, {m['timeframe']} timeframe")
-    lines.append(f"Last closed candle: {m['last_close']} at {m['last_time']}")
+        add(f"SITUATION TIER: {sit['tier']} — decided by Layer 1; use it, never change it.")
+        add(f"  Word budget: {sit['word_budget']}. Format: {sit['template']}")
+        add(f"  Why this tier: {', '.join(sit['reasons']) or 'n/a'}")
+        add("")
+    add(f"MARKET: {m['symbol']} on {m['exchange']}, {m['timeframe']} timeframe")
+    add(f"Last closed candle: {m['last_close']} at {m['last_time']}")
     ma = facts.get("market_adaptation")
     if ma:
         if ma["is_24_7"]:
-            lines.append(f"  {ma['asset_class']}, 24/7 — volume is real exchange volume.")
+            add(f"  {ma['asset_class']}, 24/7 — volume is real exchange volume.")
         else:
             gap = " (WEEKEND GAP — Sunday opened away from Friday's close)" if ma["weekend_gap"] else ""
-            lines.append(f"  {ma['asset_class']} — active session: {ma['active_session']}{gap}.")
-            lines.append("  Volume is TICK volume (a proxy): treat volume signals as weaker than in crypto.")
+            add(f"  {ma['asset_class']} — active session: {ma['active_session']}{gap}.")
+            add("  Volume is TICK volume (a proxy): treat volume signals as weaker than in crypto.")
         if ma["significant_move_pct"] is not None:
-            lines.append(f"  A 'significant move' for this market is ~{ma['significant_move_pct']}% (ATR-based).")
-    lines.append("")
-
-    t = facts["trend"]
-    lines.append(f"TREND: {t['label']}")
-    for r in t["reasons"]:
-        lines.append(f"  - {r}")
-    lines.append("")
-
-    mo = facts["momentum"]
-    lines.append("MOMENTUM:")
-    lines.append(f"  - RSI: {mo['rsi']} ({mo['rsi_zone']})")
-    lines.append(f"  - MACD: {mo['macd']} vs signal {mo['macd_signal']} ({mo['macd_state']})")
-    if mo.get("stochastic_k") is not None:
-        lines.append(f"  - Stochastic: %K {mo['stochastic_k']} / %D {mo['stochastic_d']} ({mo['stochastic_zone']})")
-    div = facts.get("divergence")
-    if div:
-        lines.append(f"  - RSI divergence ({div['kind']}): {div['reason']}")
-    lines.append("")
-
-    vt = facts.get("volatility")
-    if vt:
-        lines.append("VOLATILITY & TREND STRENGTH:")
-        lines.append(f"  - ATR: {vt['atr']} ({vt['atr_pct']}% of price)")
-        lines.append(f"  - ADX: {vt['adx']} ({vt['regime']})")
-        lines.append(f"  - Bollinger: %B {vt['bollinger_pct_b']} ({vt['bollinger_position']})")
-        lines.append("")
-
-    vol = facts.get("volume")
-    lines.append("VOLUME:")
-    if vol:
-        state = "above average (confirming the move)" if vol["confirmed"] else "below the confirmation bar (thin)"
-        obv = "" if vol.get("obv_rising") is None else f"; OBV {'rising' if vol['obv_rising'] else 'falling'}"
-        lines.append(f"  - Last bar {vol['last']} vs {vol['average']} average = {vol['ratio']}x — {state}{obv}")
-    else:
-        lines.append("  - no volume data available")
-    lines.append("")
-
-    rn = facts.get("round_number")
-    if rn:
-        near = "AT" if rn["is_near"] else f"{rn['distance_pct']}% from"
-        lines.append(f"ROUND NUMBER: price is {near} the psychological level {rn['nearest']}")
-        lines.append("")
-
-    sr = facts["support_resistance"]
-    lines.append("NEAREST SUPPORT/RESISTANCE ZONES (bands, not exact lines; by distance from price):")
-
-    def _zone(z: dict) -> str:
-        where = " — price is INSIDE this zone" if z.get("inside") else ""
-        stale = ", STALE — no reversal here for a long time" if z.get("stale") else ""
-        return (f"{z['lower']}–{z['upper']} (centre {z['price']}; {z['touches']} swing reversals, "
-                f"last one {z['bars_since_touch']} bars ago, recency-weighted strength "
-                f"{z['strength']}{stale}){where}")
-    lines.append(f"  - Support: {_zone(sup)}" if (sup := sr["nearest_support"]) else "  - Support: none detected below price")
-    lines.append(f"  - Resistance: {_zone(res)}" if (res := sr["nearest_resistance"]) else "  - Resistance: none detected above price")
-    lines.append("")
-
-    candle = facts.get("candlestick")
-    if candle:
-        lines.append(
-            f"CANDLESTICK (last closed bar): {candle['pattern']} ({candle['direction']}). "
-            "Three-candle patterns (stars, soldiers/crows) are noted here for context but are NOT "
-            "part of the confluence score."
-        )
-        lines.append("")
-
-    patterns = facts.get("chart_patterns", [])
-    lines.append("CHART PATTERNS (best-effort geometry — approximate; NOT part of the confluence score):")
-    if patterns:
-        for p in patterns:
-            conf = p.get("confirmation", {})
-            sup = [k for k, v in conf.items() if v == "supports"]
-            con = [k for k, v in conf.items() if v == "contradicts"]
-            lines.append(
-                f"  [{p['state'].upper()} · {p['direction']}] {p['type']} ({p['kind']}, quality {p['quality']}): "
-                f"breakout {p['breakout_level']}, invalidation {p['invalidation_level']}, target {p['target']}"
-            )
-            lines.append(f"      confirmation supports: {', '.join(sup) or 'none'}; "
-                         f"contradicts: {', '.join(con) or 'none'}")
-    else:
-        lines.append("  - none detected in the recent structure")
-    lines.append("")
-
-    fib = facts["fibonacci"]
-    if fib:
-        lines.append(f"FIBONACCI (latest {fib['direction']}-leg, {fib['impulse_low']} to {fib['impulse_high']}):")
-        for ratio, price in fib["key_levels"].items():
-            lines.append(f"  - {float(ratio) * 100:.1f}% retracement: {price}")
-    else:
-        lines.append("FIBONACCI: no clean price leg to measure")
-    lines.append("")
-
-    ctx = facts.get("context")
-    if ctx:
-        lines.append("MARKET CONTEXT (CONTEXT ONLY — conditions, never direction. Narrate the "
-                     "label/state as given; NEVER assign a context item a bullish/bearish vote):")
-        fg = ctx.get("fear_greed")
-        if fg:
-            lines.append(
-                f"  - Crypto Fear & Greed: {fg['value']}/100 (source label: {fg['label']}) — "
-                f"{_fear_greed_read(fg['value'])}. [as of {fg['as_of']}]"
-            )
-        fund = ctx.get("fundamentals")
-        if fund:
-            mc, v = fund.get("market_cap"), fund.get("volume_24h")
-            lines.append(
-                f"  - Fundamentals ({fund['coin']}): market cap "
-                f"{('$%.1fB' % (mc / 1e9)) if mc else 'n/a'}, 24h vol "
-                f"{('$%.1fB' % (v / 1e9)) if v else 'n/a'}, {fund.get('change_24h_pct')}% 24h, "
-                f"{fund.get('ath_change_pct')}% from all-time high "
-                "(regime/liquidity context, not a directional vote)"
-            )
-        cal = ctx.get("economic_calendar") or []
-        if cal:
-            lines.append("  - Upcoming high-impact economic events:")
-            for e in cal:
-                lines.append(f"      {e['time']} {e['country']}: {e['event']} [{e['impact']}]")
-        news = ctx.get("news") or []
-        if news:
-            lines.append("  - Recent headlines:")
-            for h in news:
-                lines.append(f"      ({h['when']}) {h['source']}: {h['headline']}")
-        if not fg and not fund and not cal and not news:
-            lines.append("  - none available")
-        lines.append(f"  (pulled {ctx.get('as_of', 'unknown')})")
-        lines.append("")
-
-    deriv = facts.get("derivatives")
-    if deriv:
-        lines.append("DERIVATIVES / POSITIONING (CONTEXT ONLY — the leverage crowd, never a "
-                     "trigger; do not turn any of it into a bullish/bearish vote):")
-        f = deriv.get("funding")
-        if f:
-            lines.append(
-                f"  - Funding: {f['rate_pct']}%/8h ({f['annualized_pct']}%/yr) — state: {f['state']}. "
-                "Only an EXTREME is a contrarian flag; otherwise no directional information."
-            )
-        oi = deriv.get("open_interest")
-        if oi:
-            notional = f" (~${oi['notional_usd']:,.0f})" if oi.get("notional_usd") else ""
-            lines.append(f"  - Open interest: {oi['amount']:,.0f} contracts{notional}")
-        lines.append(f"  (pulled {deriv.get('as_of', 'unknown')})")
-        lines.append("")
+            add(f"  A 'significant move' for this market is ~{ma['significant_move_pct']}% (ATR-based).")
+    add("All distances below are PRE-COMPUTED: + = level above price, − = below. Quote them; never recompute.")
+    add("")
 
     c = facts["confluence"]
-    conf_pct = f"{c['confidence'] * 100:.0f}%"
-    verdict = (
-        f"{c['bias'].upper()} setup FLAGGED — confidence {conf_pct} "
-        f"({c['agreeing_categories']} independent categories agree, need {c['require_categories']})"
-        if c["triggered"]
-        else f"no setup flagged (bias {c['bias']}, confidence {conf_pct}, "
-        f"{c['agreeing_categories']} of {c['require_categories']} categories agree)"
-    )
-    lines.append(f"CONFLUENCE VERDICT: {verdict}")
-    cats = c.get("categories") or {}
-    if cats:
-        lines.append("Category reads (correlated signals collapsed): "
-                     + ", ".join(f"{cat}={d}" for cat, d in cats.items()))
+    vt = facts.get("volatility") or {}
 
+    # --- (1) TREND & REGIME ---------------------------------------------------------------
+    t = facts["trend"]
+    add("1. TREND & REGIME")
+    add(f"  - TREND: {t['label']}")
+    for r in t["reasons"]:
+        add(f"  - {r}")
+    for key, mav in (facts.get("moving_averages") or {}).items():
+        add(f"  - SMA{mav['period']}: {mav['value']} ({_d(mav)})" if mav
+            else f"  - {key} moving average: not available (not enough history)")
+    if vt:
+        add(f"  - ADX: {vt.get('adx')} ({vt.get('regime')})")
     mtf_trends = c.get("mtf_trends")
     if mtf_trends:
         tf_str = ", ".join(f"{tf} {label}" for tf, label in mtf_trends.items())
         align = c.get("mtf_alignment")
-        lines.append(f"HIGHER TIMEFRAMES: {tf_str} — the setup is {align} with the bigger picture")
+        add(f"  - Higher-timeframe veto check: {tf_str} — the setup is {align} with the bigger picture")
         if align == "conflict":
-            lines.append("  (downgraded: this base-timeframe setup fights the higher-timeframe trend)")
+            add("    (downgraded: this base-timeframe setup fights the higher-timeframe trend)")
+    else:
+        add("  - Higher-timeframe veto check: none applies to this chart (the veto timeframes are not above it, or lack "
+            "enough history yet); see the per-timeframe votes below for the wider picture")
+    ms = facts.get("mtf_signals")
+    if ms and len(ms.get("timeframes", [])) > 1:
+        add("  - Each detector's vote per timeframe (base first):")
+        for name, per in ms["signals"].items():
+            add(f"      {name}: " + " / ".join(f"{tf} {d}" for tf, d in per.items()))
+    add("")
+
+    # --- (2) STRUCTURE --------------------------------------------------------------------
+    add("2. STRUCTURE")
+    nl = facts.get("nearest_levels") or {}
+    for side in ("above", "below"):
+        lv = nl.get(side)
+        add(f"  - Nearest structural level {side} price: {lv['price']} — {lv['source']} ({_d(lv)})" if lv
+            else f"  - Nearest structural level {side} price: none detected")
+    sr = facts["support_resistance"]
+
+    def _zone(z: dict) -> str:
+        where = "price is INSIDE this zone" if z.get("inside") else _d(z)
+        stale = ", STALE — no reversal here for a long time" if z.get("stale") else ""
+        return (f"{z['lower']}–{z['upper']} (centre {z['price']}; {where}; {z['touches']} swing "
+                f"reversals, last one {_bars(z['bars_since_touch'])} ago, recency-weighted strength "
+                f"{z['strength']}{stale})")
+    add("  - Support/resistance ZONES (bands, not exact lines):")
+    add(f"      support: {_zone(sup)}" if (sup := sr["nearest_support"]) else "      support: no support zone below price")
+    add(f"      resistance: {_zone(res)}" if (res := sr["nearest_resistance"]) else "      resistance: no resistance zone above price")
+    fib = facts["fibonacci"]
+    if fib:
+        add(f"  - Fibonacci (latest {fib['direction']}-leg, {fib['impulse_low']} to {fib['impulse_high']}):")
+        dists = fib.get("key_level_distances") or {}
+        for ratio, price in fib["key_levels"].items():
+            add(f"      {float(ratio) * 100:.1f}% retracement: {price} ({_d(dists.get(ratio))})")
+    else:
+        add("  - Fibonacci: no clean price leg to measure")
+    rn = facts.get("round_number")
+    if rn:
+        near = "AT it" if rn["is_near"] else "not near it"
+        signed = {"distance_atr": rn.get("signed_distance_atr"), "distance_pct": rn.get("signed_distance_pct")}
+        add(f"  - ROUND NUMBER: nearest psychological level {rn['nearest']} "
+            f"({_d(signed) if signed['distance_pct'] is not None else ''}; {near})")
+    else:
+        add("  - ROUND NUMBER: none")
+    add("")
+
+    # --- (3) PATTERNS ---------------------------------------------------------------------
+    patterns = facts.get("chart_patterns", [])
+    add("3. PATTERNS — CHART PATTERNS (best-effort geometry — approximate; NOT part of the confluence "
+        "score; detector reliability UNMEASURED):")
+    if patterns:
+        for p in patterns:
+            conf = p.get("confirmation", {})
+            sup_ = [k for k, v in conf.items() if v == "supports"]
+            con = [k for k, v in conf.items() if v == "contradicts"]
+            dd = p.get("distances") or {}
+            age = (f"{p['state']} {_bars(p['bars_since_state_change'])} ago"
+                   if p.get("bars_since_state_change") is not None else "not yet confirmed or failed")
+            add(f"  [{p['state'].upper()} · {p['direction']}] {p['type']} ({p['kind']}, quality {p['quality']}) — "
+                f"{age}; last defining swing {_bars(p.get('bars_since_completion'))} ago")
+            add(f"      breakout {p['breakout_level']} ({_d(dd.get('breakout'))}), invalidation "
+                f"{p['invalidation_level']} ({_d(dd.get('invalidation'))}), target {p['target']} "
+                f"({_d(dd.get('target'))})")
+            add(f"      confirmation supports: {', '.join(sup_) or 'none'}; contradicts: {', '.join(con) or 'none'}")
+    else:
+        add("  - none detected in the recent structure (not even forming)")
+    if not any(p["state"] == "confirmed" for p in patterns):
+        add("  - no CONFIRMED chart pattern")
+    candle = facts.get("candlestick")
+    if candle:
+        add(f"  - Candlestick (last closed bar): {candle['pattern']} ({candle['direction']}). Three-candle "
+            "patterns are context only, NOT part of the confluence score.")
+    else:
+        add("  - Candlestick (last closed bar): no pattern")
+    add("")
+
+    # --- (4) MOMENTUM ---------------------------------------------------------------------
+    mo = facts["momentum"]
+    add("4. MOMENTUM")
+    add(f"  - RSI: {mo['rsi']} ({mo['rsi_zone']})")
+    add(f"  - MACD: {mo['macd']} vs signal {mo['macd_signal']} ({mo['macd_state']})")
+    add(f"  - Stochastic: %K {mo['stochastic_k']} / %D {mo['stochastic_d']} ({mo['stochastic_zone']})"
+        if mo.get("stochastic_k") is not None else "  - Stochastic: not available")
+    div = facts.get("divergence")
+    add(f"  - RSI divergence ({div['kind']}): {div['reason']}" if div else "  - RSI divergence: none detected")
+    add("")
+
+    # --- (5) VOLATILITY -------------------------------------------------------------------
+    add("5. VOLATILITY")
+    if vt:
+        add(f"  - ATR: {vt['atr']} ({vt['atr_pct']}% of price)")
+        add(f"  - Bollinger: %B {vt['bollinger_pct_b']} ({vt['bollinger_position']})")
+    else:
+        add("  - not available")
+    add("")
+
+    # --- (6) VOLUME -----------------------------------------------------------------------
+    vol = facts.get("volume")
+    add("6. VOLUME:")
+    if vol:
+        state = "above average (confirming the move)" if vol["confirmed"] else "below the confirmation bar (thin)"
+        obv = "" if vol.get("obv_rising") is None else f"; OBV {'rising' if vol['obv_rising'] else 'falling'}"
+        add(f"  - Last bar {vol['last']} vs {vol['average']} average = {vol['ratio']}x — {state}{obv}")
+    else:
+        add("  - no volume data available")
+    add("")
+
+    # --- (7) CONTEXT ----------------------------------------------------------------------
+    add("7. MARKET CONTEXT (CONTEXT ONLY — conditions, never direction. Narrate the label/state as "
+        "given; NEVER assign a context item a bullish/bearish vote):")
+    ctx = facts.get("context")
+    if ctx:
+        fg = ctx.get("fear_greed")
+        if fg:
+            add(f"  - Crypto Fear & Greed: {fg['value']}/100 (source label: {fg['label']}) — "
+                f"{_fear_greed_read(fg['value'])}. [as of {fg['as_of']}]")
+        fund = ctx.get("fundamentals")
+        if fund:
+            mc, v = fund.get("market_cap"), fund.get("volume_24h")
+            add(f"  - Fundamentals ({fund['coin']}): market cap "
+                f"{('$%.1fB' % (mc / 1e9)) if mc else 'n/a'}, 24h vol "
+                f"{('$%.1fB' % (v / 1e9)) if v else 'n/a'}, {fund.get('change_24h_pct')}% 24h, "
+                f"{fund.get('ath_change_pct')}% from all-time high "
+                "(regime/liquidity context, not a directional vote)")
+        cal = ctx.get("economic_calendar") or []
+        if cal:
+            add("  - Upcoming high-impact economic events:")
+            for e in cal:
+                add(f"      {e['time']} {e['country']}: {e['event']} [{e['impact']}]")
+        news = ctx.get("news") or []
+        if news:
+            add("  - Recent headlines:")
+            for h in news:
+                add(f"      ({h['when']}) {h['source']}: {h['headline']}")
+        if not fg and not fund and not cal and not news:
+            add("  - market context: none available")
+        add(f"  (pulled {ctx.get('as_of', 'unknown')})")
+    else:
+        add("  - market context (sentiment, fundamentals, calendar, news): not fetched for this read")
+    deriv = facts.get("derivatives")
+    if deriv:
+        add("  - DERIVATIVES / POSITIONING (CONTEXT ONLY — the leverage crowd, never a trigger; do not "
+            "turn any of it into a bullish/bearish vote):")
+        f = deriv.get("funding")
+        if f:
+            add(f"      Funding: {f['rate_pct']}%/8h ({f['annualized_pct']}%/yr) — state: {f['state']}. "
+                "Only an EXTREME is a contrarian flag; otherwise no directional information.")
+        oi = deriv.get("open_interest")
+        if oi:
+            notional = f" (~${oi['notional_usd']:,.0f})" if oi.get("notional_usd") else ""
+            add(f"      Open interest: {oi['amount']:,.0f} contracts{notional}")
+        add(f"      (pulled {deriv.get('as_of', 'unknown')})")
+    else:
+        add("  - derivatives positioning: not available for this read (not fetched, or not a crypto perp)")
+    add("")
+
+    # --- CONFLUENCE VERDICT ---------------------------------------------------------------
+    conf_pct = f"{c['confidence'] * 100:.0f}%"
+    total = len(c.get("categories") or {})
+    count = (f"{c['agreeing_categories']} of {total} voting categories agree; "
+             f"{c['require_categories']} needed to align")
+    verdict = (
+        f"{c['bias'].upper()} setup FLAGGED — confidence {conf_pct} ({count})"
+        if c["triggered"]
+        else f"no setup flagged (bias {c['bias']}, confidence {conf_pct}, {count})"
+    )
+    add(f"CONFLUENCE VERDICT: {verdict}")
+    cats = c.get("categories") or {}
+    if cats:
+        add("Category reads (correlated signals collapsed): " + ", ".join(f"{cat}={d}" for cat, d in cats.items()))
+    opp = facts.get("strongest_opposing_fact")
+    if opp:
+        add(f"STRONGEST OPPOSING FACT (always mention it): {opp['category']} votes {opp['direction']} — "
+            f"{opp['detector']}: {opp['reason']} (opposing categories: {', '.join(opp['opposing_categories'])})")
+    elif c["bias"] in ("bullish", "bearish"):
+        add("STRONGEST OPPOSING FACT: none — no category votes against the read")
+    else:
+        add("STRONGEST OPPOSING FACT: n/a — there is no directional read to oppose")
 
     br = facts.get("base_rate")
-    if br:
-        lines.append(
-            f"TRACK RECORD: historically, {br['bias']} setups like this resolved favorably "
-            f"{br['win_rate'] * 100:.0f}% of the time ({br['n']} past cases, {br['horizon']}-bar "
-            "horizon). This is a base rate, NOT a prediction."
-        )
+    add(f"TRACK RECORD: historically, {br['bias']} setups like this resolved favorably "
+        f"{br['win_rate'] * 100:.0f}% of the time ({br['n']} past cases, {br['horizon']}-bar "
+        "horizon). This is a base rate, NOT a prediction." if br
+        else "TRACK RECORD: not available for this pair/timeframe")
 
-    lines.append("Every detector's PRE-COMPUTED vote and category (authoritative Layer-1 "
-                 "classification — narrate these, NEVER re-classify a signal yourself):")
-    for s in c["signals"]:
-        cat = s.get("category", "other")
-        lines.append(f"  [{s['direction'].upper()} · {cat}] {s['name']}: {s['reason']}")
+    add("Every detector's PRE-COMPUTED vote and category (authoritative Layer-1 "
+        "classification — narrate these, NEVER re-classify a signal yourself):")
+    for s_ in c["signals"]:
+        cat = s_.get("category", "other")
+        add(f"  [{s_['direction'].upper()} · {cat}] {s_['name']}: {s_['reason']}")
+
+    rel = facts.get("detector_reliability")
+    if rel:
+        add(f"DETECTOR RELIABILITY: {rel['status']}. Treat every detection as unverified; "
+            "do not describe any detector as reliable or accurate.")
+    absences = facts.get("absences")
+    if absences:
+        add("NOT PRESENT (explicitly checked): " + "; ".join(absences) + ".")
 
     return "\n".join(lines)

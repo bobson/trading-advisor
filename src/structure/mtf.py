@@ -35,12 +35,12 @@ ALIGNED = "aligned"
 CONFLICT = "conflict"
 ALIGN_NEUTRAL = "neutral"
 
-_UNIT_TO_MINUTES = {"m": 1, "h": 60, "d": 1440}
-_UNIT_TO_PANDAS = {"m": "min", "h": "h", "d": "D"}
+_UNIT_TO_MINUTES = {"m": 1, "h": 60, "d": 1440, "w": 10080}
+_UNIT_TO_PANDAS = {"m": "min", "h": "h", "d": "D", "w": "W-SUN"}   # weeks run Mon–Sun
 
 
 def _tf_minutes(timeframe: str) -> int:
-    """'15m'->15, '1h'->60, '4h'->240, '1d'->1440."""
+    """'15m'->15, '1h'->60, '4h'->240, '1d'->1440, '1w'->10080."""
     return int(timeframe[:-1]) * _UNIT_TO_MINUTES[timeframe[-1]]
 
 
