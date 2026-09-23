@@ -69,6 +69,10 @@ def _mode(cfg: Config) -> dict:
     return _MODES.get(cfg.advisor.explanation_style, _MODES[DEFAULT_MODE])
 
 
+# Room for the uncounted "Opposing:" line (guide §8) on top of the tier's word budget.
+_OPPOSING_LINE_TOKENS = 60
+
+
 def _tokens_for(words: int) -> int:
     """A max_tokens ceiling that fits `words` of prose with a little room (~1.3 tokens/word),
     so the brief budget is STRUCTURAL: the model can't write a longer answer than its tier."""
@@ -86,12 +90,15 @@ def _tier_mode(cfg: Config, situation: dict | None) -> dict:
     fixed = (f"SITUATION TIER: {tier} — decided by Layer 1. Use it; never choose or change it, "
              f"and never write as though the chart were a higher tier. Format: {fmt}")
     if base is _MODES["teaching"]:
-        return {"max_tokens": base["max_tokens"], "note": f"{fixed}\n\n{base['note']}"}
+        return {"max_tokens": base["max_tokens"],
+                "note": (f"{fixed}\n\n{base['note']} The tier, its format and the 'Opposing:' line "
+                         "still apply — teaching lifts only the word cap.")}
     return {
-        "max_tokens": _tokens_for(words),
-        "note": (f"{fixed}\n\nOUTPUT MODE: BRIEF. HARD CEILING: {words} words. No headings, no "
-                 "preamble; name only the 2–3 facts that carry the read. If it will not fit, say "
-                 "the read is unclear instead."),
+        "max_tokens": _tokens_for(words) + _OPPOSING_LINE_TOKENS,
+        "note": (f"{fixed}\n\nOUTPUT MODE: BRIEF. HARD CEILING: {words} words (the final "
+                 "'Opposing:' line, when a strongest opposing fact is supplied, is extra and does "
+                 "not count). No headings, no preamble; name only the 2–3 facts that carry the "
+                 "read. If it will not fit, say the read is unclear instead."),
     }
 
 

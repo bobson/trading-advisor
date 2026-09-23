@@ -235,3 +235,22 @@ def test_weekly_votes_are_information_only(cfg):
     assert set(f["mtf_signals"]["signals"]["trend"]) == {"1d", "1w"}
     assert f["confluence"]["mtf_trends"] is None          # the gate never sees 1w
     assert "1w" not in daily.mtf.context_from and "1w" in daily.mtf.facts_from
+
+
+def test_forex_prices_keep_their_precision(cfg):
+    """A6 finding: facts used to round every price to 2 dp — EUR/USD zones read '1.15–1.15', ATR
+    became 0.0 and pattern levels moved ~50 pips. Prices must keep the instrument's precision."""
+    from src.market.precision import fmt_price, price_decimals, round_price
+    assert (price_decimals(80_000), price_decimals(1.1464), price_decimals(0.52)) == (2, 5, 6)
+    assert round_price(1.146894) == 1.14689 and fmt_price(63944.1) == "63944.10"
+
+    n = 300
+    idx = pd.date_range("2024-01-01", periods=n, freq="h", tz="UTC", name="timestamp")
+    c = 1.10 + 0.004 * np.sin(np.arange(n) / 6.0) + np.linspace(0, 0.003, n)
+    df = pd.DataFrame({"open": c, "high": c + 0.0006, "low": c - 0.0006, "close": c}, index=idx)
+    f = build_facts(add_features(df, cfg), find_swings(df, cfg.structure.swing_sensitivity), cfg)
+    assert f["volatility"]["atr"] and f["volatility"]["atr"] > 0          # not rounded to 0.0
+    for key in ("nearest_support", "nearest_resistance"):
+        z = f["support_resistance"][key]
+        if z:
+            assert z["lower"] != z["upper"] and z["distance_atr"] is not None

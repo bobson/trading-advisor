@@ -3,8 +3,8 @@
 A state file for the "learning instrument" build. Source of truth for what's next: `ROADMAP.md`
 (steps A1…D6; prompts in `PROMPTS.md`). Older plans are in `docs/archive/`. See `CLAUDE.md` for conventions.
 
-**ROADMAP progress:** A1 ✓ (merged, `645231c`), A2 ✓ (merged, `800e12a`; docs `1003735`), A3 ✓ (merged), A4 ✓ (merged), A5 ✓ (merged). **Next: A6**
-(analyst guide revision).
+**ROADMAP progress:** A1 ✓ (merged, `645231c`), A2 ✓ (merged, `800e12a`; docs `1003735`), A3 ✓ (merged), A4 ✓ (merged), A5 ✓ (merged), A6 ✓ (merged). **Next: A7**
+(honest baselines).
 
 ## Current state
 
@@ -19,8 +19,8 @@ hardening pass (guide wired in, brief/teaching modes); paper trading; three-cand
 **ROADMAP A1** (verification pass: chart label/regime fixes, reclaimed-neckline → `failed`,
 two-point trendlines). **ROADMAP A2** (verdict as a category count, neutral styling, no-edge
 disclosure; `800e12a`). **ROADMAP A3** (situation tier decided in Layer 1) and **ROADMAP A4** (support/resistance as
-ATR-scaled zones) and **ROADMAP A5** (facts payload hardening). **351 tests green, ruff +
-svelte-check clean.**
+ATR-scaled zones) and **ROADMAP A5** (facts payload hardening) and **ROADMAP A6** (analyst guide revision +
+instrument price precision). **354 tests green, ruff + svelte-check clean.**
 
 **Standing facts:** patterns and 3-candle candlesticks stay OUT of the confidence score (facts
 only); regime is standalone (not a vote); two-point trendlines are chart-only (not in facts); the
@@ -54,6 +54,45 @@ apply if `config.yaml` omits them.
 ---
 
 ## Log (newest first)
+
+### ROADMAP A6 — Analyst guide revision (+ forex price-precision fix)
+- **Done:** 2026-09-24 · **branch:** `feature/guide-revision` · **merged to `main`.**
+- **Done-when → PASS (with findings):** guide updated; prompt tests pass (+2 new guide-rule tests;
+  **354 green**); brief + teaching spot-checked on BTC 1d, SOL 1d, EUR/USD 1d — verifier OK on all
+  six. Brief mode: within budget, `Opposing:` line present when supplied, conditionals two-sided,
+  no directional wording against the Layer 1 bias. Teaching mode still drifts (see findings).
+- **Guide changes:** §1.1 one rounding rule (prices exactly as given; other numbers ≥3 significant
+  figures; no "≈"; inside the verifier's 1% tolerance). §1.4 "what it conventionally suggests"
+  removed; suggests/favours/leans/path of least resistance/buyers-sellers in control are directional
+  claims, allowed only in the direction of the Layer 1 bias or when attributing a detector's own vote.
+  §2 conditional reads symmetric (nearest level above AND below, no "so"; "worth revisiting" gone).
+  §4 "conventionally read as" labels a convention, doesn't license direction; "many false breaks"
+  removed. §5 extremes = crowded positioning with no implied direction; "historically coincided with
+  turning points" and the contrarian readings removed. §7 cut to one allowed observation (higher-TF
+  trend vs a pattern's implied direction). §8 tier supplied/never escalated, `Opposing:` line always
+  when supplied and outside the budget, teaching lifts only the word cap; examples rewritten. §8/§10
+  one fact-naming style: "RSI 28 (oversold)". §11 self-check kept, noting C1 will enforce it.
+- **Code alongside:** brief `max_tokens` gets +60 for the uncounted Opposing line; the teaching note
+  restates that tier/format/Opposing still apply. Layer 1's own prompt text aligned with §5 (Fear &
+  Greed and funding extremes → "crowded positioning, no implied direction"); two tests that pinned
+  the old "contrarian" wording updated.
+- **Deviation / scope added:** the forex spot-check exposed a Layer 1 bug — facts AND the pattern
+  detectors rounded every price to 2 decimals. EUR/USD zones read "1.15–1.15", ATR became 0.0 (so ATR
+  distances vanished), and pattern breakout levels moved ~50 pips BEFORE the state machine compared
+  closes to them (wrong forex states). Fixed with `src/market/precision.py` (`price_decimals`: 2 at
+  ≥100, 5 at ≥1, 6 below — the chart's existing rule; `round_price`, `fmt_price`) used by facts,
+  detectors, `Pattern.to_dict`, zone/fib vote reasons and level labels. Crypto ≥100 is unchanged →
+  BTC snapshot byte-identical. Regression test added. My first rounding rule ("3 significant figures
+  for everything") also collapsed forex prices and was replaced by "prices exactly as given".
+- **Findings:** teaching mode keeps adding things the guide now forbids: uncounted historical claims
+  ("follow-through historically requires more confirmation", "often appears at a turning point"),
+  invented mechanics ("a stale zone has fewer participants", "the measured target is the minimum
+  move"), causal guesses ("which may explain the failure"), extra own observations (the ADX-vs-
+  sideways tension, in all three teaching runs), and bold headings. Prompt rules alone don't stop
+  it — C1's claim-level checks must. Candidate Layer 1 fact: label "ADX trending but swing structure
+  sideways" explicitly so the model stops explaining it. Round-number step for FX is still 0.1
+  (nearest 1.1 for 1.1467 — the Phase-18 "FX may want finer steps" note stands). Claude's prompt
+  still carries "confidence NN%" (not removed here).
 
 ### ROADMAP A5 — Facts payload hardening
 - **Done:** 2026-09-24 · **branch:** `feature/facts-hardening` · **merged to `main`.**

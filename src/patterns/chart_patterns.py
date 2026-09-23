@@ -22,6 +22,7 @@ import pandas as pd
 
 from src.config import Config
 from src.indicators.features import COL_ATR
+from src.market.precision import round_price
 from src.patterns.base import (
     BEARISH,
     BULLISH,
@@ -117,8 +118,8 @@ def _detect_double(highs, lows, cfg, atr, *, top: bool) -> Pattern | None:
         # the base line connects the two defining extremes (the two lows of a double bottom / two
         # peaks of a double top), plus the neckline (the breakout level, at the swing between them).
         lines=[[_pt(p1), _pt(p2)], _hseg(neckline, p1["bar"], p2["bar"])],
-        breakout_level=round(float(neckline), 2), invalidation_level=round(float(invalidation), 2),
-        target=round(float(target), 2), quality=round(quality, 3),
+        breakout_level=round_price(float(neckline)), invalidation_level=round_price(float(invalidation)),
+        target=round_price(float(target)), quality=round(quality, 3),
         reason=f"Two {'peaks' if top else 'troughs'} ~equal (within {tol:.4g}, ATR-scaled) with a reversal between.",
     )
 
@@ -157,8 +158,8 @@ def _detect_head_and_shoulders(highs, lows, cfg, atr, *, top: bool) -> Pattern |
         bars=[int(ls["bar"]), int(head["bar"]), int(rs["bar"])],
         points=[_pt(ls), _pt(head), _pt(rs)],
         lines=[_hseg(neckline, ls["bar"], rs["bar"])],
-        breakout_level=round(neckline, 2), invalidation_level=round(invalidation, 2),
-        target=round(float(target), 2), quality=round(quality, 3),
+        breakout_level=round_price(neckline), invalidation_level=round_price(invalidation),
+        target=round_price(float(target)), quality=round(quality, 3),
         reason="Three swings, middle most extreme, matching shoulders; break of the neckline confirms.",
     )
 
@@ -207,8 +208,8 @@ def _detect_triangle(highs, lows, cfg, atr) -> Pattern | None:
         bars=[int(b) for b in pd.concat([hi["bar"], lo["bar"]]).sort_values()],
         points=[_pt(r) for _, r in pd.concat([hi, lo]).sort_values("bar").iterrows()],
         lines=[_seg(hi_line, tb0, tb1), _seg(lo_line, tb0, tb1)],
-        breakout_level=round(breakout, 2), invalidation_level=round(inval, 2),
-        target=None if target is None else round(target, 2), quality=round(quality, 3),
+        breakout_level=round_price(breakout), invalidation_level=round_price(inval),
+        target=None if target is None else round_price(target), quality=round(quality, 3),
         reason="Converging highs and lows (triangle).",
     )
 
@@ -236,8 +237,8 @@ def _detect_rectangle(highs, lows, cfg, atr) -> Pattern | None:
         bars=[int(b) for b in pd.concat([hi["bar"], lo["bar"]]).sort_values()],
         points=[_pt(r) for _, r in pd.concat([hi, lo]).sort_values("bar").iterrows()],
         lines=[_hseg(upper, rb0, rb1), _hseg(lower, rb0, rb1)],
-        breakout_level=round(upper, 2), invalidation_level=round(lower, 2),
-        target=round(upper + height, 2), quality=round(quality, 3),
+        breakout_level=round_price(upper), invalidation_level=round_price(lower),
+        target=round_price(upper + height), quality=round(quality, 3),
         reason="Sideways channel — flat-top resistance and flat-bottom support; a close beyond "
                "either edge resolves it.",
     )
@@ -277,8 +278,8 @@ def _detect_channel(highs, lows, cfg, atr) -> Pattern | None:
         bars=[int(b) for b in pd.concat([hi["bar"], lo["bar"]]).sort_values()],
         points=[_pt(r) for _, r in pd.concat([hi, lo]).sort_values("bar").iterrows()],
         lines=[_seg(hi_line, cb0, last_bar), _seg(lo_line, cb0, last_bar)],
-        breakout_level=round(float(breakout), 2), invalidation_level=round(float(inval), 2),
-        target=round(float(target), 2), quality=round(quality, 3),
+        breakout_level=round_price(float(breakout)), invalidation_level=round_price(float(inval)),
+        target=round_price(float(target)), quality=round(quality, 3),
         reason="Parallel sloped highs and lows — a channel riding the trend.",
     )
 

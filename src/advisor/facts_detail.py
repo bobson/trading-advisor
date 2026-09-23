@@ -19,6 +19,7 @@ import math
 import pandas as pd
 
 from src.config import Config
+from src.market.precision import fmt_price, round_price
 
 _DIRECTIONAL = ("bullish", "bearish")
 
@@ -67,8 +68,9 @@ def nearest_structural_levels(
     cands: list[tuple[float, str]] = []
     if zones is not None and not zones.empty:
         for _, z in zones.iterrows():
-            cands.append((float(z["lower"]), f"S/R zone {z['lower']:.2f}–{z['upper']:.2f} (lower edge)"))
-            cands.append((float(z["upper"]), f"S/R zone {z['lower']:.2f}–{z['upper']:.2f} (upper edge)"))
+            band = f"{fmt_price(z['lower'], price)}–{fmt_price(z['upper'], price)}"
+            cands.append((float(z["lower"]), f"S/R zone {band} (lower edge)"))
+            cands.append((float(z["upper"]), f"S/R zone {band} (upper edge)"))
     for ratio, lvl in (fib_levels or {}).items():
         cands.append((float(lvl), f"Fibonacci {float(ratio) * 100:.1f}%"))
     rl = round_levels_around(price)
@@ -84,7 +86,7 @@ def nearest_structural_levels(
         if not pool:
             return None
         lvl, src = min(pool, key=lambda c: abs(c[0] - price))
-        return {"price": round(lvl, 6 if price < 10 else 2), "source": src, **distance(lvl, price, atr)}
+        return {"price": round_price(lvl, price), "source": src, **distance(lvl, price, atr)}
 
     return {"above": pick("above"), "below": pick("below")}
 

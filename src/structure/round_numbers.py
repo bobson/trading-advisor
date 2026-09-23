@@ -36,7 +36,7 @@ def nearest_round_number(price: float, cfg: Config) -> RoundNumber | None:
     nearest = round(price / step) * step
     distance_pct = abs(price - nearest) / price * 100.0
     return RoundNumber(
-        nearest=round(float(nearest), 2),
+        nearest=round(float(nearest), 8),   # exact step multiple (not 2 dp — FX needs more)
         step=float(step),
         distance_pct=round(float(distance_pct), 3),
         is_near=distance_pct <= cfg.structure.round_number_pct,

@@ -43,6 +43,7 @@ from src.indicators.features import (
     COL_VOLUME,
     COL_VOLUME_MA,
 )
+from src.market.precision import fmt_price
 from src.structure.fibonacci import UP, FibRetracement, fib_retracement
 from src.structure.support_resistance import (
     SUPPORT,
@@ -239,7 +240,7 @@ def signal_from_support_resistance(
         return Signal("support_resistance", NEUTRAL, "Price is not at a support/resistance zone.")
 
     z = near.sort_values(["dist", "strength"], ascending=[True, False]).iloc[0]
-    band = f"{float(z['lower']):.2f}–{float(z['upper']):.2f}"
+    band = f"{fmt_price(z['lower'], last_close)}–{fmt_price(z['upper'], last_close)}"
     where = "inside" if z["dist"] == 0 else "at the edge of"
     stale = " (stale — no reversal there for a long time)" if bool(z["stale"]) else ""
     if z["role"] == SUPPORT:
@@ -267,8 +268,8 @@ def signal_from_fibonacci(
     ratio, price = min(hits, key=lambda rp: abs(rp[1] - last_close))
     pct = f"{ratio * 100:.1f}%"
     if fib.direction == UP:
-        return Signal("fibonacci", BULLISH, f"Price is holding the {pct} Fibonacci retracement (support) near {price:.2f}.")
-    return Signal("fibonacci", BEARISH, f"Price is stalling at the {pct} Fibonacci retracement (resistance) near {price:.2f}.")
+        return Signal("fibonacci", BULLISH, f"Price is holding the {pct} Fibonacci retracement (support) near {fmt_price(price, last_close)}.")
+    return Signal("fibonacci", BEARISH, f"Price is stalling at the {pct} Fibonacci retracement (resistance) near {fmt_price(price, last_close)}.")
 
 
 # --- aggregation ---------------------------------------------------------------

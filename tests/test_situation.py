@@ -228,7 +228,7 @@ def test_brief_budget_comes_from_the_tier(cfg, tier):
     ex.explain("FACTS", _mode(cfg, "brief"), client=c, situation=st.situation(tier, []))
     note = c.captured["system"][1]["text"]
     assert f"SITUATION TIER: {tier}" in note and f"{st.WORD_BUDGET[tier]} words" in note
-    assert c.captured["max_tokens"] == ex._tokens_for(st.WORD_BUDGET[tier])
+    assert c.captured["max_tokens"] == ex._tokens_for(st.WORD_BUDGET[tier]) + ex._OPPOSING_LINE_TOKENS
     # the note names ONE tier — no menu of budgets to choose from
     assert "mildly notable 70" not in note
 
@@ -244,4 +244,4 @@ def test_synthesis_is_always_the_mtf_tier(cfg):
     c = _Client()
     ex.synthesize([("1h", "F", 1.0), ("4h", "G", 2.0)], _mode(cfg, "brief"), client=c)
     assert "SITUATION TIER: mtf_synthesis" in c.captured["system"][1]["text"]
-    assert c.captured["max_tokens"] == ex._tokens_for(st.WORD_BUDGET[st.MTF_SYNTHESIS])
+    assert c.captured["max_tokens"] == ex._tokens_for(st.WORD_BUDGET[st.MTF_SYNTHESIS]) + ex._OPPOSING_LINE_TOKENS

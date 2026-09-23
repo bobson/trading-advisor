@@ -84,13 +84,15 @@ def test_context_items_are_marked_non_directional(facts):
     assert "CONTEXT ONLY" in text                                   # both context blocks marked
     assert "mid-range" in text and "no directional information" in text   # F&G 56 is uninformative
     assert "not a directional vote" in text                        # ATH distance / fundamentals
-    assert "contrarian flag" in text                               # funding framed non-directionally
+    assert "crowded positioning with no implied direction" in text  # funding framed non-directionally (A6)
 
 
-def test_fear_greed_extreme_reads_contrarian(facts):
+def test_fear_greed_extreme_reads_as_crowding_not_direction(facts):
+    """A6: an extreme describes crowded positioning with NO implied direction (no 'contrarian')."""
     extreme = {**facts, "context": {"as_of": "x", "fear_greed": {"value": 9, "label": "Extreme Fear", "as_of": "x"}}}
     text = facts_to_prompt(extreme)
-    assert "extreme fear" in text and "contrarian" in text
+    assert "extreme fear" in text and "no implied direction" in text
+    assert "contrarian" not in text
 
 
 def test_signals_render_with_vote_and_category(facts):

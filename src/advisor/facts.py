@@ -58,6 +58,7 @@ from src.advisor.facts_detail import (
     zone_edge_distance,
 )
 from src.market.adaptation import market_context
+from src.market.precision import price_decimals, round_price
 from src.signals.situation import classify_situation
 from src.structure.divergence import find_rsi_divergence
 from src.structure.fibonacci import fib_retracement
@@ -142,9 +143,9 @@ def _nearest_levels(zones: pd.DataFrame, last_close: float) -> dict:
             continue
         row = side.sort_values(["distance", "strength"], ascending=[True, False]).iloc[0]
         out[key] = {
-            "price": round(float(row["price"]), 2),          # band centre
-            "lower": round(float(row["lower"]), 2),
-            "upper": round(float(row["upper"]), 2),
+            "price": round_price(row["price"], last_close),   # band centre
+            "lower": round_price(row["lower"], last_close),
+            "upper": round_price(row["upper"], last_close),
             "touches": int(row["touches"]),
             "bars_since_touch": int(row["bars_since_touch"]),
             "strength": float(row["strength"]),
@@ -177,7 +178,7 @@ def _harden(facts: dict, featured_df: pd.DataFrame, zones: pd.DataFrame, conflue
     mas = {}
     for key, col, period in (("slow", COL_SMA_SLOW, cfg.indicators.slow_ma),
                              ("long", COL_SMA_LONG, cfg.indicators.long_ma)):
-        v = _num(_last(featured_df, col))
+        v = _num(_last(featured_df, col), price_decimals(last_close))
         mas[key] = None if v is None else {"period": period, "value": v, **distance(v, last_close, atr)}
     facts["moving_averages"] = mas
 
@@ -258,8 +259,9 @@ def build_facts(featured_df: pd.DataFrame, swings: pd.DataFrame, cfg: Config) ->
     macd = featured_df[COL_MACD].iloc[-1]
     macd_signal = featured_df[COL_MACD_SIGNAL].iloc[-1]
     rsi_val = None if pd.isna(rsi) else round(float(rsi), 1)
-    macd_val = None if pd.isna(macd) else round(float(macd), 2)
-    macd_sig_val = None if pd.isna(macd_signal) else round(float(macd_signal), 2)
+    pdp = price_decimals(last_close)          # price-denominated values keep the instrument's precision
+    macd_val = None if pd.isna(macd) else round(float(macd), pdp)
+    macd_sig_val = None if pd.isna(macd_signal) else round(float(macd_signal), pdp)
 
     # Volume vs its average (Phase 15). None when the frame carries no usable volume.
     vol = featured_df[COL_VOLUME].iloc[-1] if COL_VOLUME in featured_df.columns else float("nan")
@@ -277,7 +279,7 @@ def build_facts(featured_df: pd.DataFrame, swings: pd.DataFrame, cfg: Config) ->
 
     # --- Phase 18 toolkit (facts/context, not votes) ---
     ind = cfg.indicators
-    atr = _num(_last(featured_df, COL_ATR))
+    atr = _num(_last(featured_df, COL_ATR), pdp)
     adx = _num(_last(featured_df, COL_ADX), 1)
     bb_pct = _num(_last(featured_df, COL_BB_PCT), 3)
     volatility_facts = {
@@ -331,10 +333,10 @@ def build_facts(featured_df: pd.DataFrame, swings: pd.DataFrame, cfg: Config) ->
     if fib is not None:
         fib_facts = {
             "direction": fib.direction,
-            "impulse_low": round(fib.low_price, 2),
-            "impulse_high": round(fib.high_price, 2),
+            "impulse_low": round_price(fib.low_price, last_close),
+            "impulse_high": round_price(fib.high_price, last_close),
             "key_levels": {
-                str(r): round(fib.levels[r], 2)
+                str(r): round_price(fib.levels[r], last_close)
                 for r in _DISPLAY_FIB_RATIOS
                 if r in fib.levels
             },
@@ -345,7 +347,7 @@ def build_facts(featured_df: pd.DataFrame, swings: pd.DataFrame, cfg: Config) ->
             "symbol": m.symbol,
             "timeframe": m.timeframe,
             "exchange": m.exchange,
-            "last_close": round(last_close, 2),
+            "last_close": round_price(last_close),
             "last_time": last_time,
         },
         "trend": {"label": trend.label, "reasons": list(trend.reasons)},
@@ -410,16 +412,17 @@ def build_facts(featured_df: pd.DataFrame, swings: pd.DataFrame, cfg: Config) ->
 
 def _fear_greed_read(value) -> str:
     """Layer-1 informativeness of a Fear & Greed value, per the analyst guide's §5 bands: only
-    the extremes (<20 / >80) carry a contrarian read; mid-range is deliberately uninformative.
+    the extremes (<20 / >80) describe crowded positioning (no implied direction); mid-range is
+    deliberately uninformative.
     This is NOT a directional vote — it tells Layer 2 how much (if any) weight to give it."""
     try:
         v = int(value)
     except (TypeError, ValueError):
         return "unclassified"
     if v < 20:
-        return "extreme fear — contrarian caution only, not a directional signal"
+        return "extreme fear — crowded pessimistic positioning, no implied direction"
     if v > 80:
-        return "extreme greed — contrarian caution only, not a directional signal"
+        return "extreme greed — crowded optimistic positioning, no implied direction"
     return "mid-range — no directional information (only the <20 / >80 extremes are read contrarily)"
 
 
@@ -634,7 +637,8 @@ def facts_to_prompt(facts: dict) -> str:
         f = deriv.get("funding")
         if f:
             add(f"      Funding: {f['rate_pct']}%/8h ({f['annualized_pct']}%/yr) — state: {f['state']}. "
-                "Only an EXTREME is a contrarian flag; otherwise no directional information.")
+                "An EXTREME describes crowded positioning with no implied direction; otherwise no "
+                "information.")
         oi = deriv.get("open_interest")
         if oi:
             notional = f" (~${oi['notional_usd']:,.0f})" if oi.get("notional_usd") else ""

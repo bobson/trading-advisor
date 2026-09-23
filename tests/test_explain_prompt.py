@@ -75,3 +75,28 @@ def test_synthesis_and_structured_also_use_the_guide(cfg):
     ex.synthesize([("1d", "FACTS", 1.4)], cfg, client=c1)
     assert c1.captured["system"][0]["text"] == ex.ANALYST_GUIDE
     assert "cross-timeframe" in c1.captured["system"][1]["text"].lower()
+
+
+# --- ROADMAP A6: the guide's revised rules are present (and the gameable ones gone) ----------
+
+def test_guide_a6_rules_present():
+    g = ex.ANALYST_GUIDE
+    assert "what it\n   conventionally suggests" not in g and "conventionally suggests" not in g
+    assert "directional claims" in g and "path of least resistance" in g          # §1.4
+    assert "does not license a directional claim" in g                              # §4
+    assert "historically coincided" not in g and "many false breaks" not in g       # §5
+    assert "no implied direction" in g
+    assert "price exactly as given" in g and "three significant figures" in g       # rounding rule
+    assert "1% tolerance" in g
+    assert "worth revisiting" not in g.lower()                                       # §2 conditional
+    assert "Both sides, same weight" in g
+    assert "Exactly **one** observation" in g                                        # §7
+    assert "never escalate it" in g and "Opposing:" in g                            # tier + opposing
+    assert "Teaching mode lifts only the word cap" in g
+    assert "C1" in g                                                                 # §11 note
+
+
+def test_guide_examples_follow_the_rounding_rule():
+    import re
+    g = ex.ANALYST_GUIDE
+    assert not re.search(r"≈\s*\d", g)          # no "≈64,900"-style numbers anywhere

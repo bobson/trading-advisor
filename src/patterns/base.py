@@ -25,6 +25,8 @@ from dataclasses import asdict, dataclass, field
 
 import pandas as pd
 
+from src.market.precision import round_price
+
 from src.indicators.features import (
     COL_ATR,
     COL_BEARISH_ENGULFING,
@@ -119,11 +121,11 @@ class Pattern:
             "direction": self.direction,
             "state": self.state,
             "bars": list(self.bars),
-            "points": [{"bar": int(b), "price": round(float(p), 2)} for b, p in self.points],
-            "lines": [[{"bar": int(b), "price": round(float(p), 2)} for b, p in line] for line in self.lines],
-            "breakout_level": None if self.breakout_level is None else round(float(self.breakout_level), 2),
-            "invalidation_level": None if self.invalidation_level is None else round(float(self.invalidation_level), 2),
-            "target": None if self.target is None else round(float(self.target), 2),
+            "points": [{"bar": int(b), "price": round_price(p)} for b, p in self.points],
+            "lines": [[{"bar": int(b), "price": round_price(p)} for b, p in line] for line in self.lines],
+            "breakout_level": None if self.breakout_level is None else round_price(self.breakout_level),
+            "invalidation_level": None if self.invalidation_level is None else round_price(self.invalidation_level),
+            "target": None if self.target is None else round_price(self.target),
             "quality": round(float(self.quality), 3),
             "confirmation": self.confirmation.to_dict(),
             "reason": self.reason,
