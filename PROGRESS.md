@@ -3,8 +3,8 @@
 A state file for the "learning instrument" build. Source of truth for what's next: `ROADMAP.md`
 (steps A1…D6; prompts in `PROMPTS.md`). Older plans are in `docs/archive/`. See `CLAUDE.md` for conventions.
 
-**ROADMAP progress:** A1 ✓ (merged, `645231c`), A2 ✓ (done-when passed; merge pending — see
-log). **Next: A3** (situation tier in Layer 1).
+**ROADMAP progress:** A1 ✓ (merged, `645231c`), A2 ✓ (merged, `800e12a`; docs `1003735`), A3 ✓ (merged). **Next: A4**
+(support/resistance as zones + level freshness).
 
 ## Current state
 
@@ -17,12 +17,15 @@ there an edge?" harness (no edge); Features 1 (pattern viz + research view), 2 (
 states), 6 (market regime), 8 (exit-rule lab), 9 (risk of ruin), 10 (honest cost model); the
 hardening pass (guide wired in, brief/teaching modes); paper trading; three-candle patterns; and
 **ROADMAP A1** (verification pass: chart label/regime fixes, reclaimed-neckline → `failed`,
-two-point trendlines). **A2** (verdict as a category count, neutral styling, no-edge disclosure)
-is done on `feature/verdict-reframe`, not yet merged. **300 tests green, ruff + svelte-check clean.**
+two-point trendlines). **ROADMAP A2** (verdict as a category count, neutral styling, no-edge
+disclosure; `800e12a`). **ROADMAP A3** (situation tier decided in Layer 1). **326 tests green, ruff + svelte-check clean.**
 
 **Standing facts:** patterns and 3-candle candlesticks stay OUT of the confidence score (facts
 only); regime is standalone (not a vote); two-point trendlines are chart-only (not in facts); the
-0–1 confluence `confidence` is internal — the UI shows "N of M categories agree", never a %.
+0–1 confluence `confidence` is internal — the UI shows "N of M categories agree", never a %. The
+situation tier (`facts["situation"]`: no_setup / notable / confirmed, + mtf_synthesis for the
+synthesis) is Layer 1's decision; it sets the explanation's format and word budget, and Claude may
+not change it.
 
 **Known open items:** channel detector over-calls (SOL 1d eye-check FAIL → B1/B2); phone-width
 right-axis price-label pile-up; the disclosure panel's evidence numbers are hard-coded from past
@@ -42,9 +45,43 @@ apply if `config.yaml` omits them.
 
 ## Log (newest first)
 
+### ROADMAP A3 — Situation tier in Layer 1
+- **Done:** 2026-09-23 · **branch:** `feature/situation-tier` · **merged to `main`.**
+- **Done-when → PASS:** identical facts always give the same tier (test); each §2 criterion has its
+  own isolated test; a forming-only chart can't be `confirmed` (test); the tier shows in the UI —
+  checked in headless Chromium at 1400px and 400px (SOL 1d notable, BTC 1h notable, ETH 1h no clear
+  setup). 26 new tests, **326 green**, ruff + svelte-check clean.
+- **Build:** `src/signals/situation.py` — `classify_situation(facts, cfg)`, a pure function of the
+  facts dict, called at the end of `build_facts` → `facts["situation"] = {tier, reasons,
+  word_budget, template}`. `confirmed` = a confirmed pattern matching a triggered bias whose
+  confirmation profile shows §4's shape (price supports, volume OR volatility supports, momentum and
+  higher TF not contradicting). `no_setup` = any §2 criterion, each a reason code
+  (`no_pattern_no_confluence`, `away_from_levels`, `conflicting_signals`, `neutral_indicators`,
+  `single_weak_signal`). Precedence confirmed > no_setup > notable. Failed patterns count toward
+  notable; forming patterns are ignored entirely.
+- **Explanation bound by the tier:** `facts_to_prompt` leads with `SITUATION TIER`; `explain` /
+  `explain_structured` take `situation=` and the mode note names ONLY that tier's template and
+  budget; brief `max_tokens` = budget×3+60 (structural cap). Teaching keeps the tier, lifts only the
+  word cap. `synthesize` is always `mtf_synthesis` (150). Guide §8 gained one line: use the supplied
+  tier, never change it (small pull-forward from A6).
+- **UI:** "Situation: notable (categories aligned; confirmed double bottom; price is at a level)"
+  under the verdict, neutral styling.
+- **Snapshot:** regenerated — diff is ONE added key, `situation` (fixture reads `confirmed` via its
+  double top); nothing else moved. Reviewed and approved by the user with the commit.
+- **Deviations from ROADMAP.md:** the premise "a forming SOL channel produced a flagged setup" doesn't
+  match the code — chart patterns were never confluence voters. A day-by-day SOL 1d replay showed
+  every flag came from MACD / S/R / volume. So SOL still shows "categories aligned" (2 of 4 really
+  agree); the change is that its tier is `notable`, not `confirmed` (its confirmed double bottom is
+  bullish vs a bearish bias). A test pins that injecting a forming pattern leaves confluence and the
+  tier unchanged.
+- **Findings / limitations:** §2's "away from levels" taken literally demotes a mid-range
+  trend+momentum agreement to no_setup (deliberate — documented in the module). A stale confirmed
+  pattern still counts as confirmed until A5 adds bars-since-confirmation. An MTF veto can leave
+  "2 of 4 agree" without the "categories aligned" badge (BTC 1h) — the UI doesn't yet say why.
+
 ### ROADMAP A2 — Verdict reframe + no-edge disclosure
 - **Done:** 2026-09-23 · **branch:** `feature/verdict-reframe` · frontend + one guide sentence.
-  **Merge pending** (not yet on `main` when this entry was written).
+  **Merged to `main`: `800e12a`** (code) + `1003735` (PROGRESS/ROADMAP updates).
 - **Done-when → PASS:** no percentage labelled "confidence" anywhere in the UI, no green/red verdict
   styling, disclosure visible — checked in headless Chromium at 1400px and 400px.
 - **Verdict:** "confidence NN%" → a count ("2 of 4 categories agree · 1 opposes · 1 neutral";

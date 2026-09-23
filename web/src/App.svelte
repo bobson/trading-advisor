@@ -91,6 +91,26 @@
   })
 
   const conf = $derived(result?.confluence)
+  // Situation tier (Layer 1, ROADMAP A3), in plain words. Neutral styling like the verdict.
+  const TIER_LABEL: Record<string, string> = {
+    no_setup: 'no clear setup', notable: 'notable', confirmed: 'confirmed pattern',
+    mtf_synthesis: 'multi-timeframe',
+  }
+  const REASON_LABEL: Record<string, string> = {
+    no_pattern_no_confluence: 'no confirmed pattern and categories not aligned',
+    away_from_levels: 'price is away from support/resistance, Fibonacci and round numbers',
+    conflicting_signals: 'categories point in opposite directions',
+    neutral_indicators: 'indicators neutral (RSI mid-range, weak ADX, sideways trend)',
+    single_weak_signal: 'only one category has a direction',
+    categories_aligned: 'categories aligned',
+    at_level: 'price is at a level',
+  }
+  const reasonText = (r: string) => {
+    const [code, name] = r.split(':')
+    if (name) return `${code.replace('_pattern', '')} ${name}`
+    return REASON_LABEL[code] ?? code
+  }
+  const situation = $derived(result?.situation)
   // Verdict as a COUNT of categories, never a percentage: "2 of 4 categories agree · 1 opposes".
   // The 0–1 confidence stays in the API/facts for internal use; it is not displayed.
   const catCount = $derived.by(() => {
@@ -230,6 +250,12 @@
         <span>categories: {catCount.bullish} bullish · {catCount.bearish} bearish · {catCount.neutral} neutral</span>
       {/if}
       {#if conf?.triggered}<span class="flag">categories aligned</span>{/if}
+      {#if situation}
+        <span class="tier" title={situation.reasons.map(reasonText).join(' · ')}>
+          Situation: <b>{TIER_LABEL[situation.tier] ?? situation.tier}</b>
+          <span class="tier-why">({situation.reasons.map(reasonText).join('; ')})</span>
+        </span>
+      {/if}
     </div>
 
     {#if result.base_rate}
@@ -452,6 +478,8 @@
   .hint { color: #8b949e; }
   .verdict { display: flex; gap: 18px; align-items: center; flex-wrap: wrap;
     padding: 10px 14px; border: 1px solid #30363d; border-radius: 8px; margin-bottom: 12px; }
+  .tier { color: #c9d1d9; }
+  .tier-why { color: #8b949e; font-size: 12px; }
   .flag { border: 1px solid #484f58; color: #c9d1d9; padding: 2px 8px; border-radius: 999px; font-size: 12px; }
   .track { color: #8b949e; font-size: 13px; margin: 0 0 12px; }
   .panels { display: grid; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); gap: 12px; margin: 14px 0; }

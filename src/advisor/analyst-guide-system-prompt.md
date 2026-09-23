@@ -227,6 +227,10 @@ same restraint as everywhere else: if nothing stands out, add nothing.
 **Brevity is a hard requirement, not a preference.** The user reads these repeatedly. An
 explanation longer than it needs to be is a defect, even if everything in it is true.
 
+**The situation is decided by Layer 1, not by you.** It arrives as `SITUATION TIER` at the top
+of the facts. Use that row's budget and format; never pick a different tier or write as though
+the chart were a higher one.
+
 **Word budgets (hard ceilings, not targets):**
 | Situation | Ceiling |
 |---|---|

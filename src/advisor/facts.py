@@ -48,6 +48,7 @@ from src.signals.confluence import (
     signal_from_volume,
 )
 from src.market.adaptation import market_context
+from src.signals.situation import classify_situation
 from src.structure.divergence import find_rsi_divergence
 from src.structure.fibonacci import fib_retracement
 from src.structure.mtf import resolve_mtf
@@ -249,7 +250,7 @@ def build_facts(featured_df: pd.DataFrame, swings: pd.DataFrame, cfg: Config) ->
             },
         }
 
-    return {
+    facts = {
         "market": {
             "symbol": m.symbol,
             "timeframe": m.timeframe,
@@ -309,6 +310,10 @@ def build_facts(featured_df: pd.DataFrame, swings: pd.DataFrame, cfg: Config) ->
             "mtf_trends": confluence.mtf_trends,
         },
     }
+    # ROADMAP A3: the situation tier is decided HERE (Layer 1), from the finished facts — it picks
+    # the explanation's template and word budget, and Layer 2 may not change it.
+    facts["situation"] = classify_situation(facts, cfg)
+    return facts
 
 
 def _fear_greed_read(value) -> str:
@@ -330,6 +335,12 @@ def facts_to_prompt(facts: dict) -> str:
     """Render the facts dict as a readable text block for the model (and for debugging)."""
     m = facts["market"]
     lines: list[str] = []
+    sit = facts.get("situation")
+    if sit:
+        lines.append(f"SITUATION TIER: {sit['tier']} — decided by Layer 1; use it, never change it.")
+        lines.append(f"  Word budget: {sit['word_budget']}. Format: {sit['template']}")
+        lines.append(f"  Why this tier: {', '.join(sit['reasons']) or 'n/a'}")
+        lines.append("")
     lines.append(f"MARKET: {m['symbol']} on {m['exchange']}, {m['timeframe']} timeframe")
     lines.append(f"Last closed candle: {m['last_close']} at {m['last_time']}")
     ma = facts.get("market_adaptation")

@@ -26,6 +26,7 @@ from __future__ import annotations
 from pathlib import Path
 
 from src.config import Config
+from src.signals.situation import MTF_SYNTHESIS, TEMPLATE, WORD_BUDGET
 
 # The analyst guide IS the system prompt. Load it once, at import, and fail loudly if it's gone —
 # a silent fallback to some other prompt is exactly the drift this wiring exists to prevent.
@@ -66,6 +67,32 @@ DEFAULT_MODE = "brief"
 
 def _mode(cfg: Config) -> dict:
     return _MODES.get(cfg.advisor.explanation_style, _MODES[DEFAULT_MODE])
+
+
+def _tokens_for(words: int) -> int:
+    """A max_tokens ceiling that fits `words` of prose with a little room (~1.3 tokens/word),
+    so the brief budget is STRUCTURAL: the model can't write a longer answer than its tier."""
+    return words * 3 + 60
+
+
+def _tier_mode(cfg: Config, situation: dict | None) -> dict:
+    """ROADMAP A3: when Layer 1 supplied a situation tier, the mode note names THAT tier, its
+    template and budget (no menu of tiers to pick from), and brief mode's `max_tokens` comes from
+    the tier. Teaching keeps the tier and template and lifts only the word cap."""
+    base = _mode(cfg)
+    if not situation:
+        return base
+    tier, words, fmt = situation["tier"], situation["word_budget"], situation["template"]
+    fixed = (f"SITUATION TIER: {tier} — decided by Layer 1. Use it; never choose or change it, "
+             f"and never write as though the chart were a higher tier. Format: {fmt}")
+    if base is _MODES["teaching"]:
+        return {"max_tokens": base["max_tokens"], "note": f"{fixed}\n\n{base['note']}"}
+    return {
+        "max_tokens": _tokens_for(words),
+        "note": (f"{fixed}\n\nOUTPUT MODE: BRIEF. HARD CEILING: {words} words. No headings, no "
+                 "preamble; name only the 2–3 facts that carry the read. If it will not fit, say "
+                 "the read is unclear instead."),
+    }
 
 
 def _system(mode: dict, task_note: str = "") -> list[dict]:
@@ -142,7 +169,10 @@ def synthesize(per_tf: list[tuple[str, str, float]], cfg: Config, client=None, m
 
         client = anthropic.Anthropic(api_key=cfg.require_api_key())
 
-    mode = _mode(cfg)
+    # The synthesis is always the mtf_synthesis tier — set explicitly, never escalated from a
+    # per-timeframe tier.
+    mode = _tier_mode(cfg, {"tier": MTF_SYNTHESIS, "word_budget": WORD_BUDGET[MTF_SYNTHESIS],
+                            "template": TEMPLATE[MTF_SYNTHESIS]})
     response = client.messages.create(
         model=cfg.advisor.model,
         max_tokens=max_tokens or mode["max_tokens"],
@@ -152,7 +182,8 @@ def synthesize(per_tf: list[tuple[str, str, float]], cfg: Config, client=None, m
     return "".join(b.text for b in response.content if getattr(b, "type", None) == "text").strip()
 
 
-def explain_structured(facts_text: str, cfg: Config, client=None, max_tokens: int | None = None) -> dict:
+def explain_structured(facts_text: str, cfg: Config, client=None, max_tokens: int | None = None,
+                       situation: dict | None = None) -> dict:
     """Like `explain`, but returns `{setup, why, invalidation}` via a forced tool call.
 
     Same authoritative-facts guide and output mode as `explain`. `client` is injectable for tests;
@@ -163,7 +194,7 @@ def explain_structured(facts_text: str, cfg: Config, client=None, max_tokens: in
 
         client = anthropic.Anthropic(api_key=cfg.require_api_key())
 
-    mode = _mode(cfg)
+    mode = _tier_mode(cfg, situation)
     response = client.messages.create(
         model=cfg.advisor.model,
         max_tokens=max_tokens or mode["max_tokens"],
@@ -183,19 +214,22 @@ def explain_structured(facts_text: str, cfg: Config, client=None, max_tokens: in
     raise RuntimeError("model did not return an emit_analysis tool call")
 
 
-def explain(facts_text: str, cfg: Config, client=None, max_tokens: int | None = None) -> str:
+def explain(facts_text: str, cfg: Config, client=None, max_tokens: int | None = None,
+            situation: dict | None = None) -> str:
     """Send the facts to Claude and return the plain-language explanation.
 
     `client` is injectable for testing; in normal use it's created here from the API key.
     Requires `ANTHROPIC_API_KEY` (via `cfg.require_api_key()`). The system prompt is the shared
     analyst guide; `max_tokens` defaults to the current mode's budget (brief ~400, teaching 2048).
+    `situation` (facts["situation"], ROADMAP A3) fixes the tier: its template goes in the note and,
+    in brief mode, its word budget sets `max_tokens`.
     """
     if client is None:
         import anthropic
 
         client = anthropic.Anthropic(api_key=cfg.require_api_key())
 
-    mode = _mode(cfg)
+    mode = _tier_mode(cfg, situation)
     response = client.messages.create(
         model=cfg.advisor.model,
         max_tokens=max_tokens or mode["max_tokens"],

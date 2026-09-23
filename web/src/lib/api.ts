@@ -50,9 +50,16 @@ export interface Confluence {
   categories?: Record<string, string>
 }
 export interface BaseRate { bias: string; win_rate: number; n: number; horizon: number }
+// ROADMAP A3: Layer 1's situation tier (it sets the explanation's template + word budget).
+export interface Situation {
+  tier: 'no_setup' | 'notable' | 'confirmed' | 'mtf_synthesis'
+  reasons: string[]; word_budget: number; template: string
+}
+
 export interface Analysis {
   market: { symbol: string; timeframe: string; last_close: number }
   confluence: Confluence
+  situation?: Situation
   base_rate: BaseRate | null
   explanation: string | null
   chart: ChartData

@@ -163,7 +163,7 @@ def advise(
     explanation: Optional[str] = None
     if explain_enabled:
         try:
-            explanation = explain(facts_text, req, client=client)
+            explanation = explain(facts_text, req, client=client, situation=facts.get("situation"))
         except RuntimeError:
             explanation = None  # no ANTHROPIC_API_KEY — deterministic facts stand on their own
 

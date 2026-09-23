@@ -245,6 +245,14 @@
     "is_near": true,
     "nearest": 64000.0
   },
+  "situation": {
+    "reasons": [
+      "confirmed_pattern:double top"
+    ],
+    "template": "Four lines: Read. Why (2\u20133 named facts). Invalidation. What to watch.",
+    "tier": "confirmed",
+    "word_budget": 130
+  },
   "support_resistance": {
     "nearest_resistance": {
       "price": 64166.59,

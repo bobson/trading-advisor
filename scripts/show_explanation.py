@@ -45,7 +45,7 @@ def main() -> None:
     print(f"LAYER 2 — {cfg.advisor.model} EXPLAINS")
     print("=" * 70)
     try:
-        explanation = explain(facts_text, cfg)
+        explanation = explain(facts_text, cfg, situation=facts.get("situation"))
     except RuntimeError as e:  # missing API key
         print(f"\n{e}")
         sys.exit(1)
