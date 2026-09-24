@@ -126,6 +126,43 @@ class BacktestReport:
         return "\n".join(lines)
 
 
+def default_warmup(cfg: Config) -> int:
+    """Enough history for the slow MA to exist and a few swings to have formed."""
+    return cfg.indicators.slow_ma + cfg.structure.swing_sensitivity * 3
+
+
+def walk(
+    df: pd.DataFrame,
+    cfg: Config,
+    *,
+    warmup: Optional[int] = None,
+    horizon: int = 24,
+    step: int = 1,
+):
+    """THE look-ahead-safe walk — the only one in the codebase (the backtest and the pattern
+    encyclopedia both iterate it). Yields `(i, sub, feat, swings)` for each scanned bar, where
+    `sub = df[:i+1]`, `feat` is the causal features table sliced to the same rows, and `swings` are
+    RECOMPUTED on `sub` (the confirmed-interior filter means nothing after `i` can leak). The last
+    scanned bar leaves `horizon` future bars for the caller's forward measurement."""
+    if horizon < 1:
+        raise ValueError("horizon must be >= 1 bar")
+    if step < 1:
+        raise ValueError("step must be >= 1")
+    if warmup is None:
+        warmup = default_warmup(cfg)
+    # Last valid i is len-1-horizon (need `horizon` future bars) -> range stop is len-horizon.
+    last_exclusive = len(df) - horizon
+    if warmup >= last_exclusive:
+        raise ValueError(
+            f"Not enough history: need more than warmup+horizon = {warmup + horizon} bars, "
+            f"have {len(df)}."
+        )
+    featured_full = add_features(df, cfg)
+    for i in range(warmup, last_exclusive, step):
+        sub = df.iloc[: i + 1]
+        yield i, sub, featured_full.iloc[: i + 1], find_swings(sub, cfg.structure.swing_sensitivity)
+
+
 def signal_at(
     df: pd.DataFrame,
     i: int,
@@ -133,6 +170,7 @@ def signal_at(
     *,
     featured: Optional[pd.DataFrame] = None,
     require_categories: Optional[int] = None,
+    swings: Optional[pd.DataFrame] = None,
 ) -> ConfluenceResult:
     """The confluence verdict AS OF bar ``i``, using only data at or before ``i``.
 
@@ -142,7 +180,8 @@ def signal_at(
     """
     sub = df.iloc[: i + 1]
     feat = featured.iloc[: i + 1] if featured is not None else add_features(sub, cfg)
-    swings = find_swings(sub, cfg.structure.swing_sensitivity)
+    if swings is None:
+        swings = find_swings(sub, cfg.structure.swing_sensitivity)
     signals = gather_signals(feat, swings, cfg)
     result = evaluate_confluence(signals, cfg, require_categories=require_categories)
     # Phase 16: gate against the higher timeframes, resampled from THIS slice (look-ahead-safe).
@@ -163,32 +202,18 @@ def evaluate(
     Returns a `BacktestReport` with per-bias and overall stats. Raises `ValueError` when there
     is not enough history for the warmup + horizon.
     """
-    if horizon < 1:
-        raise ValueError("horizon must be >= 1 bar")
-    if step < 1:
-        raise ValueError("step must be >= 1")
     require_categories = require_categories or cfg.confluence.require_categories
     if warmup is None:
-        # Enough history for the slow MA to exist and a few swings to have formed.
-        warmup = cfg.indicators.slow_ma + cfg.structure.swing_sensitivity * 3
-
-    # Last valid i is len-1-horizon (need `horizon` future bars) -> range stop is len-horizon.
-    last_exclusive = len(df) - horizon
-    if warmup >= last_exclusive:
-        raise ValueError(
-            f"Not enough history: need more than warmup+horizon = {warmup + horizon} bars, "
-            f"have {len(df)}."
-        )
-
-    featured_full = add_features(df, cfg)
+        warmup = default_warmup(cfg)
     close = df["close"]
+    feat = None
 
     outcomes: list[SetupOutcome] = []
     scanned = 0
     downgraded = 0
-    for i in range(warmup, last_exclusive, step):
+    for i, sub, feat, swings in walk(df, cfg, warmup=warmup, horizon=horizon, step=step):
         scanned += 1
-        res = signal_at(df, i, cfg, featured=featured_full, require_categories=require_categories)
+        res = signal_at(df, i, cfg, featured=feat, require_categories=require_categories, swings=swings)
         if res.mtf_downgraded:
             downgraded += 1
         if not res.triggered or res.bias not in (BULLISH, BEARISH):
@@ -221,7 +246,8 @@ def evaluate(
         "3+ cats": Stats.from_outcomes([o for o in outcomes if o.agreeing_categories >= 3]),
     }
     # Feature 10 — net-of-costs results applied by DEFAULT (a backtest without costs is fiction).
-    costs = apply_costs(outcomes, cfg, featured=featured_full) if cfg.costs.enabled else None
+    # `feat` is the walk's last causal slice — it covers every outcome bar (all <= the last scanned i).
+    costs = apply_costs(outcomes, cfg, featured=feat) if cfg.costs.enabled else None
 
     return BacktestReport(
         symbol=cfg.market.symbol,

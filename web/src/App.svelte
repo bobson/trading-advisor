@@ -3,6 +3,7 @@
   import PriceChart from './lib/PriceChart.svelte'
   import RiskCalculator from './lib/RiskCalculator.svelte'
   import LabelPanel from './lib/LabelPanel.svelte'
+  import Encyclopedia from './lib/Encyclopedia.svelte'
   import {
     getPairs, getTimeframes, getAnalysis, getTrades, getPosition, postTrade, deleteTrade,
     getTradesBaseline,
@@ -10,7 +11,9 @@
     type TradeBaseline, type GoldLabels,
   } from './lib/api'
 
-  let view = $state<'analysis' | 'risk'>('analysis')
+  // #/encyclopedia[/<type>] opens the encyclopedia directly (linkable pages).
+  let view = $state<'analysis' | 'risk' | 'encyclopedia'>(
+    typeof location !== 'undefined' && location.hash.startsWith('#/encyclopedia') ? 'encyclopedia' : 'analysis')
   let pairs = $state<Pair[]>([])
   let timeframes = $state<string[]>([])
   let symbol = $state('BTC/USDT')
@@ -62,6 +65,13 @@
   const labelBar = $derived(result?.bar_index ?? scrubMax)
   const labelBarTime = $derived(result?.chart.candles.at(-1)?.time ?? null)
   function toggleLabelMode() { labelMode = !labelMode; pending = null }
+  // Encyclopedia example -> the analysis view, scrubbed to the breakout candle (future hidden).
+  async function openExample(s: string, tf: string, bar: number) {
+    symbol = s; timeframe = tf; asOfBar = bar; labelMode = false
+    view = 'analysis'
+    history.replaceState(null, '', location.pathname + location.search)
+    await run(false)
+  }
   async function jumpToLabel(s: string, tf: string, bar: number) {
     symbol = s; timeframe = tf; asOfBar = bar
     await run(false)
@@ -255,6 +265,7 @@
   <nav class="views">
     <button class:active={view === 'analysis'} onclick={() => (view = 'analysis')}>Analysis</button>
     <button class:active={view === 'risk'} onclick={() => (view = 'risk')}>Risk calculator</button>
+    <button class:active={view === 'encyclopedia'} onclick={() => { view = 'encyclopedia'; location.hash = '#/encyclopedia' }}>Encyclopedia</button>
   </nav>
 
   {#if view === 'analysis'}
@@ -523,6 +534,8 @@
   {:else if !error}
     <p class="hint">Pick a pair and timeframe, then press Analyze.</p>
   {/if}
+  {:else if view === 'encyclopedia'}
+    <Encyclopedia onOpenExample={openExample} />
   {:else}
     <RiskCalculator {symbol} {timeframe} />
   {/if}

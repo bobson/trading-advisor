@@ -206,3 +206,26 @@ export const getLabel = (symbol: string, timeframe: string, bar: number) =>
 export const putLabel = (body: { symbol: string; timeframe: string; bar: number; bar_time: number | null; labels: GoldLabels }) =>
   send<{ label: GoldRow; summary: GoldSummary }>('PUT', '/labels', body)
 export const deleteLabel = (id: number) => send<{ deleted: number; summary: GoldSummary }>('DELETE', `/labels/${id}`)
+
+// --- ROADMAP B3: Empirical Pattern Encyclopedia ---
+export interface EncRow {
+  pattern_type: string; timeframe: string; symbol: string; regime: string; split: string
+  sample_size: number; insufficient_data: boolean
+  seen_forming: number; decided_n: number; pending_breakout_n: number
+  confirmed_n: number; invalidated_n: number; confirmation_rate: number | null
+  judged_n: number; pending_outcome_n: number
+  target_n: number; target_hit_n: number; follow_through_rate: number | null
+  failed_n: number; failure_rate: number | null
+  move_n: number; move_atr_median: number | null; move_atr_q1: number | null; move_atr_q3: number | null
+  resolved_n: number; bars_to_resolution_median: number | null
+  built_at: number
+  examples?: { symbol: string; timeframe: string; bar: number; direction: string; outcome: string; move_atr: number | null }[]
+}
+export interface EncIndex { built_at: number | null; params: Record<string, number>; types: EncRow[] }
+export interface Textbook { shape: string | null; trigger: string | null; claims: string[]; source: string }
+export interface EncPage {
+  pattern_type: string; rows: EncRow[]; textbook: Textbook | null
+  detector_precision: Record<string, { precision: number | null; n: number; status: string }>
+}
+export const getEncyclopedia = () => get<EncIndex>('/encyclopedia')
+export const getEncyclopediaPage = (t: string) => get<EncPage>(`/encyclopedia/${encodeURIComponent(t)}`)

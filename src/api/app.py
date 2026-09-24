@@ -357,3 +357,41 @@ def delete_label(label_id: int) -> dict:
         return {"deleted": label_id, "summary": gold.summary(conn)}
     finally:
         conn.close()
+
+
+# --- ROADMAP B3: Empirical Pattern Encyclopedia (reads the precomputed `encyclopedia_stats`) --------
+@app.get("/encyclopedia", dependencies=_GUARDS)
+def encyclopedia_index() -> dict:
+    """One summary line per pattern type × timeframe (symbol='all', regime='all', split='all'), plus
+    when the table was built. Empty `types` means scripts/build_encyclopedia.py hasn't been run."""
+    from src.research.encyclopedia import load_rows
+    conn = _trades_conn()
+    try:
+        rows = load_rows(conn)
+    finally:
+        conn.close()
+    top = [r for r in rows if r["symbol"] == "all" and r["regime"] == "all" and r["split"] == "all"]
+    return {"built_at": max((r["built_at"] for r in rows), default=None),
+            "params": top[0]["params"] if top else {},
+            "types": sorted(({k: r[k] for k in r if k not in ("examples", "params")} for r in top),
+                            key=lambda r: (r["pattern_type"], r["timeframe"]))}
+
+
+@app.get("/encyclopedia/{pattern_type}", dependencies=_GUARDS)
+def encyclopedia_page(pattern_type: str) -> dict:
+    """Everything for one pattern type: every stored row (per timeframe × symbol × regime × split),
+    the textbook claim from docs/patterns-research.md, and the detector's measured precision (B2 —
+    'unmeasured' until gold labels exist)."""
+    from src.research.encyclopedia import load_rows
+    from src.research.textbook import textbook_claim
+    conn = _trades_conn()
+    try:
+        rows = load_rows(conn, pattern_type)
+    finally:
+        conn.close()
+    table = RELIABILITY.get("table") or {}
+    tfs = sorted({r["timeframe"] for r in rows})
+    precision = {tf: table.get(f"{pattern_type}|{tf}") or {"precision": None, "n": 0, "status": "unmeasured"}
+                 for tf in tfs}
+    return {"pattern_type": pattern_type, "rows": rows, "textbook": textbook_claim(pattern_type),
+            "detector_precision": precision}

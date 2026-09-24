@@ -6,8 +6,8 @@ A state file for the "learning instrument" build. Source of truth for what's nex
 **ROADMAP progress:** A1 ✓ (merged, `645231c`), A2 ✓ (merged, `800e12a`; docs `1003735`), A3 ✓ (merged), A4 ✓ (merged), A5 ✓ (merged), A6 ✓ (merged), A7 ✓ (merged), B1 ✓ (merged — labelling mode
 built; the ≥30 labelled charts are the user's ongoing work), B2 tooling ✓ (merged — `eval_detectors.py`;
 its measurement + tuning run as soon as ≥30 charts are labelled — the user has decided NOT to label, so
-it stays unmeasured). **Next: B3** (Empirical Pattern Encyclopedia). Order from here, by the user's
-decision: B3 → B4 → B5 → C1 → D1…D6 → **A8 last**. Drawing tools: deferred.
+it stays unmeasured). B3 ✓ (merged). **Next: B4** (data adjacency). Order from here, by the user's
+decision: B4 → B5 → C1 → D1…D6 → **A8 last**. Drawing tools: deferred.
 
 ## Current state
 
@@ -25,8 +25,9 @@ disclosure; `800e12a`). **ROADMAP A3** (situation tier decided in Layer 1) and *
 ATR-scaled zones) and **ROADMAP A5** (facts payload hardening) and **ROADMAP A6** (analyst guide revision +
 instrument price precision) and **ROADMAP A7** (honest baselines: luck band + zero-edge calculator
 default) and **ROADMAP B1** (gold-set labelling mode — `gold_labels` table), plus the user-requested
-**1–2 candle patterns at levels** chart markers, the **ROADMAP B2** evaluation instrument, and the **pattern life cycle** (fresh / in play /
-completed / expired). **412 tests green, ruff + svelte-check clean.**
+**1–2 candle patterns at levels** chart markers, the **ROADMAP B2** evaluation instrument, the **pattern life cycle** (fresh / in play /
+completed / expired), and **ROADMAP B3** (the Empirical Pattern Encyclopedia — `encyclopedia_stats` +
+Encyclopedia view). **431 tests green, ruff + svelte-check clean.**
 
 **Standing facts:** patterns and 3-candle candlesticks stay OUT of the confidence score (facts
 only); regime is standalone (not a vote); two-point trendlines are chart-only (not in facts); the
@@ -60,6 +61,45 @@ apply if `config.yaml` omits them.
 ---
 
 ## Log (newest first)
+
+### ROADMAP B3 — Empirical Pattern Encyclopedia
+- **Done:** 2026-09-24 · **branch:** `feature/encyclopedia` · **merged to `main`.**
+- **Done-when → PASS (precision column: unmeasured):** every detector pattern type has a page of real
+  numbers with sample sizes; thin data labelled honestly (any rate under 20 cases shown as "7 of 12 —
+  too few to rate", never a %); examples open in the scrub view at the breakout bar. Browser-verified
+  (desktop + 400px) against a scratch build; the real table is built into `data/wizard.db` (all
+  registered pairs, 1d). Detector precision shows "unmeasured" — B2 has no gold labels (user decision).
+  19 new tests, **431 green**.
+- **No second walker:** the backtest's inline loop was extracted into `backtest.evaluate.walk()` (+
+  `default_warmup`), used by both `evaluate()` and the encyclopedia. Verified the refactor is exact:
+  old vs new backtest on real BTC 1h → identical outcomes and identical report text. A test spies
+  that the encyclopedia calls that very function.
+- **Build:** `src/research/encyclopedia.py` + `scripts/build_encyclopedia.py`. Each distinct pattern
+  (type + defining swing bars) is recorded the first time the walk detects it (look-ahead-safe; test
+  mutates future bars). Outcomes on the FOLLOWING candles: breakout = first close beyond the breakout
+  within 50 bars (neutral coils take the edge they break); then over 24 bars: target reached (wick),
+  failure = close back through the breakout by reclaim_atr_mult × ATR (both on one bar → failed),
+  move in ATR at +24, bars to resolution; confirmation profile at the breakout candle for the splits
+  (volume / momentum / volatility / candlestick supported or not). Regime at first sighting.
+- **Honesty rules:** rates use only patterns first seen while still FORMING (late-detected ones are
+  counted as occurrences, kept out of rates — survivorship); patterns whose breakout window or 24-bar
+  outcome window hasn't finished are **pending** — counted, shown as "too recent to judge", excluded
+  from rates (caught in the browser: a 3-day-old breakout was being counted as "went nowhere"). Every
+  row has `sample_size`; rates/quantiles are NULL below 20.
+- **Storage/API/UI:** `encyclopedia_stats` (PK type × timeframe × symbol × regime × split; stats JSON;
+  examples; built_at; params) with 'all' roll-ups for symbol and regime; rebuilds replace only the
+  rebuilt markets. `GET /encyclopedia`, `GET /encyclopedia/{type}` (rows + textbook claim parsed from
+  `docs/patterns-research.md` Parts A & C + B2 precision). New **Encyclopedia** view (`#/encyclopedia`,
+  `#/encyclopedia/<type>`): list → page with textbook claim beside "what actually happened here",
+  timeframe/market/regime filters, the split table, examples → analysis view scrubbed to that bar.
+- **Deviation:** none in substance; "regime" is read at first sighting (not at the breakout).
+- **First real build** (BTC/ETH/SOL/XRP/EUR/USD/GBP/USD, 1d; 1,712 patterns, 3,096 rows): after a
+  breakout, most patterns FAILED more often than they reached target — double top 25% target / 65%
+  failed (72 judged), double bottom 41% / 54% (85), ascending triangle 11% / 72% (54), descending
+  channel 16% / 69% (97); sideways channel 51% / 45% (118). Median move 24 bars after a breakout is
+  ~0–0.6 ATR for most types. H&S / inverse H&S have too few judged breakouts to rate (11, 18).
+  Symmetric triangles have no measured target in the detector, so follow-through is "no cases".
+  Consistent with the no-edge finding — the textbook's confident claims mostly don't hold here.
 
 ### Pattern life cycle — old signals labelled as history (user request)
 - **Done:** 2026-09-24 · built on `main`'s working tree (user to branch/commit) · **merged to `main`.**
