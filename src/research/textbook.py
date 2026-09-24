@@ -24,6 +24,8 @@ _MAP = {
     "sideways channel": ("Rectangle (range)", "Rectangles / channels"),
     "ascending channel": ("Channel", "Rectangles / channels"),
     "descending channel": ("Channel", "Rectangles / channels"),
+    "rising wedge": ("Rising wedge", "Wedges"),
+    "falling wedge": ("Falling wedge", "Wedges"),
 }
 
 

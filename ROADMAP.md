@@ -72,7 +72,7 @@ instructing it better. So **the guide shrinks as Layer 1 grows.**
 | B1 Detector gold set — labelling mode | ✅ Tooling merged (2026-09-24); ≥30 labelled charts pending (user) |
 | B2 Detector precision/recall + tuning | ✅ Instrument merged (2026-09-24); measurement + tuning pending labels |
 | B3 Empirical Pattern Encyclopedia | ✅ Done (merged, 2026-09-24) |
-| Tests | 431 green, ruff + svelte-check clean |
+| Tests | 440 green, ruff + svelte-check clean |
 
 **Remaining, in order:**
 

@@ -243,3 +243,17 @@ def test_pending_cases_are_counted_but_left_out_of_the_rates():
     assert r["seen_forming"] == 35 and r["decided_n"] == 30 and r["pending_breakout_n"] == 5
     assert r["confirmed_n"] == 30 and r["pending_outcome_n"] == 10 and r["judged_n"] == 20
     assert r["target_hit_n"] + r["failed_n"] == 20 and r["follow_through_rate"] == 0.5
+
+
+def test_sloped_boundaries_are_judged_bar_by_bar():
+    """A falling wedge's upper line keeps falling: a close above the LINE on that bar confirms it, even
+    though it's below where the line was when the pattern was first seen."""
+    x = _inst(pattern_type="falling wedge", direction="bullish", breakout=110.0, invalidation=100.0,
+              target=120.0, upper_line=(-1.0, 110.0), lower_line=(-0.5, 100.0))
+    enc._resolve_breakout(x, np.array([105.0, 104.0, 106.0, 104.0]), 0, 4)
+    # line values: bar0 110, bar1 109, bar2 108, bar3 107 → no close above yet
+    assert x.confirmed_bar is None
+    y = _inst(pattern_type="falling wedge", direction="bullish", breakout=110.0, invalidation=100.0,
+              target=120.0, upper_line=(-2.0, 110.0), lower_line=(-0.5, 100.0))
+    enc._resolve_breakout(y, np.array([105.0, 104.0, 107.0]), 0, 3)   # line at bar2 = 106 → 107 breaks
+    assert y.confirmed_bar == 2 and y.breakout == pytest.approx(106.0) and y.target == pytest.approx(116.0)

@@ -35,6 +35,7 @@ from src.patterns.base import (
     build_confirmation,
     classify_state,
     classify_state_history,
+    classify_state_path,
 )
 from src.patterns.dedupe import dedupe_patterns
 from src.structure.swings import SWING_HIGH, SWING_LOW
@@ -51,6 +52,8 @@ SYMMETRIC_TRIANGLE = "symmetric triangle"
 RECTANGLE = "sideways channel"   # a horizontal range: flat-top resistance, flat-bottom support
 ASCENDING_CHANNEL = "ascending channel"
 DESCENDING_CHANNEL = "descending channel"
+RISING_WEDGE = "rising wedge"       # both lines rising, converging — conventionally bearish
+FALLING_WEDGE = "falling wedge"     # both lines falling, converging — conventionally bullish
 
 DEFAULT_LOOKBACK = 7
 
@@ -165,8 +168,14 @@ def _detect_head_and_shoulders(highs, lows, cfg, atr, *, top: bool) -> Pattern |
     )
 
 
-def _detect_triangle(highs, lows, cfg, atr) -> Pattern | None:
-    if len(highs) < 3 or len(lows) < 3:
+def _enough(highs, lows, min_side: int) -> bool:
+    """At least `min_side` swings on each side (3 normally; 2 after a post-impulse trim) and at least
+    5 swings in total, so a line through only two points is never both sides of a pattern."""
+    return len(highs) >= min_side and len(lows) >= min_side and len(highs) + len(lows) >= 5
+
+
+def _detect_triangle(highs, lows, cfg, atr, min_side: int = 3) -> Pattern | None:
+    if not _enough(highs, lows, min_side):
         return None
     flat = cfg.patterns.flat_slope_pct
     hi, lo = highs.tail(3), lows.tail(3)
@@ -204,7 +213,15 @@ def _detect_triangle(highs, lows, cfg, atr) -> Pattern | None:
         quality = _clamp01((hi_r2 + lo_r2) / 2)
     tb0 = int(min(hi["bar"].min(), lo["bar"].min()))
     tb1 = int(max(hi["bar"].max(), lo["bar"].max()))
+    # boundary lines for the breakout check: a flat side is its horizontal level
+    if hc != "flat":
+        hi_line = _envelope(hi, True, hi_line)
+    if lc != "flat":
+        lo_line = _envelope(lo, False, lo_line)
+    up_ln = (0.0, upper) if hc == "flat" else (hi_line.slope, hi_line.intercept)
+    lo_ln = (0.0, lower) if lc == "flat" else (lo_line.slope, lo_line.intercept)
     return Pattern(
+        upper_line=up_ln, lower_line=lo_ln,
         type=name, kind=CONTINUATION, direction=direction, state=FORMING,
         bars=[int(b) for b in pd.concat([hi["bar"], lo["bar"]]).sort_values()],
         points=[_pt(r) for _, r in pd.concat([hi, lo]).sort_values("bar").iterrows()],
@@ -234,6 +251,7 @@ def _detect_rectangle(highs, lows, cfg, atr) -> Pattern | None:
     rb0 = int(min(hi["bar"].min(), lo["bar"].min()))
     rb1 = int(max(hi["bar"].max(), lo["bar"].max()))
     return Pattern(
+        upper_line=(0.0, upper), lower_line=(0.0, lower),
         type=RECTANGLE, kind=CONTINUATION, direction=NEUTRAL_DIR, state=FORMING,
         bars=[int(b) for b in pd.concat([hi["bar"], lo["bar"]]).sort_values()],
         points=[_pt(r) for _, r in pd.concat([hi, lo]).sort_values("bar").iterrows()],
@@ -245,17 +263,55 @@ def _detect_rectangle(highs, lows, cfg, atr) -> Pattern | None:
     )
 
 
-def _detect_channel(highs, lows, cfg, atr, closes=None) -> Pattern | None:
+def _envelope(pts: pd.DataFrame, upper: bool, fallback):
+    """The boundary line a trader would DRAW: through two of the swings with every other swing on or
+    inside it (resistance touches the highest wicks, support the lowest). Among valid pairs the one
+    spanning the most bars wins. Falls back to the least-squares fit if none qualifies."""
+    b = pts["bar"].to_numpy(dtype=float)
+    p = pts["price"].to_numpy(dtype=float)
+    best, best_span = None, -1.0
+    for i in range(len(b)):
+        for j in range(i + 1, len(b)):
+            if b[j] == b[i]:
+                continue
+            slope = (p[j] - p[i]) / (b[j] - b[i])
+            line = p[i] + slope * (b - b[i])
+            eps = 1e-9 * max(1.0, abs(p).max())
+            ok = (p <= line + eps).all() if upper else (p >= line - eps).all()
+            if ok and b[j] - b[i] > best_span:
+                best, best_span = (i, j), b[j] - b[i]
+    if best is None:
+        return fallback
+    i, j = best
+    return fit_trendline(b[[i, j]], p[[i, j]], RESISTANCE if upper else SUPPORT)
+
+
+def _convergence(hi_line, lo_line, hi, lo) -> float | None:
+    """How much the gap between the two lines shrinks from the pattern's first to its last swing
+    (1 − width_end / width_start). None if the lines cross or start inverted."""
+    b0 = int(min(hi["bar"].min(), lo["bar"].min()))
+    b1 = int(max(hi["bar"].max(), lo["bar"].max()))
+    w0 = hi_line.value_at(b0) - lo_line.value_at(b0)
+    w1 = hi_line.value_at(b1) - lo_line.value_at(b1)
+    if w0 <= 0 or w1 <= 0:
+        return None
+    return 1.0 - w1 / w0
+
+
+def _detect_channel(highs, lows, cfg, atr, closes=None, min_side: int = 3) -> Pattern | None:
     """Parallel sloped highs and lows — a trending channel (continuation of that trend).
     Thresholds come from `cfg.patterns.channel_*` (B2-tunable). With `channel_respect_rails`, a
     channel is only real if no close since its first anchor went beyond either rail by more than
     `structure.trendline_break_atr_mult` × ATR (A1 finding: least-squares rails needn't be respected)."""
-    if len(highs) < 3 or len(lows) < 3:
+    if not _enough(highs, lows, min_side):
         return None
     hi, lo = highs.tail(3), lows.tail(3)
     hi_line = fit_trendline(hi["bar"].to_numpy(), hi["price"].to_numpy(), RESISTANCE)
     lo_line = fit_trendline(lo["bar"].to_numpy(), lo["price"].to_numpy(), SUPPORT)
     pc = cfg.patterns
+    conv = _convergence(hi_line, lo_line, hi, lo)
+    if conv is not None and conv >= pc.wedge_min_convergence:
+        return None                          # converging: that's a wedge, not a channel
     if hi_line.r2 < pc.channel_min_r2 or lo_line.r2 < pc.channel_min_r2:
         return None
     s1, s2 = hi_line.slope, lo_line.slope
@@ -286,7 +342,14 @@ def _detect_channel(highs, lows, cfg, atr, closes=None) -> Pattern | None:
     target = breakout + height if direction == BULLISH else breakout - height
     quality = _clamp01(parallel * (hi_line.r2 + lo_line.r2) / 2)
     cb0 = int(min(hi["bar"].min(), lo["bar"].min()))
+    hi_env, lo_env = _envelope(hi, True, hi_line), _envelope(lo, False, lo_line)
+    upper, lower = hi_env.value_at(last_bar), lo_env.value_at(last_bar)
+    breakout, inval = (upper, lower) if direction == BULLISH else (lower, upper)
+    height = abs(upper - lower)
+    target = breakout + height if direction == BULLISH else breakout - height
+    hi_line, lo_line = hi_env, lo_env                  # draw what a trader would draw
     return Pattern(
+        upper_line=(hi_line.slope, hi_line.intercept), lower_line=(lo_line.slope, lo_line.intercept),
         type=name, kind=CONTINUATION, direction=direction, state=FORMING,
         bars=[int(b) for b in pd.concat([hi["bar"], lo["bar"]]).sort_values()],
         points=[_pt(r) for _, r in pd.concat([hi, lo]).sort_values("bar").iterrows()],
@@ -295,6 +358,91 @@ def _detect_channel(highs, lows, cfg, atr, closes=None) -> Pattern | None:
         target=round_price(float(target)), quality=round(quality, 3),
         reason="Parallel sloped highs and lows — a channel riding the trend.",
     )
+
+
+def _detect_wedge(highs, lows, cfg, atr, min_side: int = 3) -> Pattern | None:
+    """Both boundary lines slope the SAME way and CONVERGE (gap shrinks by >= wedge_min_convergence).
+    Falling wedge (both down) is conventionally bullish — breakout above the upper line; rising wedge
+    (both up) bearish — breakout below the lower line. Measured target: the wedge's height at its
+    start, projected from the breakout."""
+    if not _enough(highs, lows, min_side):
+        return None
+    hi, lo = highs.tail(3), lows.tail(3)
+    hi_line = fit_trendline(hi["bar"].to_numpy(), hi["price"].to_numpy(), RESISTANCE)
+    lo_line = fit_trendline(lo["bar"].to_numpy(), lo["price"].to_numpy(), SUPPORT)
+    pc = cfg.patterns
+    for line, pts in ((hi_line, hi), (lo_line, lo)):
+        if len(pts) >= 3 and (pd.isna(line.r2) or line.r2 < pc.channel_min_r2):
+            return None
+    s1, s2 = hi_line.slope, lo_line.slope
+    if s1 * s2 <= 0:
+        return None
+    mean_price = float(pd.concat([hi["price"], lo["price"]]).mean())
+    if abs(_rel_change_pct((s1 + s2) / 2, hi["bar"].to_numpy(), mean_price)) < pc.flat_slope_pct:
+        return None
+    conv = _convergence(hi_line, lo_line, hi, lo)
+    if conv is None or conv < pc.wedge_min_convergence:
+        return None
+    falling = s1 < 0
+    name, direction = (FALLING_WEDGE, BULLISH) if falling else (RISING_WEDGE, BEARISH)
+    hi_line, lo_line = _envelope(hi, True, hi_line), _envelope(lo, False, lo_line)
+    s1, s2 = hi_line.slope, lo_line.slope
+    b0 = int(min(hi["bar"].min(), lo["bar"].min()))
+    b1 = int(max(hi["bar"].max(), lo["bar"].max()))
+    upper, lower = hi_line.value_at(b1), lo_line.value_at(b1)
+    height0 = hi_line.value_at(b0) - lo_line.value_at(b0)
+    breakout, inval = (upper, lower) if falling else (lower, upper)
+    target = breakout + height0 if falling else breakout - height0
+    r2s = [ln.r2 for ln, pts in ((hi_line, hi), (lo_line, lo)) if len(pts) >= 3 and not pd.isna(ln.r2)]
+    quality = _clamp01(min(1.0, conv / 0.5) * (sum(r2s) / len(r2s) if r2s else 0.7))
+    return Pattern(
+        upper_line=(s1, hi_line.intercept), lower_line=(s2, lo_line.intercept),
+        type=name, kind=REVERSAL, direction=direction, state=FORMING,
+        bars=[int(b) for b in pd.concat([hi["bar"], lo["bar"]]).sort_values()],
+        points=[_pt(r) for _, r in pd.concat([hi, lo]).sort_values("bar").iterrows()],
+        lines=[_seg(hi_line, b0, b1), _seg(lo_line, b0, b1)],
+        breakout_level=round_price(float(breakout)), invalidation_level=round_price(float(inval)),
+        target=round_price(float(target)), quality=round(quality, 3),
+        reason=(f"Both lines {'falling' if falling else 'rising'} and converging ({conv * 100:.0f}% narrower) "
+                f"— a {name}, conventionally {'bullish' if falling else 'bearish'}."),
+    )
+
+
+def _after_last_impulse(tail: pd.DataFrame, featured_df: pd.DataFrame, cfg: Config, atr: float):
+    """Drop swings that come before the last IMPULSE leg — consecutive high↔low swings at least
+    impulse_atr_mult × the ATR at the leg's end apart, ending at a NEW extreme beyond every earlier swing
+    in the window (a breakout move, not an oscillation inside a range), and at least impulse_leg_ratio ×
+    the median of the OTHER legs in the same direction (a steady trend's similar legs are not an
+    impulse). Returns (swings, trimmed?). Only continuation patterns use this — a
+    consolidation after a big move shouldn't borrow swings from before it."""
+    pts = tail.sort_values("bar").reset_index(drop=True)
+    # (index, direction, size) of every high<->low leg in the window
+    legs = [(k, pts.iloc[k]["kind"], abs(float(pts.iloc[k]["price"]) - float(pts.iloc[k - 1]["price"])))
+            for k in range(1, len(pts)) if pts.iloc[k]["kind"] != pts.iloc[k - 1]["kind"]]
+    cut = None
+    for k in range(2, len(pts)):          # a leg needs at least one swing BEFORE it to break out of
+        prev, r = pts.iloc[k - 1], pts.iloc[k]
+        if r["kind"] == prev["kind"]:
+            continue
+        b = int(r["bar"])
+        a = float(featured_df[COL_ATR].iloc[b]) if COL_ATR in featured_df.columns and b < len(featured_df) else atr
+        a = a if a == a and a > 0 else atr
+        earlier = pts.iloc[: k - 1]["price"]
+        # an IMPULSE: a big leg that reaches a NEW extreme beyond every earlier swing — a breakout move,
+        # not just a wide oscillation inside a range
+        new_extreme = (r["price"] > earlier.max()) if r["kind"] == SWING_HIGH else (r["price"] < earlier.min())
+        leg = abs(float(r["price"]) - float(prev["price"]))
+        # compare with the OTHER legs in the same direction (a channel's up-legs are all alike; its
+        # small pullbacks mustn't make every up-leg look huge); fall back to all other legs
+        same = [sz for kk, kind, sz in legs if kk != k and kind == r["kind"]]
+        others = same or [sz for kk, _, sz in legs if kk != k]
+        typical = float(np.median(others)) if others else 0.0
+        if (new_extreme and leg >= cfg.patterns.impulse_atr_mult * a
+                and leg >= cfg.patterns.impulse_leg_ratio * typical):
+            cut = b
+    if cut is None:
+        return pts, False
+    return pts[pts["bar"] >= cut], True
 
 
 FRESH, IN_PLAY, COMPLETED, EXPIRED = "fresh", "in_play", "completed", "expired"
@@ -341,6 +489,39 @@ def _lifecycle(p: Pattern, featured_df: pd.DataFrame, cfg: Config) -> None:
     p.lifecycle = EXPIRED if since > pc.expire_duration_mult * duration else IN_PLAY
 
 
+def _line_state(p: Pattern, featured_df: pd.DataFrame, cfg: Config, atr: float) -> None:
+    """Breakout MEMORY for line-bounded patterns (triangles, channels, ranges, wedges): judge every close
+    since the pattern completed against the boundary lines' values ON THAT BAR (they may slope). Sets
+    state, direction (neutral ones take the edge they break), bars_since_state_change, and the levels:
+    at the breakout bar once resolved, else where the lines are now (bar N). Look-ahead-safe."""
+    n = len(featured_df)
+    start = max(p.bars) + 1
+    bars = np.arange(start, n)
+    (su, iu), (sl, il) = p.upper_line, p.lower_line
+    upper, lower = su * bars + iu, sl * bars + il
+    after = featured_df.iloc[start:]
+    bar_atr = (after[COL_ATR].fillna(atr).to_numpy() if COL_ATR in after.columns else np.full(len(after), atr))
+    was_neutral = p.direction == NEUTRAL_DIR
+    p.state, p.direction, since = classify_state_path(
+        p.direction, upper, lower, after["close"].to_numpy(dtype=float), bar_atr * cfg.patterns.reclaim_atr_mult)
+    at = start + since if since is not None else n - 1          # the bar whose line values to report
+    up_v, lo_v = su * at + iu, sl * at + il
+    b0 = min(p.bars)
+    base_height = (su * b0 + iu) - (sl * b0 + il)
+    if p.direction == BULLISH:
+        p.breakout_level, p.invalidation_level = round_price(up_v), round_price(lo_v)
+    elif p.direction == BEARISH:
+        p.breakout_level, p.invalidation_level = round_price(lo_v), round_price(up_v)
+    else:                                                       # neutral, unresolved: edges as they stand now
+        p.breakout_level, p.invalidation_level = round_price(up_v), round_price(lo_v)
+    if was_neutral and p.direction in (BULLISH, BEARISH) and base_height > 0:
+        # the target follows the direction the neutral coil actually broke
+        p.target = round_price(p.breakout_level + base_height if p.direction == BULLISH
+                               else p.breakout_level - base_height)
+    if since is not None:
+        p.bars_since_state_change = n - 1 - (start + since)
+
+
 def _cls(rc: float, flat: float) -> str:
     if abs(rc) < flat:
         return "flat"
@@ -380,14 +561,21 @@ def find_patterns(
     highs = tail[tail["kind"] == SWING_HIGH].sort_values("bar")
     lows = tail[tail["kind"] == SWING_LOW].sort_values("bar")
 
+    # Consolidation patterns start after the last impulse (a big one-way leg); with fewer swings left
+    # they may use 2 per side (5+ in total). Reversal patterns keep the full recent swings.
+    ctail, trimmed = _after_last_impulse(tail, featured_df, cfg, atr)
+    chighs = ctail[ctail["kind"] == SWING_HIGH].sort_values("bar")
+    clows = ctail[ctail["kind"] == SWING_LOW].sort_values("bar")
+    min_side = 2 if trimmed else 3
     raw = [
         _detect_head_and_shoulders(highs, lows, cfg, atr, top=True),
         _detect_head_and_shoulders(highs, lows, cfg, atr, top=False),
         _detect_double(highs, lows, cfg, atr, top=True),
         _detect_double(highs, lows, cfg, atr, top=False),
-        _detect_triangle(highs, lows, cfg, atr),
-        _detect_rectangle(highs, lows, cfg, atr),
-        _detect_channel(highs, lows, cfg, atr, closes=featured_df["close"].to_numpy()),
+        _detect_triangle(chighs, clows, cfg, atr, min_side=min_side),
+        _detect_rectangle(chighs, clows, cfg, atr),
+        _detect_channel(chighs, clows, cfg, atr, closes=featured_df["close"].to_numpy(), min_side=min_side),
+        _detect_wedge(chighs, clows, cfg, atr, min_side=min_side),
     ]
     patterns = dedupe_patterns([p for p in raw if p is not None])
 
@@ -395,15 +583,9 @@ def find_patterns(
     n_bars = len(featured_df)
     has_structure = structure_levels is not None or fib is not None or round_number is not None
     for p in patterns:
-        # neutral coils (symmetric triangle / rectangle) resolve direction on a close beyond an edge
-        if p.direction == NEUTRAL_DIR and p.breakout_level is not None and p.invalidation_level is not None:
-            hi_b = max(p.breakout_level, p.invalidation_level)
-            lo_b = min(p.breakout_level, p.invalidation_level)
-            if last_close > hi_b:
-                p.direction, p.breakout_level, p.invalidation_level = BULLISH, hi_b, lo_b
-            elif last_close < lo_b:
-                p.direction, p.breakout_level, p.invalidation_level = BEARISH, lo_b, hi_b
-        if p.kind == REVERSAL and p.bars:
+        if p.upper_line is not None and p.lower_line is not None and p.bars:
+            _line_state(p, featured_df, cfg, atr)
+        elif p.kind == REVERSAL and p.bars:
             # Reversal patterns remember their history since completion, so a neckline break that
             # price later reclaims reads `failed` instead of reverting to `forming`.
             # The reclaim needs a close back through the neckline by reclaim_atr_mult × THAT bar's
@@ -418,7 +600,7 @@ def find_patterns(
                 p.reason += " Broke the neckline, then closed back through it: failed break."
             if since is not None:
                 p.bars_since_state_change = len(after) - 1 - since
-        else:
+        else:                                    # fallback (no boundary lines): memoryless
             p.state = classify_state(p.direction, p.breakout_level, p.invalidation_level, last_close)
             if p.state != FORMING and p.bars:
                 # memoryless state: it began where the current unbroken run of same-state closes began

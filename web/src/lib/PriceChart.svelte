@@ -113,7 +113,7 @@
     'double top': 'DTop', 'double bottom': 'DBot', 'head and shoulders': 'H&S',
     'inverse head and shoulders': 'iH&S', 'ascending triangle': 'AscTri', 'descending triangle': 'DescTri',
     'symmetric triangle': 'SymTri', 'sideways channel': 'Range', 'ascending channel': 'AscCh',
-    'descending channel': 'DescCh',
+    'descending channel': 'DescCh', 'falling wedge': 'FWedge', 'rising wedge': 'RWedge',
   }
   const patternAbbr = (t: string) => PATTERN_ABBR[t] ?? t
   const LIFE_TEXT: Record<string, string> = {

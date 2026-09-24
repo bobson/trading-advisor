@@ -23,9 +23,11 @@ from src.patterns.chart_patterns import (
     DESCENDING_TRIANGLE,
     DOUBLE_BOTTOM,
     DOUBLE_TOP,
+    FALLING_WEDGE,
     HEAD_AND_SHOULDERS,
     INVERSE_HEAD_AND_SHOULDERS,
     RECTANGLE,
+    RISING_WEDGE,
     SYMMETRIC_TRIANGLE,
 )
 
@@ -33,8 +35,8 @@ from src.patterns.chart_patterns import (
 # yet, so the gold set can measure RECALL on them too.
 DETECTOR_TYPES = [DOUBLE_TOP, DOUBLE_BOTTOM, HEAD_AND_SHOULDERS, INVERSE_HEAD_AND_SHOULDERS,
                   ASCENDING_TRIANGLE, DESCENDING_TRIANGLE, SYMMETRIC_TRIANGLE, RECTANGLE,
-                  ASCENDING_CHANNEL, DESCENDING_CHANNEL]
-EXTRA_TYPES = ["rising wedge", "falling wedge", "bull flag", "bear flag", "other"]
+                  ASCENDING_CHANNEL, DESCENDING_CHANNEL, RISING_WEDGE, FALLING_WEDGE]
+EXTRA_TYPES = ["bull flag", "bear flag", "other"]
 PATTERN_TYPES = DETECTOR_TYPES + EXTRA_TYPES
 ZONE_ROLES = ("support", "resistance")
 

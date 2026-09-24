@@ -55,6 +55,9 @@ patterns:
   channel_respect_rails: false  # B2 tunable: reject channels whose rails price closed through (ATR margin)
   fresh_bars: 3              # a confirmed pattern is "fresh" for this many bars after its breakout
   expire_duration_mult: 1.0  # ...and "expired" after this x its formation length without target/failure
+  impulse_atr_mult: 5.0      # continuation patterns start after the last swing leg of >= this x ATR
+  impulse_leg_ratio: 2.0     # ...that is also >= this x the median leg (so a steady trend isn't an "impulse")
+  wedge_min_convergence: 0.25  # same-direction lines whose gap shrinks by >= this fraction = a wedge
 
 mtf:
   enabled: true

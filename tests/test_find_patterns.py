@@ -189,3 +189,65 @@ def test_state_is_look_ahead_safe(cfg):
     msub = mutated.iloc[: k + 1]
     after = find_patterns(add_features(msub, cfg), find_swings(msub, cfg.structure.swing_sensitivity), cfg)
     assert sorted((p.type, p.state) for p in after) == states_before
+
+
+# --- impulse trim, wedges, trader-style lines, breakout memory on sloped lines ----------------
+
+def _frame_closes(swing_rows, closes, atr=2.0):
+    """Like _frame, but with explicit closes for every bar (so sloped-line breakouts are realistic)."""
+    idx = pd.date_range("2024-01-01", periods=len(closes), freq="D", tz="UTC", name="timestamp")
+    c = np.asarray(closes, dtype=float)
+    df = pd.DataFrame({"open": c, "high": c + 0.5, "low": c - 0.5, "close": c}, index=idx)
+    df[COL_ATR] = atr
+    return df, pd.DataFrame(swing_rows, columns=["bar", "price", "kind"])
+
+
+def test_xrp_like_falling_wedge_after_a_rally(cfg):
+    """Regression (XRP/USDT 1d, Aug–Sep 2026): a big rally to a new high, then lower highs and lower
+    lows converging. The pre-rally low must NOT be used (it made the old detector say 'symmetric
+    triangle'); it's a falling wedge, and the breakout is the first close above the line a trader
+    draws through the highest wicks."""
+    from src.patterns.chart_patterns import FALLING_WEDGE
+    sw = [(2, 99.0, SWING_HIGH), (5, 98.0, SWING_LOW),            # before the rally
+          (13, 170.0, SWING_HIGH),                                 # rally top: a +72 leg = impulse
+          (24, 131.0, SWING_LOW), (25, 148.0, SWING_HIGH), (36, 150.0, SWING_HIGH), (38, 125.0, SWING_LOW)]
+    closes = [100.0] * 13 + [150.0] * 11 + [135.0] * 15
+    upper_at = lambda b: 170.0 + (150.0 - 170.0) / 23 * (b - 13)   # noqa: E731  line through 13 and 36
+    closes += [upper_at(39) - 3, upper_at(40) - 2, upper_at(41) + 4, upper_at(42) + 6]
+    df, sw_df = _frame_closes(sw, closes)
+    p = next(p for p in find_patterns(df, sw_df, cfg) if p.type == FALLING_WEDGE)
+    assert p.direction == BULLISH and p.state == CONFIRMED
+    assert p.state_bar == 41                                         # first close above the drawn line
+    assert min(p.bars) >= 13                                         # nothing from before the rally
+
+
+def test_upper_boundary_is_the_line_through_the_highest_wicks(cfg):
+    from src.patterns.chart_patterns import _envelope
+    from src.structure.trendlines import fit_trendline
+    pts = pd.DataFrame([(13, 170.0), (25, 148.0), (36, 150.0)], columns=["bar", "price"])
+    fit = fit_trendline(pts["bar"].to_numpy(), pts["price"].to_numpy(), "resistance")
+    env = _envelope(pts, True, fit)
+    assert all(env.value_at(b) >= p - 1e-9 for b, p in zip(pts["bar"], pts["price"]))   # nothing above it
+    assert env.value_at(13) == pytest.approx(170.0) and env.value_at(36) == pytest.approx(150.0)
+
+
+def test_a_steady_trend_is_not_mistaken_for_an_impulse(cfg):
+    from src.patterns.chart_patterns import _after_last_impulse
+    n = 40
+    idx = pd.date_range("2024-01-01", periods=n, freq="D", tz="UTC")
+    c = np.linspace(100, 120, n)
+    df = pd.DataFrame({"open": c, "high": c + 1, "low": c - 1, "close": c, COL_ATR: 1.0}, index=idx)
+    sw = pd.DataFrame([(5, 106.0, SWING_HIGH), (15, 111.0, SWING_HIGH), (25, 116.0, SWING_HIGH),
+                       (10, 102.0, SWING_LOW), (20, 107.0, SWING_LOW), (30, 112.0, SWING_LOW)],
+                      columns=["bar", "price", "kind"])
+    _, trimmed = _after_last_impulse(sw, df, cfg, 1.0)
+    assert not trimmed
+
+
+def test_neutral_range_that_breaks_down_gets_a_downside_target(cfg):
+    sw = [(1, 110.0, SWING_HIGH), (3, 110.0, SWING_HIGH), (5, 110.0, SWING_HIGH),
+          (2, 100.0, SWING_LOW), (4, 100.0, SWING_LOW), (6, 100.0, SWING_LOW)]
+    df, sw = _frame(sw, last_close=96)
+    p = next(p for p in find_patterns(df, sw, cfg) if p.type == RECTANGLE)
+    assert p.direction == "bearish" and p.state == CONFIRMED
+    assert p.target == pytest.approx(90.0)                         # 100 − (110 − 100), not 120

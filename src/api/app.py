@@ -143,6 +143,9 @@ def analysis(
     # The bar index this payload was ACTUALLY computed at (as_of_bar is clamped up to a warm-up
     # floor, and None means the latest bar). Labels are keyed to this, never to the slider value.
     payload["bar_index"] = len(result.df) - 1
+    # Each detected pattern carries its measured record (encyclopedia, same timeframe, all markets) —
+    # the history beside the find, rendered by the UI, never written by Claude.
+    _attach_records(payload.get("chart", {}).get("overlays", {}).get("patterns", []), timeframe)
     _CACHE[key] = (now, payload)
     return payload
 
@@ -395,3 +398,51 @@ def encyclopedia_page(pattern_type: str) -> dict:
                  for tf in tfs}
     return {"pattern_type": pattern_type, "rows": rows, "textbook": textbook_claim(pattern_type),
             "detector_precision": precision}
+
+
+# --- Pattern scanner + records beside every find ---------------------------------------------------
+def _encyclopedia_top_rows() -> list[dict]:
+    from src.research.encyclopedia import load_rows
+    conn = _trades_conn()
+    try:
+        return [r for r in load_rows(conn) if r["symbol"] == "all" and r["regime"] == "all" and r["split"] == "all"]
+    finally:
+        conn.close()
+
+
+def _attach_records(patterns: list[dict], timeframe: str) -> None:
+    if not patterns:
+        return
+    from src.research.scanner import pattern_record
+    rows = _encyclopedia_top_rows()
+    for p in patterns:
+        p["record"] = pattern_record(rows, p["type"], timeframe)
+
+
+_SCAN_CACHE: dict = {}
+_SCAN_TTL = 300.0
+
+
+@app.get("/scan", dependencies=_GUARDS)
+def scan_patterns(timeframes: str = Query("1d", description="comma list, e.g. 1d,4h,1h")) -> dict:
+    """Every registered pair × the given timeframes: patterns that broke out in the last few candles,
+    are forming (closest to breaking out first) or are in play — each with its encyclopedia record.
+    Candles older than one bar are refreshed (cache-first otherwise); a market that can't load is
+    skipped and listed. Cached 5 minutes. No Claude call."""
+    from src.data.registry import get_candles, list_pairs
+    from src.research.scanner import scan
+    from src.service.analyze import _timeframe_minutes
+
+    tfs = [t for t in timeframes.split(",") if t]
+    key = tuple(tfs)
+    now = time.time()
+    hit = _SCAN_CACHE.get(key)
+    if hit and now - hit[0] < _SCAN_TTL:
+        return hit[1]
+    markets = [(p.symbol, tf) for tf in tfs for p in list_pairs()]
+    result = scan(markets, cfg,
+                  lambda s, tf: get_candles(s, tf, cfg, stale_after_minutes=_timeframe_minutes(tf)),
+                  _encyclopedia_top_rows())
+    result["scanned_at"] = int(now)
+    _SCAN_CACHE[key] = (now, result)
+    return result

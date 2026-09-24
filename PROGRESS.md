@@ -27,7 +27,8 @@ instrument price precision) and **ROADMAP A7** (honest baselines: luck band + ze
 default) and **ROADMAP B1** (gold-set labelling mode — `gold_labels` table), plus the user-requested
 **1–2 candle patterns at levels** chart markers, the **ROADMAP B2** evaluation instrument, the **pattern life cycle** (fresh / in play /
 completed / expired), and **ROADMAP B3** (the Empirical Pattern Encyclopedia — `encyclopedia_stats` +
-Encyclopedia view). **431 tests green, ruff + svelte-check clean.**
+Encyclopedia view), plus **better pattern detection + the Pattern scanner + history beside every
+find** (user request). **440 tests green, ruff + svelte-check clean.**
 
 **Standing facts:** patterns and 3-candle candlesticks stay OUT of the confidence score (facts
 only); regime is standalone (not a vote); two-point trendlines are chart-only (not in facts); the
@@ -61,6 +62,51 @@ apply if `config.yaml` omits them.
 ---
 
 ## Log (newest first)
+
+### Pattern detection upgrade + Pattern scanner + history beside every find (user request)
+- **Done:** 2026-09-24 · built on `main`'s working tree (user to branch/commit) · **merged to `main`.**
+- **Why:** on XRP/USDT 1d the user saw a falling structure (upper line through the Aug 22 and Sep 14
+  wick highs, lower through the Sep 2 and Sep 16 lows) breaking out on Sep 21; the app said "symmetric
+  triangle, forming". The user wants to NOTICE patterns quickly — told plainly that the app's own
+  record shows patterns haven't made these markets predictable (most breakouts failed), and that the
+  prediction journal (D1) is the honest test of their own reads.
+- **Detection (Layer 1, `chart_patterns.py`):**
+  1. **Start after the last impulse** (continuation patterns only): drop swings before a leg that is ≥
+     `patterns.impulse_atr_mult` (5) × ATR, reaches a NEW extreme beyond every earlier swing, and is ≥
+     `impulse_leg_ratio` (2) × the median of the other same-direction legs (so a steady trend's legs
+     and a wide range's oscillations are not "impulses"). With a trim, 2 swings per side (5+ total)
+     may define a pattern. Fixes XRP (the pre-rally Aug 14 low made the lows look "rising") and the
+     SOL "ascending channel" (A1 eye-check FAIL).
+  2. **Wedges:** `rising wedge` / `falling wedge` — same-direction lines converging by ≥
+     `wedge_min_convergence` (25%); falling = bullish (breaks above), rising = bearish; target = the
+     wedge's starting height from the breakout. Channels now exclude converging lines.
+  3. **Trader-style boundary lines** (`_envelope`): through two swings with every other swing inside
+     (resistance touches the highest wicks) — least squares kept only for quality/slope checks. That's
+     what moved the XRP breakout from Sep 20 (fit cut between peaks) to Sep 21, matching the user.
+  4. **Breakout memory for line-bounded patterns** (`classify_state_path` + `_line_state`): triangles,
+     channels, ranges and wedges are judged close by close against their (sloping) lines' values on
+     each bar; neutral coils take the direction of the edge they break and their target follows it
+     (a range breaking DOWN used to keep an upside target).
+- **Real charts after:** XRP 1d → falling wedge, confirmed, broke out Sep 21 (fresh); SOL 1d → no
+  channel (only the completed double bottom); BTC/ETH unchanged; EUR/USD ascending triangle → failed.
+- **Encyclopedia (rebuilt, 6 markets 1d), before → after:** ascending channel seen 300→164 (judged
+  breakouts 118→25), descending channel 269→176 (97→22) — over-calling largely gone. Falling wedge
+  (new): target 2/43, failed 27/43 (63%); rising wedge (new): target 0/21, failed 19/21 (90%). Breakout
+  memory made ranges/triangles look worse (sideways channel target 51%→33%, failed 45%→62%) — breakouts
+  now counted when they happen. The encyclopedia's outcome sim also judges sloped lines bar by bar.
+- **Pattern scanner** (`src/research/scanner.py`, `GET /scan?timeframes=`, cached 5 min, candles
+  refreshed when a bar old, failing markets skipped): every registered pair × chosen timeframes →
+  fresh breakouts (newest first), forming (closest to breakout in ATR first), in play. New **Scanner**
+  view (`#/scanner`): 1d/4h/1h toggles, rows with levels, "open chart ▶" → analysis view live.
+- **History beside every find:** each row, and each current pattern under the chart's tags, shows its
+  type's encyclopedia record for that timeframe ("reached target 35 of 80 (44%) · failed 41 of 80
+  (51%)"; a % only with 20+ cases). `/analysis` attaches `record` to each pattern. UI-rendered, not
+  written by Claude (the pattern half of ROADMAP B4).
+- **Snapshot:** regenerated after the user approved the diff — the fixture's ascending triangle is now
+  `failed` (a close below its rising support 4 bars ago, missed by the old last-close check); tier
+  unchanged. Wedges added to the textbook reader and the gold-label vocabulary.
+- **Open:** symmetric triangles still have no measured target (follow-through "no cases"); B4's
+  verdict-record half is not done.
 
 ### ROADMAP B3 — Empirical Pattern Encyclopedia
 - **Done:** 2026-09-24 · **branch:** `feature/encyclopedia` · **merged to `main`.**

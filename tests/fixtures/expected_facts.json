@@ -1,7 +1,6 @@
 {
   "absences": [
     "no RSI divergence detected",
-    "no failed chart pattern",
     "no category votes against the read"
   ],
   "candlestick": {
@@ -19,13 +18,13 @@
         343
       ],
       "bars_since_completion": 6,
-      "bars_since_state_change": null,
+      "bars_since_state_change": 4,
       "breakout_level": 64762.77,
       "confirmation": {
         "candlestick": "contradicts",
         "higher_tf": "neutral",
         "momentum": "contradicts",
-        "price": "neutral",
+        "price": "contradicts",
         "structure": "supports",
         "volatility": "supports",
         "volume": "contradicts"
@@ -37,17 +36,17 @@
           "distance_pct": 1.28
         },
         "invalidation": {
-          "distance_atr": -2.36,
-          "distance_pct": -0.85
+          "distance_atr": 1.79,
+          "distance_pct": 0.65
         },
         "target": {
           "distance_atr": 9.48,
           "distance_pct": 3.41
         }
       },
-      "invalidation_level": 63400.0,
+      "invalidation_level": 64356.03,
       "kind": "continuation",
-      "lifecycle": "forming",
+      "lifecycle": "failed",
       "lines": [
         [
           {
@@ -62,11 +61,11 @@
         [
           {
             "bar": 305,
-            "price": 63331.36
+            "price": 63219.83
           },
           {
             "bar": 343,
-            "price": 64271.02
+            "price": 64299.22
           }
         ]
       ],
@@ -98,8 +97,8 @@
       ],
       "quality": 0.0,
       "reason": "Converging highs and lows (triangle).",
-      "state": "forming",
-      "state_bar": null,
+      "state": "failed",
+      "state_bar": 345,
       "target": 66125.54,
       "target_hit_bar": null,
       "type": "ascending triangle"
@@ -426,6 +425,7 @@
   },
   "situation": {
     "reasons": [
+      "failed_pattern:ascending triangle",
       "confirmed_pattern:double top",
       "at_level"
     ],

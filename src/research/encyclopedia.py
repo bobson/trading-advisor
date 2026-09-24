@@ -64,6 +64,8 @@ class Instance:
     invalidated: bool = False
     outcome: str | None = None        # target | failed | open (neither within horizon) | pending | None
     pending_breakout: bool = False    # forming, and the data ended before its breakout window closed
+    upper_line: tuple | None = None   # (slope, intercept) — sloped boundaries are judged bar by bar
+    lower_line: tuple | None = None
     move_atr: float | None = None
     bars_to_resolution: int | None = None
     profile: dict = field(default_factory=dict)
@@ -72,6 +74,9 @@ class Instance:
 def _resolve_breakout(inst: Instance, closes: np.ndarray, start: int, stop: int, *, window_complete: bool = True) -> None:
     """Scan closes[start:stop] for the confirmation (or invalidation) of a forming pattern. If
     nothing happened and the data ended before the full window, it's PENDING (too recent to judge)."""
+    if inst.upper_line is not None and inst.lower_line is not None:
+        _resolve_on_lines(inst, closes, start, stop, window_complete)
+        return
     hi = lo = None
     if inst.direction == NEUTRAL_DIR and inst.breakout is not None and inst.invalidation is not None:
         hi, lo = max(inst.breakout, inst.invalidation), min(inst.breakout, inst.invalidation)
@@ -92,6 +97,36 @@ def _resolve_breakout(inst: Instance, closes: np.ndarray, start: int, stop: int,
         if inst.breakout is not None and (c > inst.breakout if bull else c < inst.breakout):
             inst.confirmed_bar = j
             return
+    inst.pending_breakout = not window_complete
+
+
+def _resolve_on_lines(inst: Instance, closes: np.ndarray, start: int, stop: int, window_complete: bool) -> None:
+    """Same as `_resolve_breakout`, but against boundary LINES evaluated on each bar (wedges, channels,
+    triangles, ranges). On confirmation the levels become the lines' values at that bar and the target
+    keeps its measured distance from the breakout (flipped if a neutral coil breaks down)."""
+    (su, iu), (sl, il) = inst.upper_line, inst.lower_line
+    offset = None if inst.target is None or inst.breakout is None else inst.target - inst.breakout
+    neutral = inst.direction == NEUTRAL_DIR
+    for j in range(start, stop):
+        c, up, lo = closes[j], su * j + iu, sl * j + il
+        bull_break, bear_break = c > up, c < lo
+        if neutral and (bull_break or bear_break):
+            inst.direction = BULLISH if bull_break else BEARISH
+        elif not neutral:
+            bull = inst.direction == BULLISH
+            if (bear_break if bull else bull_break):
+                inst.invalidated = True
+                return
+            if not (bull_break if bull else bear_break):
+                continue
+        else:
+            continue
+        bull = inst.direction == BULLISH
+        inst.confirmed_bar = j
+        inst.breakout, inst.invalidation = (up, lo) if bull else (lo, up)
+        if offset is not None:
+            inst.target = inst.breakout + (abs(offset) if bull else -abs(offset))
+        return
     inst.pending_breakout = not window_complete
 
 
@@ -136,7 +171,8 @@ def collect_instances(df: pd.DataFrame, cfg: Config, symbol: str, timeframe: str
             reg = regimes.iloc[i]
             inst = Instance(p.type, symbol, timeframe, key[1], i, p.state,
                             str(reg) if reg is not None and not pd.isna(reg) else "unknown",
-                            p.direction, p.breakout_level, p.invalidation_level, p.target)
+                            p.direction, p.breakout_level, p.invalidation_level, p.target,
+                            upper_line=p.upper_line, lower_line=p.lower_line)
             if p.state == "forming":
                 stop = min(len(df), i + 1 + max_wait)
                 _resolve_breakout(inst, closes, i + 1, stop, window_complete=(i + 1 + max_wait <= len(df)))

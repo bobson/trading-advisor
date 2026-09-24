@@ -4,16 +4,19 @@
   import RiskCalculator from './lib/RiskCalculator.svelte'
   import LabelPanel from './lib/LabelPanel.svelte'
   import Encyclopedia from './lib/Encyclopedia.svelte'
+  import Scanner from './lib/Scanner.svelte'
   import {
     getPairs, getTimeframes, getAnalysis, getTrades, getPosition, postTrade, deleteTrade,
-    getTradesBaseline,
+    getTradesBaseline, recordText,
     type Pair, type Analysis, type PanelToggles, type Trade, type TradePnl, type Position,
     type TradeBaseline, type GoldLabels,
   } from './lib/api'
 
   // #/encyclopedia[/<type>] opens the encyclopedia directly (linkable pages).
-  let view = $state<'analysis' | 'risk' | 'encyclopedia'>(
-    typeof location !== 'undefined' && location.hash.startsWith('#/encyclopedia') ? 'encyclopedia' : 'analysis')
+  let view = $state<'analysis' | 'risk' | 'encyclopedia' | 'scanner'>(
+    typeof location === 'undefined' ? 'analysis'
+    : location.hash.startsWith('#/encyclopedia') ? 'encyclopedia'
+    : location.hash.startsWith('#/scanner') ? 'scanner' : 'analysis')
   let pairs = $state<Pair[]>([])
   let timeframes = $state<string[]>([])
   let symbol = $state('BTC/USDT')
@@ -68,6 +71,13 @@
   // Encyclopedia example -> the analysis view, scrubbed to the breakout candle (future hidden).
   async function openExample(s: string, tf: string, bar: number) {
     symbol = s; timeframe = tf; asOfBar = bar; labelMode = false
+    view = 'analysis'
+    history.replaceState(null, '', location.pathname + location.search)
+    await run(false)
+  }
+  // Scanner row -> the analysis view on that pair/timeframe, live (latest candle).
+  async function openLive(s: string, tf: string) {
+    symbol = s; timeframe = tf; asOfBar = null; labelMode = false
     view = 'analysis'
     history.replaceState(null, '', location.pathname + location.search)
     await run(false)
@@ -265,6 +275,7 @@
   <nav class="views">
     <button class:active={view === 'analysis'} onclick={() => (view = 'analysis')}>Analysis</button>
     <button class:active={view === 'risk'} onclick={() => (view = 'risk')}>Risk calculator</button>
+    <button class:active={view === 'scanner'} onclick={() => { view = 'scanner'; location.hash = '#/scanner' }}>Scanner</button>
     <button class:active={view === 'encyclopedia'} onclick={() => { view = 'encyclopedia'; location.hash = '#/encyclopedia' }}>Encyclopedia</button>
   </nav>
 
@@ -449,9 +460,13 @@
     {#if !labelMode && result.chart.overlays.patterns.length}
       <div class="patterns">
         {#each result.chart.overlays.patterns as p}
-          <span class="pchip {p.state} {p.lifecycle}">{p.type} · {LIFE_CHIP[p.lifecycle ?? p.state] ?? p.state}</span>
+          <span class="pchip {p.state} {p.lifecycle}" title={`History of ${p.type} on ${timeframe}: ${recordText(p.record)}`}>{p.type} · {LIFE_CHIP[p.lifecycle ?? p.state] ?? p.state}</span>
         {/each}
       </div>
+      <!-- The measured history beside every CURRENT pattern (history-stage ones don't need it). -->
+      {#each result.chart.overlays.patterns.filter((p) => ['forming', 'fresh', 'in_play'].includes(p.lifecycle ?? '')) as p}
+        <p class="phist">{p.type} ({timeframe}) — history after a breakout: {recordText(p.record)}</p>
+      {/each}
     {/if}
 
     <PriceChart data={result.chart} {toggles} {trades} {labelMode} {draft} {pending}
@@ -534,6 +549,8 @@
   {:else if !error}
     <p class="hint">Pick a pair and timeframe, then press Analyze.</p>
   {/if}
+  {:else if view === 'scanner'}
+    <Scanner onOpen={openLive} />
   {:else if view === 'encyclopedia'}
     <Encyclopedia onOpenExample={openExample} />
   {:else}
@@ -657,4 +674,5 @@
   .pchip.failed { border-color: #6e7681; color: #6e7681; }
   .pchip.forming { border-color: #d29922; color: #d29922; }
   .pchip.completed, .pchip.expired { border-color: #6e7681; color: #6e7681; }
+  .phist { margin: 2px 0; font-size: 12px; color: #8b949e; }
 </style>

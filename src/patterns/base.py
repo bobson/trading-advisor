@@ -114,6 +114,11 @@ class Pattern:
     lifecycle: str = "forming"
     state_bar: int | None = None
     target_hit_bar: int | None = None
+    # Boundary LINES (slope, intercept) in bar units, for patterns whose breakout is a line that may
+    # slope (triangles, channels, ranges, wedges) — the state is judged against the line's value on
+    # each bar. Internal (not serialized).
+    upper_line: tuple | None = None
+    lower_line: tuple | None = None
 
     @property
     def span(self) -> tuple:
@@ -190,6 +195,38 @@ def classify_state_history(
         elif broke_at is not None and (c < breakout_level - m if bull else c > breakout_level + m):
             return FAILED, True, i                # broke out, then closed back inside -> reclaimed
     return (CONFIRMED, False, broke_at) if broke_at is not None else (FORMING, False, None)
+
+
+def classify_state_path(direction: str, upper, lower, closes, margins) -> tuple[str, str, int | None]:
+    """State with MEMORY for patterns bounded by two lines (triangles, channels, ranges, wedges).
+    `upper`/`lower` are the boundary values on each bar after the pattern completed; `closes` and
+    `margins` (ATR-scaled reclaim tolerance) are aligned with them. Returns (state, direction, since).
+
+      - neutral (symmetric triangle, range): the first close beyond EITHER line confirms and sets
+        the direction;
+      - directional: a close beyond the breakout line confirms (upper for bullish, lower for
+        bearish); a close beyond the OTHER line first = failed (invalidated before breaking out);
+      - after confirming, a close back through the breakout line by more than the margin = failed.
+    `since` is the index (into the arrays) where the current confirmed/failed state began."""
+    broke_at = None
+    for i, (c, up, lo, m) in enumerate(zip(closes, upper, lower, margins)):
+        if broke_at is None:
+            if direction == NEUTRAL_DIR:
+                if c > up:
+                    direction, broke_at = BULLISH, i
+                elif c < lo:
+                    direction, broke_at = BEARISH, i
+                continue
+            bull = direction == BULLISH
+            if (c < lo) if bull else (c > up):
+                return FAILED, direction, i
+            if (c > up) if bull else (c < lo):
+                broke_at = i
+            continue
+        bull = direction == BULLISH
+        if (c < up - m) if bull else (c > lo + m):
+            return FAILED, direction, i
+    return (CONFIRMED, direction, broke_at) if broke_at is not None else (FORMING, direction, None)
 
 
 def _last(df: pd.DataFrame, col: str):

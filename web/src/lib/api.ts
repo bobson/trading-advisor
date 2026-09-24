@@ -20,6 +20,7 @@ export interface Pattern {
   bars_since_state_change?: number | null
   state_time?: number | null         // the breakout (or failure) candle
   target_hit_time?: number | null    // the candle that reached the target (completed patterns)
+  record?: PatternRecord | null      // measured history of this pattern type (encyclopedia)
 }
 export interface Divergence { kind: string; reason: string; times: number[] }
 export interface CandlePattern { time: number; direction: string; label: string }
@@ -229,3 +230,25 @@ export interface EncPage {
 }
 export const getEncyclopedia = () => get<EncIndex>('/encyclopedia')
 export const getEncyclopediaPage = (t: string) => get<EncPage>(`/encyclopedia/${encodeURIComponent(t)}`)
+
+// --- Pattern scanner (every pair × timeframes) + the record beside each find ---
+export interface PatternRecord {
+  sample_size: number; judged_n: number; target_n: number; target_hit_n: number
+  follow_through_rate: number | null; failed_n: number; failure_rate: number | null; move_atr_median: number | null
+}
+export interface ScanRow {
+  symbol: string; timeframe: string; type: string; direction: string; lifecycle: string
+  bars_since_breakout: number | null; breakout_level: number | null; invalidation_level: number | null
+  target: number | null; last_close: number; distance_atr: number | null; quality: number
+  last_time: number; record: PatternRecord | null
+}
+export interface ScanResult { rows: ScanRow[]; skipped: { symbol: string; timeframe: string; reason: string }[]; markets: number; scanned_at: number }
+export const getScan = (timeframes: string[]) => get<ScanResult>(`/scan?timeframes=${timeframes.join(',')}`)
+
+// "target 35 of 85 (41%) · failed 46 of 85 (54%)" — a % only with 20+ judged cases.
+export function recordText(r: PatternRecord | null | undefined): string {
+  if (!r) return 'no history yet (rebuild the encyclopedia)'
+  const part = (label: string, n: number, d: number, rate: number | null) =>
+    d === 0 ? `${label}: no cases` : `${label} ${n} of ${d}` + (rate != null && d >= 20 ? ` (${Math.round(rate * 100)}%)` : ' — too few to rate')
+  return `${part('reached target', r.target_hit_n, r.target_n, r.follow_through_rate)} · ${part('failed', r.failed_n, r.judged_n, r.failure_rate)}`
+}

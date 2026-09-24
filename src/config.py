@@ -131,6 +131,16 @@ class PatternsConfig(_Strict):
     # pattern's own formation length without reaching its target (or failing).
     fresh_bars: int = 3
     expire_duration_mult: float = 1.0
+    # Continuation patterns (triangles, channels, ranges, wedges) start AFTER the last impulse: a
+    # swing-to-swing leg of at least this × ATR. Swings from before a big rally/crash don't belong
+    # to the consolidation after it (the SOL "channel" and XRP "triangle" misreads).
+    impulse_atr_mult: float = 5.0
+    # ...and at least this × the median swing leg in the window (a trending channel's legs are all
+    # similar and each makes a new extreme — that's a trend, not an impulse)
+    impulse_leg_ratio: float = 2.0
+    # A wedge: both boundary lines slope the same way AND the gap between them shrinks by at least
+    # this fraction from the pattern's start to its last swing (a channel's lines stay ~parallel).
+    wedge_min_convergence: float = 0.25
 
 
 class TimeframesConfig(_Strict):
