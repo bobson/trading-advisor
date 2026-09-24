@@ -97,12 +97,15 @@ def find_sr_zones(
     pts = swings.sort_values("price")[["price", "bar"]].to_numpy(dtype=float)
 
     clusters: list[list[tuple[float, int]]] = [[(pts[0][0], int(pts[0][1]))]]
+    run_sum = float(pts[0][0])                    # running sum of the current cluster (O(n), not O(n²))
     for price, bar in pts[1:]:
-        centroid = float(np.mean([p for p, _ in clusters[-1]]))
+        centroid = run_sum / len(clusters[-1])
         if abs(price - centroid) <= tol:
             clusters[-1].append((float(price), int(bar)))
+            run_sum += float(price)
         else:
             clusters.append([(float(price), int(bar))])
+            run_sum = float(price)
 
     last = n_bars - 1
     rows = []

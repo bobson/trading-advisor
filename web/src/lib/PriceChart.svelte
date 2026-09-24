@@ -108,6 +108,15 @@
     'three white soldiers': '3WS', 'three black crows': '3BC',
   }
   const candleCode = (label: string) => CANDLE_CODES[label] ?? label
+  // Short tag for the level a 1–2 candle pattern tagged ("support zone 1.14–1.15" -> "sup").
+  const levelAbbr = (level: string | null) => {
+    if (!level) return ''
+    if (level.startsWith('support zone')) return 'sup'
+    if (level.startsWith('resistance zone')) return 'res'
+    if (level.startsWith('fib')) return 'fib' + level.replace(/[^0-9.]/g, '')
+    if (level.includes('trendline')) return 'TL'
+    return level
+  }
 
   const patternStyle = (p: Pattern) => {
     if (p.state === 'failed') return { color: '#6e7681', width: 1, dashed: true }
@@ -251,6 +260,36 @@
       markers.push({ time: cp.time, position: bull ? 'belowBar' : 'aboveBar',
         color: bull ? '#26a641' : '#f85149', shape: 'square', text: candleCode(cp.label) })
     }
+    // 1–2 candle patterns (facts-only). By default only those whose wick TAGGED a level that
+    // favours them (as of that candle) — "H@sup", "BeE@fib61.8" — plus the last closed candle's
+    // pattern (the one the candlestick vote reads). The study toggle adds every other one, faded.
+    const c12 = ov.candles_12
+    const c12Drawn: { code: string; label: string }[] = []
+    if (c12 && !labelMode) {
+      const atTimes = new Set(c12.at_level.map((c) => c.time))
+      const col = (d: string, faded = false) =>
+        (d === 'bullish' ? '#26a641' : d === 'bearish' ? '#f85149' : '#8b949e') + (faded ? '99' : '')
+      const pos = (d: string) => (d === 'bearish' ? 'aboveBar' : 'belowBar')
+      const isLast = (t: number) => c12.last?.time === t
+      if (toggles.patterns) for (const c of c12.at_level) {
+        markers.push({ time: c.time, position: pos(c.direction), color: col(c.direction), shape: 'circle',
+          text: `${c.code}@${levelAbbr(c.level)}${isLast(c.time) ? ' (last)' : ''}` })
+        c12Drawn.push(c)
+      }
+      if (toggles.candles_all) for (const c of c12.all) {
+        if (atTimes.has(c.time)) continue
+        markers.push({ time: c.time, position: pos(c.direction), color: col(c.direction, true), shape: 'circle',
+          text: c.code + (isLast(c.time) ? ' (last)' : '') })
+        c12Drawn.push(c)
+      }
+      const last = c12.last
+      if (toggles.patterns && last && !atTimes.has(last.time) && !toggles.candles_all) {
+        markers.push({ time: last.time, position: pos(last.direction), color: col(last.direction), shape: 'circle',
+          text: `${last.code} (last)` })
+        c12Drawn.push(last)
+      }
+    }
+
     if (!labelMode && toggles.marker && ov.marker)
       markers.push({ time: ov.marker.time,
         position: ov.marker.bias === 'bullish' ? 'belowBar' : 'aboveBar',
@@ -361,13 +400,18 @@
 
     // Candle-pattern legend (full names for the short marker codes) — below the regime strip,
     // so the strip stays directly under the candles.
-    if (candlePats.length) {
+    if (candlePats.length || c12Drawn.length) {
       const legend = document.createElement('div')
       legend.className = 'chart-legend'
-      const seen = [...new Map(candlePats.map((cp) => [cp.label, cp.direction])).entries()]
-      legend.innerHTML = 'Candle patterns: ' + seen.map(([label, dir]) =>
-        `<span class="legend-swatch"><i style="background:${dir === 'bullish' ? '#26a641' : '#f85149'}"></i>`
-        + `<b>${candleCode(label)}</b>&nbsp;${label}</span>`).join('')
+      const swatch = (dir: string) => dir === 'bullish' ? '#26a641' : dir === 'bearish' ? '#f85149' : '#8b949e'
+      const three = [...new Map(candlePats.map((cp) => [cp.label, cp.direction])).entries()]
+        .map(([label, dir]) => ({ code: candleCode(label), label, dir }))
+      const twelve = [...new Map(c12Drawn.map((c: any) => [c.label, c])).values()]
+        .map((c: any) => ({ code: c.code, label: c.label, dir: c.direction }))
+      legend.innerHTML = 'Candle patterns: ' + [...three, ...twelve].map((x) =>
+        `<span class="legend-swatch"><i style="background:${swatch(x.dir)}"></i><b>${x.code}</b>&nbsp;${x.label}</span>`).join('')
+        + (c12Drawn.length ? '<span class="legend-note">@sup / @res = support / resistance zone, @fib = Fibonacci level, '
+          + '@TL = trendline — shown where the wick touched that level as of that candle. (last) = the candle the verdict reads.</span>' : '')
       root.appendChild(legend)
     }
 
@@ -519,6 +563,7 @@
   }
   .chart-root :global(.regime-current) { color: #c9d1d9; margin-right: 6px; }
   .chart-root :global(.legend-swatch) { display: inline-flex; align-items: center; gap: 5px; }
+  .chart-root :global(.legend-note) { flex-basis: 100%; font-size: 11px; color: #6e7681; }
   .chart-root :global(.legend-swatch i) {
     display: inline-block; width: 10px; height: 10px; border-radius: 2px;
   }

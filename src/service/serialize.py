@@ -29,6 +29,7 @@ from src.indicators.features import (
     THREE_CANDLE_PATTERNS,
 )
 from src.market.regime import classify_regime
+from src.patterns.candle_context import candle_events
 from src.patterns.chart_patterns import find_patterns
 from src.service.analyze import AnalysisResult
 from src.structure.divergence import find_rsi_divergence
@@ -113,6 +114,28 @@ def _serialize_trendlines(result: AnalysisResult, df: pd.DataFrame, start_ts: in
                        {"time": _epoch(df.index[last]), "price": rp(tl.value_at(last))}],
         })
     return out
+
+
+# Level context (the slow part) is computed for the most recent candles only; older candles in the
+# window still appear in the all-patterns view, just without a level check.
+CANDLE_LEVEL_BARS = 500
+
+
+def _serialize_candles_12(result: AnalysisResult, df: pd.DataFrame, start_ts: int) -> dict:
+    """1- and 2-candle patterns for the chart (facts-only, never a vote):
+      all      — every one in the window (for the "1–2 candle patterns" study toggle)
+      at_level — directional ones whose wick TAGGED a level that favours them, as of that candle
+      last     — the pattern on the last closed candle: the one the candlestick VOTE reads."""
+    n = len(df)
+    start = next((i for i in range(n) if _epoch(df.index[i]) >= start_ts), n)
+    m = result.cfg.market
+    ev = candle_events(result.featured, result.swings, result.cfg, start=start,
+                       level_from=max(start, n - CANDLE_LEVEL_BARS), market=(m.symbol, m.timeframe))
+    rows = [{"time": _epoch(df.index[e["bar"]]), "label": e["label"], "code": e["code"],
+             "direction": e["direction"], "level": e["level"]} for e in ev]
+    last = rows[-1] if rows and ev[-1]["bar"] == n - 1 else None
+    return {"all": rows, "at_level": [r for r in rows if r["level"]], "last": last,
+            "level_window": CANDLE_LEVEL_BARS}
 
 
 def _series(fw: pd.DataFrame, col: str, decimals: int) -> list[dict]:
@@ -253,7 +276,8 @@ def serialize_chart(result: AnalysisResult, limit: int = 500, levels_per_side: i
         ],
         "overlays": {"swings": swings, "levels": levels, "fibonacci": fib, "marker": marker,
                      "patterns": patterns, "divergence": divergence, "regime": regime,
-                     "candle_patterns": candle_patterns, "trendlines": trendlines},
+                     "candle_patterns": candle_patterns, "trendlines": trendlines,
+                     "candles_12": _serialize_candles_12(result, df, start_ts)},
     }
 
 

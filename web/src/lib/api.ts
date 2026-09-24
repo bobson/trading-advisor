@@ -19,6 +19,8 @@ export interface Pattern {
 }
 export interface Divergence { kind: string; reason: string; times: number[] }
 export interface CandlePattern { time: number; direction: string; label: string }
+// 1- and 2-candle patterns (facts-only). `level` = what the wick tagged, as of that candle (or null).
+export interface Candle12 { time: number; label: string; code: string; direction: string; level: string | null }
 export interface Point { time: number; value: number }
 export interface Indicators {
   volume_ma: Point[]; rsi: Point[]; adx: Point[]; atr: Point[]
@@ -36,6 +38,7 @@ export interface ChartData {
     levels: Level[]; swings: SwingMarker[]; fibonacci: Fib | null; marker: Marker | null
     patterns: Pattern[]; divergence: Divergence | null; candle_patterns: CandlePattern[]
     trendlines?: TrendLine[]
+    candles_12?: { all: Candle12[]; at_level: Candle12[]; last: Candle12 | null; level_window: number }
     regime?: { time: number; label: string }[]   // TEMP: Feature-6 eyeball strip
   }
 }
@@ -46,7 +49,7 @@ export interface TrendLine {
 }
 
 export interface PanelToggles {
-  trendlines: boolean; levels: boolean; fib: boolean; swings: boolean; patterns: boolean; marker: boolean; ma: boolean
+  trendlines: boolean; candles_all: boolean; levels: boolean; fib: boolean; swings: boolean; patterns: boolean; marker: boolean; ma: boolean
   volume: boolean; rsi: boolean; macd: boolean; adx: boolean; atr: boolean
 }
 export interface Confluence {

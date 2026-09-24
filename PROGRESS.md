@@ -22,8 +22,8 @@ two-point trendlines). **ROADMAP A2** (verdict as a category count, neutral styl
 disclosure; `800e12a`). **ROADMAP A3** (situation tier decided in Layer 1) and **ROADMAP A4** (support/resistance as
 ATR-scaled zones) and **ROADMAP A5** (facts payload hardening) and **ROADMAP A6** (analyst guide revision +
 instrument price precision) and **ROADMAP A7** (honest baselines: luck band + zero-edge calculator
-default) and **ROADMAP B1** (gold-set labelling mode — `gold_labels` table). **382 tests green, ruff +
-svelte-check clean.**
+default) and **ROADMAP B1** (gold-set labelling mode — `gold_labels` table), plus the user-requested
+**1–2 candle patterns at levels** chart markers. **392 tests green, ruff + svelte-check clean.**
 
 **Standing facts:** patterns and 3-candle candlesticks stay OUT of the confidence score (facts
 only); regime is standalone (not a vote); two-point trendlines are chart-only (not in facts); the
@@ -57,6 +57,34 @@ apply if `config.yaml` omits them.
 ---
 
 ## Log (newest first)
+
+### 1–2 candle patterns at levels — chart markers (user request, facts-only)
+- **Done:** 2026-09-24 · built on `main`'s working tree (user to branch/commit) · **merged to `main`.**
+- **Why:** only the 3-candle patterns were drawn; doji/hammer/shooting star/engulfing were detected
+  (and the last one votes) but never shown — ~190 per 500 candles would bury the chart.
+- **What's drawn now (browser-verified on BTC 1d and XRP 1d):**
+  - by default, a directional 1–2 candle pattern whose **wick tagged a level that favours it, as of
+    that candle**: `H@sup`, `BeE@res`, `BuE@fib61.8`, `SS@TL` — bullish needs the nearest non-stale
+    support zone below the previous close, a key Fibonacci level (38.2–78.6%) of an up-leg, or an
+    unbroken support trendline; bearish the mirror. ~45–65 per 500 candles (BTC/SOL/EUR/USD 1d, BTC 1h).
+  - always, the **last closed candle's** 1–2 candle pattern — the one the candlestick vote reads — as
+    `CODE (last)`.
+  - a study toggle **"1–2 candle patterns (all)"** (off by default) adds every other one, faded.
+  - the legend explains the codes and the `@` tags.
+- **Build:** `src/patterns/candle_context.py` — `candle_events()` (vectorised pattern lookup, vote
+  precedence engulfing > hammer/shooting star > doji), `level_for()` (levels rebuilt as they existed at
+  that bar: swings filtered to bars ≤ i − sensitivity — verified equal to recomputing on df[:i+1] up to
+  the tie order of outside bars — then zones / Fibonacci / two-point trendlines on that history). An
+  in-process cache per (market, bar, direction) makes repeat views and scrubbing cheap (first view of
+  a market ~1.6 s, then ~0.04 s); level context covers the last 500 candles. `serialize.py` adds
+  `overlays.candles_12 = {all, at_level, last}`. `find_sr_zones` clustering made linear-time (running
+  sum; snapshot unchanged). 10 new tests incl. look-ahead guards.
+- **How the rule was chosen (measured, not tuned to a count):** every historical zone + a 0.25×ATR "near"
+  margin → 85–99% of patterns "at a level" (meaningless); nearest non-stale zone only → 64–86%; wick
+  must actually TAG the level → ~50%; doji excluded (no direction for a level to favour) → final.
+- **Not changed:** the candlestick VOTE (still any 1–2 candle pattern on the last bar); the facts sent
+  to Claude (no "at a level" fact yet — a natural Layer-1 addition, would change the snapshot).
+  Stale zones don't count as a level here (a pattern at a long-dormant zone isn't marked).
 
 ### ROADMAP B1 — Detector gold set: labelling mode
 - **Done:** 2026-09-24 · **branch:** `feature/gold-set` · **merged to `main`.** Tooling done; the

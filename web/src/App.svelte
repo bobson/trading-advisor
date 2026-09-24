@@ -25,7 +25,7 @@
 
   // ---- per-overlay / per-pane toggles, persisted to localStorage ----
   const DEFAULT_TOGGLES: PanelToggles = {
-    trendlines: true, levels: true, fib: true, swings: true, patterns: true, marker: true, ma: true,
+    trendlines: true, candles_all: false, levels: true, fib: true, swings: true, patterns: true, marker: true, ma: true,
     volume: true, rsi: true, macd: true, adx: false, atr: false,
   }
   const TOGGLE_KEY = 'tw.toggles'
@@ -35,7 +35,8 @@
   }
   let toggles = $state<PanelToggles>(loadToggles())
   $effect(() => { localStorage.setItem(TOGGLE_KEY, JSON.stringify(toggles)) })
-  const OVERLAY_KEYS: (keyof PanelToggles)[] = ['trendlines', 'levels', 'fib', 'swings', 'patterns', 'marker', 'ma']
+  const OVERLAY_KEYS: (keyof PanelToggles)[] = ['trendlines', 'levels', 'fib', 'swings', 'patterns', 'candles_all', 'marker', 'ma']
+  const TOGGLE_LABELS: Partial<Record<keyof PanelToggles, string>> = { candles_all: '1–2 candle patterns (all)' }
   const PANE_KEYS: (keyof PanelToggles)[] = ['volume', 'rsi', 'macd', 'adx', 'atr']
 
   // ---- historical scrubbing (as_of_bar) ----
@@ -417,7 +418,7 @@
         <div class="toggle-grid">
           <div><span class="grp">overlays</span>
             {#each OVERLAY_KEYS as k}
-              <label><input type="checkbox" bind:checked={toggles[k]} /> {k}</label>
+              <label><input type="checkbox" bind:checked={toggles[k]} /> {TOGGLE_LABELS[k] ?? k}</label>
             {/each}
           </div>
           <div><span class="grp">panes</span>
