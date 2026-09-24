@@ -148,6 +148,28 @@ def mtf_signal_alignment(featured_df: pd.DataFrame, base_votes: dict[str, str], 
     return {"timeframes": available, "signals": per}
 
 
+def apply_measured_reliability(facts: dict, table: dict | None) -> None:
+    """ROADMAP B2: replace the placeholder with MEASURED precision from `scripts/eval_detectors.py`
+    (`data/detector_reliability.json`, keyed 'detector|timeframe'), for this chart's timeframe.
+    Entries not in the table stay unmeasured. Injected by the caller (like the base rate) — never read
+    inside build_facts, so offline tests and the snapshot don't depend on a local file."""
+    rel = facts.get("detector_reliability")
+    if not rel or not table:
+        return
+    tf = facts["market"]["timeframe"]
+    measured = 0
+    for group in ("detectors", "chart_patterns"):
+        for name in rel[group]:
+            entry = table.get(f"{name}|{tf}")
+            if entry and entry.get("precision") is not None:
+                rel[group][name] = {"precision": entry["precision"], "n": entry["n"],
+                                    "status": entry.get("status", "measured")}
+                measured += 1
+    if measured:
+        rel["status"] = (f"measured against the user's gold labels for {measured} detector(s) on {tf} "
+                         "(precision = share of detections that matched a label); the rest unmeasured")
+
+
 def reliability_placeholder(detectors: list[str], pattern_types: list[str]) -> dict:
     """Detector reliability as a FIELD (ROADMAP A5). Unmeasured for now — B2 fills `precision`
     and `n` from hand-labelled charts. Until then every detection is unverified."""

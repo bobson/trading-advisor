@@ -32,7 +32,10 @@ from src.service.analyze import advise
 from src.service.serialize import serialize_analysis
 
 cfg = load_config()
-BASE_RATES = load_base_rates()  # precomputed track record (data/base_rates.json); {} if absent
+BASE_RATES = load_base_rates()
+# ROADMAP B2: measured detector precision (scripts/eval_detectors.py --write); {} until it has run.
+from src.labels.evaluate import load_reliability as _load_reliability  # noqa: E402
+RELIABILITY = _load_reliability()  # precomputed track record (data/base_rates.json); {} if absent
 
 app = FastAPI(title="Trading Advisor API", version="1.0")
 # CORS restricted to the configured origins (default: the local Svelte dev server), NOT "*".
@@ -128,6 +131,7 @@ def analysis(
         result = advise(symbol, timeframe, cfg, context=ctx, derivatives=deriv,
                         explain_enabled=explain, refresh_stale=not scrubbing,
                         base_rate=BASE_RATES.get(f"{symbol}|{timeframe}"),
+                        reliability=RELIABILITY.get("table"),
                         as_of_bar=as_of_bar, explanation_style=explanation_style)
     except NotImplementedError as exc:  # e.g. forex before Phase 26
         raise HTTPException(status_code=501, detail=str(exc))

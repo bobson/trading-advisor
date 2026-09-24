@@ -101,6 +101,7 @@ def advise(
     explain_enabled: bool = True,
     refresh_stale: bool = False,
     base_rate: Optional[dict] = None,
+    reliability: Optional[dict] = None,
     as_of_bar: Optional[int] = None,
     explanation_style: Optional[str] = None,
 ) -> AnalysisResult:
@@ -149,6 +150,10 @@ def advise(
     if derivatives is not None:
         facts = {**facts, "derivatives": derivatives}
     # Rec #2: attach the historical track record for THIS setup's bias (honest, not a forecast).
+    # B2: measured detector precision (data/detector_reliability.json), injected like the base rate.
+    if reliability:
+        from src.advisor.facts_detail import apply_measured_reliability
+        apply_measured_reliability(facts, reliability)
     if base_rate is not None:
         entry = base_rate_entry(base_rate, facts["confluence"]["bias"])
         if entry:

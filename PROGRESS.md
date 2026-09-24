@@ -4,8 +4,9 @@ A state file for the "learning instrument" build. Source of truth for what's nex
 (steps A1…D6; prompts in `PROMPTS.md`). Older plans are in `docs/archive/`. See `CLAUDE.md` for conventions.
 
 **ROADMAP progress:** A1 ✓ (merged, `645231c`), A2 ✓ (merged, `800e12a`; docs `1003735`), A3 ✓ (merged), A4 ✓ (merged), A5 ✓ (merged), A6 ✓ (merged), A7 ✓ (merged), B1 ✓ (merged — labelling mode
-built; the ≥30 labelled charts are the user's ongoing work). **Next: A8** (morning report — the forward
-record), with gold-set labelling continuing alongside.
+built; the ≥30 labelled charts are the user's ongoing work), B2 tooling ✓ (merged — `eval_detectors.py`;
+its measurement + tuning run as soon as ≥30 charts are labelled). **Next: A8** (morning report — the
+forward record), with gold-set labelling continuing alongside.
 
 ## Current state
 
@@ -23,7 +24,8 @@ disclosure; `800e12a`). **ROADMAP A3** (situation tier decided in Layer 1) and *
 ATR-scaled zones) and **ROADMAP A5** (facts payload hardening) and **ROADMAP A6** (analyst guide revision +
 instrument price precision) and **ROADMAP A7** (honest baselines: luck band + zero-edge calculator
 default) and **ROADMAP B1** (gold-set labelling mode — `gold_labels` table), plus the user-requested
-**1–2 candle patterns at levels** chart markers. **392 tests green, ruff + svelte-check clean.**
+**1–2 candle patterns at levels** chart markers, and the **ROADMAP B2** evaluation instrument. **403 tests
+green, ruff + svelte-check clean.**
 
 **Standing facts:** patterns and 3-candle candlesticks stay OUT of the confidence score (facts
 only); regime is standalone (not a vote); two-point trendlines are chart-only (not in facts); the
@@ -57,6 +59,37 @@ apply if `config.yaml` omits them.
 ---
 
 ## Log (newest first)
+
+### ROADMAP B2 — Detector precision/recall + tuning (instrument built; measurement waits for labels)
+- **Done:** 2026-09-24 · **branch:** `feature/detector-eval` · **merged to `main`** (tooling).
+- **Done-when → NOT YET:** "a precision/recall table per detector with counts, before and after tuning,
+  on held-out labels" needs the gold set — **the real `gold_labels` table had 0 charts** when B2 was
+  built. No detector was tuned and no reliability was filled with real numbers (tuning without labels
+  would be guessing — exactly what B2 exists to prevent). Re-run once ≥30 charts are labelled.
+- **Build:** `src/labels/evaluate.py` — detectors re-run on candles up to each labelled bar; patterns
+  match when the TYPE is equal and both ENDPOINTS line up (≤ 2×swing-sensitivity bars, ≤ 1×ATR at that
+  bar — scale-free); one-to-one greedy matching; S/R = the chart's nearest 3 zones per side vs your
+  zones (same role, bands overlap ± 0.25×ATR), scored only where you marked zones. `Tally` → precision
+  (tp/fired) and recall (tp/gold), always printed with counts; a detector that never fires has
+  undefined precision, not perfect. Fixed ~30% HOLDOUT by a hash of symbol|timeframe|bar (a chart
+  never changes side as the set grows). `tune()` grid-searches on the TUNE split only (a test spies to
+  prove the holdout is never evaluated during search), picks best combined F1 (min fires), then
+  before/after is reported on the holdout. `scripts/eval_detectors.py [--tune channels] [--write]`
+  refuses to run under 30 labels without `--force`; `--write` saves `data/detector_reliability.json`.
+- **Channel knobs made tunable** (defaults = old hard-coded behaviour → snapshot unchanged):
+  `patterns.channel_min_r2` (0.6), `channel_min_parallel` (0.5), and the A1 idea as an option,
+  `channel_respect_rails` (false) — reject a channel whose rails price closed through by >
+  trendline_break_atr_mult × ATR. The tuner decides from your labels; the script only PRINTS the
+  chosen values (you copy them into config.yaml).
+- **Reliability field:** measured precision is injected like the base rate (`advise(reliability=…)`,
+  API loads the JSON at startup) — never read inside build_facts, so the snapshot/offline tests don't
+  depend on a local file. The prompt then lists "X precision P over N detections (status)"; entries
+  with n < 10 are marked thin; everything unlisted stays "unverified".
+- **Dry run** on a scratch DB (13 charts seeded from the detector's own output + "nothing here") showed
+  the report format and caught a scoring bug: "nothing here" had also made every shown zone a false
+  positive — it means *no pattern*, so zones are now scored only where zones were marked (test added).
+- **Labelling implication (tell the user):** a labelled chart is treated as COMPLETE — mark every
+  pattern you see (or "nothing here"), and if you mark zones, mark all the zones you'd draw there.
 
 ### 1–2 candle patterns at levels — chart markers (user request, facts-only)
 - **Done:** 2026-09-24 · built on `main`'s working tree (user to branch/commit) · **merged to `main`.**

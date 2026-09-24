@@ -121,6 +121,11 @@ class PatternsConfig(_Strict):
     # the neckline by at least this multiple of that bar's ATR — so a close hovering a hair past
     # the line doesn't flip the state. A neutral prior, not tuned to any backtest.
     reclaim_atr_mult: float = 0.25
+    # ROADMAP B2 — channel detector knobs (defaults = the original hard-coded behaviour). Tuned ONLY
+    # by scripts/eval_detectors.py on the tune split of the gold labels, never by hand.
+    channel_min_r2: float = 0.6            # each rail's least-squares fit must reach this r²
+    channel_min_parallel: float = 0.5      # 1 − |s1−s2|/max(|s1|,|s2|): how parallel the rails are
+    channel_respect_rails: bool = False    # also require no close beyond either rail by > trendline_break_atr_mult × ATR
 
 
 class TimeframesConfig(_Strict):

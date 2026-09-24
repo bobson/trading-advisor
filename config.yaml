@@ -50,6 +50,9 @@ patterns:
   min_trough_pct: 3.0        # min depth between peaks/valleys for a real reversal (anti over-call)
   flat_slope_pct: 1.0        # a trendline flatter than this (% across its span) counts as flat
   reclaim_atr_mult: 0.25     # a broken neckline counts as reclaimed (-> failed) only this x ATR back through it
+  channel_min_r2: 0.6        # B2 tunable: min r² of each channel rail's fit
+  channel_min_parallel: 0.5  # B2 tunable: how parallel the rails must be (0–1)
+  channel_respect_rails: false  # B2 tunable: reject channels whose rails price closed through (ATR margin)
 
 mtf:
   enabled: true

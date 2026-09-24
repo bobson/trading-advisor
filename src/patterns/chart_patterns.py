@@ -244,14 +244,18 @@ def _detect_rectangle(highs, lows, cfg, atr) -> Pattern | None:
     )
 
 
-def _detect_channel(highs, lows, cfg, atr) -> Pattern | None:
-    """Parallel sloped highs and lows — a trending channel (continuation of that trend)."""
+def _detect_channel(highs, lows, cfg, atr, closes=None) -> Pattern | None:
+    """Parallel sloped highs and lows — a trending channel (continuation of that trend).
+    Thresholds come from `cfg.patterns.channel_*` (B2-tunable). With `channel_respect_rails`, a
+    channel is only real if no close since its first anchor went beyond either rail by more than
+    `structure.trendline_break_atr_mult` × ATR (A1 finding: least-squares rails needn't be respected)."""
     if len(highs) < 3 or len(lows) < 3:
         return None
     hi, lo = highs.tail(3), lows.tail(3)
     hi_line = fit_trendline(hi["bar"].to_numpy(), hi["price"].to_numpy(), RESISTANCE)
     lo_line = fit_trendline(lo["bar"].to_numpy(), lo["price"].to_numpy(), SUPPORT)
-    if hi_line.r2 < 0.6 or lo_line.r2 < 0.6:
+    pc = cfg.patterns
+    if hi_line.r2 < pc.channel_min_r2 or lo_line.r2 < pc.channel_min_r2:
         return None
     s1, s2 = hi_line.slope, lo_line.slope
     if s1 * s2 <= 0:                        # slopes must point the same way
@@ -261,8 +265,16 @@ def _detect_channel(highs, lows, cfg, atr) -> Pattern | None:
     if abs(rc) < cfg.patterns.flat_slope_pct:   # ~flat is a rectangle, not a channel
         return None
     parallel = 1 - abs(s1 - s2) / (max(abs(s1), abs(s2)) or 1)
-    if parallel < 0.5:
+    if parallel < pc.channel_min_parallel:
         return None
+    if pc.channel_respect_rails and closes is not None:
+        start = int(min(hi["bar"].min(), lo["bar"].min()))
+        seg = np.asarray(closes[start:], dtype=float)
+        bars = np.arange(start, start + len(seg))
+        margin = cfg.structure.trendline_break_atr_mult * atr
+        if ((seg > hi_line.slope * bars + hi_line.intercept + margin).any()
+                or (seg < lo_line.slope * bars + lo_line.intercept - margin).any()):
+            return None
 
     direction = BULLISH if rc > 0 else BEARISH
     name = ASCENDING_CHANNEL if rc > 0 else DESCENDING_CHANNEL
@@ -330,7 +342,7 @@ def find_patterns(
         _detect_double(highs, lows, cfg, atr, top=False),
         _detect_triangle(highs, lows, cfg, atr),
         _detect_rectangle(highs, lows, cfg, atr),
-        _detect_channel(highs, lows, cfg, atr),
+        _detect_channel(highs, lows, cfg, atr, closes=featured_df["close"].to_numpy()),
     ]
     patterns = dedupe_patterns([p for p in raw if p is not None])
 

@@ -685,8 +685,15 @@ def facts_to_prompt(facts: dict) -> str:
 
     rel = facts.get("detector_reliability")
     if rel:
-        add(f"DETECTOR RELIABILITY: {rel['status']}. Treat every detection as unverified; "
-            "do not describe any detector as reliable or accurate.")
+        measured = [f"{name} precision {v['precision']} over {v['n']} detections ({v['status']})"
+                    for group in ("chart_patterns", "detectors") for name, v in rel[group].items()
+                    if v.get("precision") is not None]
+        if measured:
+            add(f"DETECTOR RELIABILITY: {rel['status']}: " + "; ".join(measured) + ". Quote a precision "
+                "only with its count; everything not listed is unverified.")
+        else:
+            add(f"DETECTOR RELIABILITY: {rel['status']}. Treat every detection as unverified; "
+                "do not describe any detector as reliable or accurate.")
     absences = facts.get("absences")
     if absences:
         add("NOT PRESENT (explicitly checked): " + "; ".join(absences) + ".")
