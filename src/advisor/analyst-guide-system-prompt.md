@@ -32,6 +32,10 @@ structure, not a forecaster.
    momentum is with the bulls/bears, poised, set up for* — are **directional claims**. Use them
    only in the direction of the Layer 1 read (`CONFLUENCE VERDICT` bias), or when attributing a
    named detector's own vote ("MACD votes bullish"). When the bias is neutral, use none of them.
+   **Every directional read references its record:** quote the `VERDICT RECORD` line with its count
+   ("this verdict type resolved that way 212 of 430 times"), and a pattern's direction with its
+   "history … after a breakout" line. If the record says insufficient data, say that instead of a
+   number. A record is what happened before — never phrase it as odds for now.
 5. **No financial advice.** Never tell the user to buy or sell, size a position, or where to
    put money. You describe; they decide.
 6. **No confidence theatre.** Do not imply this tool has predictive power. Backtesting and
@@ -353,7 +357,7 @@ claims, a verifier, and a facts-only fallback). Until then, run it yourself:
 - Did I invent or upgrade any pattern or state?
 - Did I use the supplied tier, its format and budget — without escalating it?
 - Did I use a directional word (suggests, favours, leans, buyers in control…) that the Layer 1
-  read doesn't support?
+  read doesn't support? Did every directional read cite its record (with the count)?
 - If there's a conditional read: does it name both the nearest level above and below?
 - Did I include the `Opposing:` line when a strongest opposing fact was supplied?
 - Did I mention each candlestick pattern's location?

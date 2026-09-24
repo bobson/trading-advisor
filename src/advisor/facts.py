@@ -454,6 +454,18 @@ def _stage_text(p: dict) -> str:
     return f"failed {ago}"
 
 
+def _pattern_record_text(r: dict | None) -> str:
+    """'reached target 35 of 80 (44%) · failed 41 of 80 (51%)' — a % only with 20+ cases."""
+    if not r:
+        return "no record yet"
+    def part(label, n, d, rate):
+        if not d:
+            return f"{label}: no cases"
+        return f"{label} {n} of {d}" + (f" ({rate * 100:.0f}%)" if rate is not None and d >= 20 else " (too few to rate)")
+    return (part("reached target", r["target_hit_n"], r["target_n"], r["follow_through_rate"]) + " · "
+            + part("failed", r["failed_n"], r["judged_n"], r["failure_rate"]))
+
+
 def _bars(n) -> str:
     """'1 bar' / 'N bars' (and 'n/a' when unknown)."""
     return "n/a bars" if n is None else f"{n} bar" if n == 1 else f"{n} bars"
@@ -577,6 +589,8 @@ def facts_to_prompt(facts: dict) -> str:
             dd = p.get("distances") or {}
             add(f"  [{_stage(p)} · {p['direction']}] {p['type']} ({p['kind']}, quality {p['quality']}) — "
                 f"{_stage_text(p)}; shape formed until {_bars(p.get('bars_since_completion'))} ago")
+            if "record" in p:
+                add(f"      history of this pattern type after a breakout: {_pattern_record_text(p['record'])}")
             add(f"      breakout {p['breakout_level']} ({_d(dd.get('breakout'))}), invalidation "
                 f"{p['invalidation_level']} ({_d(dd.get('invalidation'))}), target {p['target']} "
                 f"({_d(dd.get('target'))})")
@@ -698,10 +712,15 @@ def facts_to_prompt(facts: dict) -> str:
         add("STRONGEST OPPOSING FACT: n/a — there is no directional read to oppose")
 
     br = facts.get("base_rate")
-    add(f"TRACK RECORD: historically, {br['bias']} setups like this resolved favorably "
-        f"{br['win_rate'] * 100:.0f}% of the time ({br['n']} past cases, {br['horizon']}-bar "
-        "horizon). This is a base rate, NOT a prediction." if br
-        else "TRACK RECORD: not available for this pair/timeframe")
+    if "verdict_record" in facts:
+        from src.research.verdict_records import record_text
+        add("VERDICT RECORD (how this verdict type resolved before — cite it with its count whenever you "
+            f"state a direction; NOT odds for now): {record_text(facts['verdict_record'])}")
+    else:
+        add(f"TRACK RECORD: historically, {br['bias']} setups like this resolved favorably "
+            f"{br['win_rate'] * 100:.0f}% of the time ({br['n']} past cases, {br['horizon']}-bar "
+            "horizon). This is a base rate, NOT a prediction." if br
+            else "TRACK RECORD: not available for this pair/timeframe")
 
     add("Every detector's PRE-COMPUTED vote and category (authoritative Layer-1 "
         "classification — narrate these, NEVER re-classify a signal yourself):")

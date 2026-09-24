@@ -136,6 +136,14 @@
   })
 
   const conf = $derived(result?.confluence)
+  // "categories aligned bullish, 2 categories agreeing — 212 of 430 resolved that way (49%) over 24 bars
+  // (BTC/USDT 1d)" — a % only with 20+ cases; neutral reads have no record.
+  function verdictRecordText(r: any): string {
+    if (!r) return 'no directional read, so no record to show'
+    const where = `(${r.scope} ${r.timeframe})`
+    if (r.insufficient) return `${r.label} — insufficient data (${r.n} cases) ${where}`
+    return `${r.label} — ${r.resolved} of ${r.n} resolved that way (${Math.round(r.rate * 100)}%) over ${r.horizon} bars ${where}`
+  }
   // Pattern chip text: where the pattern is in its life cycle (history is labelled as history).
   const LIFE_CHIP: Record<string, string> = {
     forming: 'forming', fresh: 'confirmed · fresh', in_play: 'confirmed · in play',
@@ -321,7 +329,11 @@
       {/if}
     </div>
 
-    {#if result.base_rate}
+    {#if result.verdict_record !== undefined}
+      <!-- B4: how this verdict TYPE resolved before — rendered from Layer 1 data, never by Claude. -->
+      <p class="track">📊 Record: {verdictRecordText(result.verdict_record)}
+        <b>What happened before, not odds for now.</b></p>
+    {:else if result.base_rate}
       <p class="track">
         📊 Track record: {result.base_rate.bias} setups like this were right
         <b>{(result.base_rate.win_rate * 100).toFixed(0)}%</b> of the time

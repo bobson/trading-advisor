@@ -6,8 +6,8 @@ A state file for the "learning instrument" build. Source of truth for what's nex
 **ROADMAP progress:** A1 ✓ (merged, `645231c`), A2 ✓ (merged, `800e12a`; docs `1003735`), A3 ✓ (merged), A4 ✓ (merged), A5 ✓ (merged), A6 ✓ (merged), A7 ✓ (merged), B1 ✓ (merged — labelling mode
 built; the ≥30 labelled charts are the user's ongoing work), B2 tooling ✓ (merged — `eval_detectors.py`;
 its measurement + tuning run as soon as ≥30 charts are labelled — the user has decided NOT to label, so
-it stays unmeasured). B3 ✓ (merged). **Next: B4** (data adjacency). Order from here, by the user's
-decision: B4 → B5 → C1 → D1…D6 → **A8 last**. Drawing tools: deferred.
+it stays unmeasured). B3 ✓ (merged), B4 ✓ (merged). **Next: B5** (calibrate quality + re-rank the guide).
+Order from here, by the user's decision: B5 → C1 → D1…D6 → **A8 last**. Drawing tools: deferred.
 
 ## Current state
 
@@ -28,7 +28,8 @@ default) and **ROADMAP B1** (gold-set labelling mode — `gold_labels` table), p
 **1–2 candle patterns at levels** chart markers, the **ROADMAP B2** evaluation instrument, the **pattern life cycle** (fresh / in play /
 completed / expired), and **ROADMAP B3** (the Empirical Pattern Encyclopedia — `encyclopedia_stats` +
 Encyclopedia view), plus **better pattern detection + the Pattern scanner + history beside every
-find** (user request). **440 tests green, ruff + svelte-check clean.**
+find** (user request), and **ROADMAP B4** (verdict records beside the verdict). **450 tests green,
+ruff + svelte-check clean.**
 
 **Standing facts:** patterns and 3-candle candlesticks stay OUT of the confidence score (facts
 only); regime is standalone (not a vote); two-point trendlines are chart-only (not in facts); the
@@ -62,6 +63,31 @@ apply if `config.yaml` omits them.
 ---
 
 ## Log (newest first)
+
+### ROADMAP B4 — Data adjacency: measured records beside every directional read
+- **Done:** 2026-09-24 · **branch:** `feature/data-adjacency` · **merged to `main`.**
+- **Done-when → PASS:** every directional verdict and every measured target carries an adjacent count
+  or "insufficient data". Browser-verified (desktop + 400px) on BTC 1d and XRP 1d. 10 new tests,
+  **450 green**. No snapshot change (records are injected after build_facts, like the base rate).
+- **Verdict records:** `src/research/verdict_records.py` + `scripts/build_verdict_records.py` →
+  SQLite `verdict_records` (symbol × timeframe × bias × agreeing categories × aligned, + 'all markets'
+  roll-up, with counts). Built by THE backtest walk (`walk` + `signal_at`; step 2) — every directional
+  verdict, "resolved that way" = close 24 bars later beyond this close in the bias direction. Lookup
+  prefers the market's own row at 20+ cases, else the all-markets row; <20 → "insufficient data (N
+  cases)", never a %. Neutral reads have no record. Overlapping windows → cases not independent (count
+  always shown).
+- **Shown:** under the verdict — "Record: categories aligned bullish, 2 categories agreeing — 173 of 329
+  resolved that way (53%) over 24 bars (BTC/USDT 1d). What happened before, not odds for now." (replaces
+  the old Rec #2 track-record line when records exist). Beside every measured target on the chart:
+  "double bottom target · hit 35/80". Beside every current pattern: its encyclopedia history (done in
+  the previous step). All rendered by the UI from Layer 1 data.
+- **For Claude:** facts gain `verdict_record` and a per-pattern `record`; the prompt shows a VERDICT
+  RECORD line and each pattern's history line. Guide §1.4: every directional read references its record
+  with the count (or says insufficient data); self-check updated.
+- **First build (6 markets, 1d, ~10,300 directional verdicts):** every verdict type is near a coin flip —
+  all markets: aligned bullish (2 agreeing) 867/1755 = 49%, aligned bearish (2) 844/1668 = 51%, aligned
+  bullish (3) 107/201 = 53%, aligned bearish (3) 94/165 = 57%; not-aligned reads 47–51%. More agreement
+  didn't reliably mean more follow-through — consistent with the no-edge finding.
 
 ### Pattern detection upgrade + Pattern scanner + history beside every find (user request)
 - **Done:** 2026-09-24 · built on `main`'s working tree (user to branch/commit) · **merged to `main`.**

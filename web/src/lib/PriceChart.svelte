@@ -116,6 +116,11 @@
     'descending channel': 'DescCh', 'falling wedge': 'FWedge', 'rising wedge': 'RWedge',
   }
   const patternAbbr = (t: string) => PATTERN_ABBR[t] ?? t
+  // B4: beside a measured target, how often that pattern type reached it ("· hit 35/80").
+  const targetRecord = (p: Pattern) => {
+    const r = p.record
+    return r && r.target_n ? ` · hit ${r.target_hit_n}/${r.target_n}` : ' · no record'
+  }
   const LIFE_TEXT: Record<string, string> = {
     fresh: '✓ breakout (fresh)', in_play: '✓ breakout (in play)', completed: '✓ breakout (done)',
     expired: '✓ breakout (expired)', failed: '✗ failed',
@@ -262,7 +267,7 @@
       // Only CURRENT patterns show their target on the price axis; history doesn't need one.
       if (p.target != null && !['completed', 'expired', 'failed'].includes(p.lifecycle ?? p.state))
         series.createPriceLine({ price: p.target, color: st.color, lineWidth: 1, lineStyle: 1,
-          axisLabelVisible: true, title: `${p.type} target` } as any)
+          axisLabelVisible: true, title: `${p.type} target${targetRecord(p)}` } as any)
     }
 
     // Two-point trendlines: support through two swing lows (teal), resistance through two swing

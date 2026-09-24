@@ -102,6 +102,8 @@ def advise(
     refresh_stale: bool = False,
     base_rate: Optional[dict] = None,
     reliability: Optional[dict] = None,
+    verdict_records: Optional[list] = None,
+    pattern_records: Optional[list] = None,
     as_of_bar: Optional[int] = None,
     explanation_style: Optional[str] = None,
 ) -> AnalysisResult:
@@ -154,6 +156,17 @@ def advise(
     if reliability:
         from src.advisor.facts_detail import apply_measured_reliability
         apply_measured_reliability(facts, reliability)
+    # B4: the measured record of THIS verdict type and of each detected pattern type — injected (never
+    # computed in build_facts), so Claude can cite counts and the UI can show them beside the read.
+    if verdict_records is not None:
+        from src.research.verdict_records import record_for
+        c = facts["confluence"]
+        facts = {**facts, "verdict_record": record_for(verdict_records, m.symbol, m.timeframe, c["bias"],
+                                                       c["agreeing_categories"], c["triggered"])}
+    if pattern_records is not None:
+        from src.research.scanner import pattern_record
+        for p in facts["chart_patterns"]:
+            p["record"] = pattern_record(pattern_records, p["type"], m.timeframe)
     if base_rate is not None:
         entry = base_rate_entry(base_rate, facts["confluence"]["bias"])
         if entry:

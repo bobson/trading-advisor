@@ -132,6 +132,7 @@ def analysis(
                         explain_enabled=explain, refresh_stale=not scrubbing,
                         base_rate=BASE_RATES.get(f"{symbol}|{timeframe}"),
                         reliability=RELIABILITY.get("table"),
+                        verdict_records=_verdict_rows(), pattern_records=_encyclopedia_top_rows(),
                         as_of_bar=as_of_bar, explanation_style=explanation_style)
     except NotImplementedError as exc:  # e.g. forex before Phase 26
         raise HTTPException(status_code=501, detail=str(exc))
@@ -446,3 +447,13 @@ def scan_patterns(timeframes: str = Query("1d", description="comma list, e.g. 1d
     result["scanned_at"] = int(now)
     _SCAN_CACHE[key] = (now, result)
     return result
+
+
+def _verdict_rows() -> list[dict]:
+    """ROADMAP B4: the precomputed verdict records ([] until scripts/build_verdict_records.py runs)."""
+    from src.research.verdict_records import load
+    conn = _trades_conn()
+    try:
+        return load(conn)
+    finally:
+        conn.close()
