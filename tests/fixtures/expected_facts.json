@@ -47,6 +47,7 @@
       },
       "invalidation_level": 63400.0,
       "kind": "continuation",
+      "lifecycle": "forming",
       "lines": [
         [
           {
@@ -98,7 +99,9 @@
       "quality": 0.0,
       "reason": "Converging highs and lows (triangle).",
       "state": "forming",
+      "state_bar": null,
       "target": 66125.54,
+      "target_hit_bar": null,
       "type": "ascending triangle"
     },
     {
@@ -136,6 +139,7 @@
       },
       "invalidation_level": 64762.77,
       "kind": "reversal",
+      "lifecycle": "fresh",
       "lines": [
         [
           {
@@ -175,7 +179,9 @@
       "quality": 0.643,
       "reason": "Two peaks ~equal (within 138.2, ATR-scaled) with a reversal between.",
       "state": "confirmed",
+      "state_bar": 347,
       "target": 63764.0,
+      "target_hit_bar": null,
       "type": "double top"
     }
   ],

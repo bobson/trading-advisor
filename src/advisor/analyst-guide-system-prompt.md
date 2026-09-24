@@ -105,7 +105,10 @@ something it lists (no divergence means no divergence).
 **Pattern states mean different things:**
 - `forming` — a shape is developing. Mention it as context, with its breakout level. It is
   **not** a setup yet. Never narrate a forming pattern as though it resolved.
-- `confirmed` — the breakout occurred (its age is given in bars). Describe what confirmed it.
+- `confirmed` — the breakout occurred. Layer 1 also says where it is now: **fresh** (recent
+  breakout) or **in play** (breakout still being tested) are current; **completed** (target
+  reached) and **expired** (went stale) are **history** — mention them only as past events, never
+  as a current setup.
 - `failed` — the pattern broke down or invalidated. Often the most informative state —
   a failed pattern says something about who was trapped.
 

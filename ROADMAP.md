@@ -71,7 +71,7 @@ instructing it better. So **the guide shrinks as Layer 1 grows.**
 | A7 Honest baselines | ✅ Done (merged, 2026-09-24) |
 | B1 Detector gold set — labelling mode | ✅ Tooling merged (2026-09-24); ≥30 labelled charts pending (user) |
 | B2 Detector precision/recall + tuning | ✅ Instrument merged (2026-09-24); measurement + tuning pending labels |
-| Tests | 403 green, ruff + svelte-check clean |
+| Tests | 412 green, ruff + svelte-check clean |
 
 **Remaining, in order:**
 

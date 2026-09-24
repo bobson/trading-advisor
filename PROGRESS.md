@@ -5,8 +5,9 @@ A state file for the "learning instrument" build. Source of truth for what's nex
 
 **ROADMAP progress:** A1 ✓ (merged, `645231c`), A2 ✓ (merged, `800e12a`; docs `1003735`), A3 ✓ (merged), A4 ✓ (merged), A5 ✓ (merged), A6 ✓ (merged), A7 ✓ (merged), B1 ✓ (merged — labelling mode
 built; the ≥30 labelled charts are the user's ongoing work), B2 tooling ✓ (merged — `eval_detectors.py`;
-its measurement + tuning run as soon as ≥30 charts are labelled). **Next: A8** (morning report — the
-forward record), with gold-set labelling continuing alongside.
+its measurement + tuning run as soon as ≥30 charts are labelled — the user has decided NOT to label, so
+it stays unmeasured). **Next: B3** (Empirical Pattern Encyclopedia). Order from here, by the user's
+decision: B3 → B4 → B5 → C1 → D1…D6 → **A8 last**. Drawing tools: deferred.
 
 ## Current state
 
@@ -24,8 +25,8 @@ disclosure; `800e12a`). **ROADMAP A3** (situation tier decided in Layer 1) and *
 ATR-scaled zones) and **ROADMAP A5** (facts payload hardening) and **ROADMAP A6** (analyst guide revision +
 instrument price precision) and **ROADMAP A7** (honest baselines: luck band + zero-edge calculator
 default) and **ROADMAP B1** (gold-set labelling mode — `gold_labels` table), plus the user-requested
-**1–2 candle patterns at levels** chart markers, and the **ROADMAP B2** evaluation instrument. **403 tests
-green, ruff + svelte-check clean.**
+**1–2 candle patterns at levels** chart markers, the **ROADMAP B2** evaluation instrument, and the **pattern life cycle** (fresh / in play /
+completed / expired). **412 tests green, ruff + svelte-check clean.**
 
 **Standing facts:** patterns and 3-candle candlesticks stay OUT of the confidence score (facts
 only); regime is standalone (not a vote); two-point trendlines are chart-only (not in facts); the
@@ -59,6 +60,34 @@ apply if `config.yaml` omits them.
 ---
 
 ## Log (newest first)
+
+### Pattern life cycle — old signals labelled as history (user request)
+- **Done:** 2026-09-24 · built on `main`'s working tree (user to branch/commit) · **merged to `main`.**
+- **Why:** on BTC 1d the explanation said "two confirmed bullish patterns, confirmed 2 bars ago" and
+  the user couldn't find them: the shape formed Aug 28 – Sep 15, the breakout was Sep 21, and the drawn
+  lines stopped at Sep 15. Worse, the app had no notion of a pattern getting old — once confirmed it
+  stayed "confirmed", in the present tense, for as long as the detector saw it (the limitation noted in
+  A3).
+- **Layer 1:** new `Pattern.lifecycle` (+ `state_bar`, `target_hit_bar`), set by
+  `chart_patterns._lifecycle`, look-ahead-safe: forming · **fresh** (confirmed ≤ `patterns.fresh_bars`=3
+  bars ago) · **in_play** · **completed** (a high/low reached the target since the breakout → history) ·
+  **expired** (older than `expire_duration_mult`=1.0 × its own formation length, no target, no failure →
+  history) · failed. `state` (forming/confirmed/failed) is unchanged. The situation tier ignores
+  completed/expired patterns (history can't make a chart "confirmed"). The prompt labels each pattern
+  "CONFIRMED · FRESH — broke out 2 bars ago" / "COMPLETED · HISTORY — reached its target N bars ago,
+  not a current setup"; guide §3 got one line on it.
+- **Chart (browser-verified, BTC 1d + SOL 1d):** the breakout level is extended to the breakout candle;
+  an arrow marker there reads "DBot ✓ breakout (fresh)" / "(done)" / "DTop ✗ failed"; completed
+  patterns get a "target hit" marker, are drawn grey, and lose their target price tag; the pattern
+  chips read "confirmed · fresh" / "completed (history)".
+- **Real charts:** BTC 1d double bottom + range → fresh (Sep 21); SOL 1d double bottom → completed (target
+  117.34 hit Sep 21 — previously described as a current confirmed setup); BTC double top, EUR/USD double
+  bottom → failed.
+- **Snapshot:** regenerated after the user approved the diff — purely additive (`lifecycle`,
+  `state_bar`, `target_hit_bar` per pattern; tier unchanged). 9 new tests, **412 green**.
+- **Also noticed (not fixed):** the BTC explanation said "volume 1.41× on the breakout bars" — the 1.41×
+  is the LAST (down) candle's volume; a correct number with the wrong meaning. C1's claim checks are
+  what catch this.
 
 ### ROADMAP B2 — Detector precision/recall + tuning (instrument built; measurement waits for labels)
 - **Done:** 2026-09-24 · **branch:** `feature/detector-eval` · **merged to `main`** (tooling).

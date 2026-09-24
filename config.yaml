@@ -53,6 +53,8 @@ patterns:
   channel_min_r2: 0.6        # B2 tunable: min r² of each channel rail's fit
   channel_min_parallel: 0.5  # B2 tunable: how parallel the rails must be (0–1)
   channel_respect_rails: false  # B2 tunable: reject channels whose rails price closed through (ATR margin)
+  fresh_bars: 3              # a confirmed pattern is "fresh" for this many bars after its breakout
+  expire_duration_mult: 1.0  # ...and "expired" after this x its formation length without target/failure
 
 mtf:
   enabled: true

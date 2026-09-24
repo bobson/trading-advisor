@@ -16,6 +16,10 @@ export interface Pattern {
   type: string; direction: string; state: string; quality: number | null
   points: PatternPoint[]; lines: PatternPoint[][]
   breakout_level: number | null; invalidation_level: number | null; target: number | null
+  lifecycle?: string                 // forming | fresh | in_play | completed | expired | failed
+  bars_since_state_change?: number | null
+  state_time?: number | null         // the breakout (or failure) candle
+  target_hit_time?: number | null    // the candle that reached the target (completed patterns)
 }
 export interface Divergence { kind: string; reason: string; times: number[] }
 export interface CandlePattern { time: number; direction: string; label: string }

@@ -126,6 +126,11 @@ class PatternsConfig(_Strict):
     channel_min_r2: float = 0.6            # each rail's least-squares fit must reach this r²
     channel_min_parallel: float = 0.5      # 1 − |s1−s2|/max(|s1|,|s2|): how parallel the rails are
     channel_respect_rails: bool = False    # also require no close beyond either rail by > trendline_break_atr_mult × ATR
+    # Pattern LIFE CYCLE after the breakout (see chart_patterns._lifecycle): "fresh" for this many
+    # bars after confirming; "expired" once it has gone longer than expire_duration_mult × the
+    # pattern's own formation length without reaching its target (or failing).
+    fresh_bars: int = 3
+    expire_duration_mult: float = 1.0
 
 
 class TimeframesConfig(_Strict):

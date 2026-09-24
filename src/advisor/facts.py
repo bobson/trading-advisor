@@ -426,6 +426,34 @@ def _fear_greed_read(value) -> str:
     return "mid-range — no directional information (only the <20 / >80 extremes are read contrarily)"
 
 
+_STAGE_LABEL = {"forming": "FORMING", "fresh": "CONFIRMED · FRESH", "in_play": "CONFIRMED · IN PLAY",
+                "completed": "COMPLETED · HISTORY", "expired": "EXPIRED · HISTORY", "failed": "FAILED"}
+
+
+def _stage(p: dict) -> str:
+    return _STAGE_LABEL.get(p.get("lifecycle") or p["state"], p["state"].upper())
+
+
+def _stage_text(p: dict) -> str:
+    """Where the pattern is in its life cycle, in words — so an old signal is never read as current."""
+    life, since = p.get("lifecycle") or p["state"], p.get("bars_since_state_change")
+    ago = _bars(since) + " ago"
+    if life == "forming":
+        return "not broken out yet — a shape still developing, not a setup"
+    if life == "fresh":
+        return f"broke out {ago} — a recent breakout; target not reached yet"
+    if life == "in_play":
+        return f"broke out {ago} — breakout still being tested (target not reached, not failed)"
+    if life == "completed":
+        hit_ago = (p["state_bar"] + since - p["target_hit_bar"]) if p.get("target_hit_bar") is not None else None
+        return (f"broke out {ago} and reached its target {_bars(hit_ago)} ago — the move is DONE; "
+                "HISTORY, not a current setup")
+    if life == "expired":
+        return (f"broke out {ago} and has neither reached its target nor failed for longer than it took to "
+                "form — HISTORY, not a current setup")
+    return f"failed {ago}"
+
+
 def _bars(n) -> str:
     """'1 bar' / 'N bars' (and 'n/a' when unknown)."""
     return "n/a bars" if n is None else f"{n} bar" if n == 1 else f"{n} bars"
@@ -547,10 +575,8 @@ def facts_to_prompt(facts: dict) -> str:
             sup_ = [k for k, v in conf.items() if v == "supports"]
             con = [k for k, v in conf.items() if v == "contradicts"]
             dd = p.get("distances") or {}
-            age = (f"{p['state']} {_bars(p['bars_since_state_change'])} ago"
-                   if p.get("bars_since_state_change") is not None else "not yet confirmed or failed")
-            add(f"  [{p['state'].upper()} · {p['direction']}] {p['type']} ({p['kind']}, quality {p['quality']}) — "
-                f"{age}; last defining swing {_bars(p.get('bars_since_completion'))} ago")
+            add(f"  [{_stage(p)} · {p['direction']}] {p['type']} ({p['kind']}, quality {p['quality']}) — "
+                f"{_stage_text(p)}; shape formed until {_bars(p.get('bars_since_completion'))} ago")
             add(f"      breakout {p['breakout_level']} ({_d(dd.get('breakout'))}), invalidation "
                 f"{p['invalidation_level']} ({_d(dd.get('invalidation'))}), target {p['target']} "
                 f"({_d(dd.get('target'))})")

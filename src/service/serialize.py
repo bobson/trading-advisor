@@ -88,6 +88,14 @@ def _serialize_patterns(result: AnalysisResult, df: pd.DataFrame, rp) -> list[di
             "invalidation_level": None if pat.invalidation_level is None else rp(pat.invalidation_level),
             "target": None if pat.target is None else rp(pat.target),
             "confirmation": pat.confirmation.to_dict(),
+            # Life cycle (fresh / in_play / completed / expired / failed / forming) and WHEN the
+            # breakout (or failure) and the target hit happened — so the chart can mark them.
+            "lifecycle": pat.lifecycle,
+            "bars_since_state_change": pat.bars_since_state_change,
+            "state_time": (_epoch(df.index[pat.state_bar]) if pat.state_bar is not None
+                           and 0 <= pat.state_bar < n else None),
+            "target_hit_time": (_epoch(df.index[pat.target_hit_bar]) if pat.target_hit_bar is not None
+                                and 0 <= pat.target_hit_bar < n else None),
         })
     return out
 

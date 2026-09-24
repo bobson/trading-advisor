@@ -109,6 +109,11 @@ class Pattern:
     # current confirmed/failed state began (None while forming). Set by `find_patterns`.
     bars_since_completion: int | None = None
     bars_since_state_change: int | None = None
+    # Life cycle after the breakout: forming | fresh | in_play | completed | expired | failed, plus the
+    # absolute bar where the state began (the breakout / failure candle) and where the target was hit.
+    lifecycle: str = "forming"
+    state_bar: int | None = None
+    target_hit_bar: int | None = None
 
     @property
     def span(self) -> tuple:
@@ -131,6 +136,9 @@ class Pattern:
             "reason": self.reason,
             "bars_since_completion": self.bars_since_completion,
             "bars_since_state_change": self.bars_since_state_change,
+            "lifecycle": self.lifecycle,
+            "state_bar": self.state_bar,
+            "target_hit_bar": self.target_hit_bar,
         }
 
 

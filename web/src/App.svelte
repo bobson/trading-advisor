@@ -116,6 +116,11 @@
   })
 
   const conf = $derived(result?.confluence)
+  // Pattern chip text: where the pattern is in its life cycle (history is labelled as history).
+  const LIFE_CHIP: Record<string, string> = {
+    forming: 'forming', fresh: 'confirmed · fresh', in_play: 'confirmed · in play',
+    completed: 'completed (history)', expired: 'expired (history)', failed: 'failed',
+  }
   // Situation tier (Layer 1, ROADMAP A3), in plain words. Neutral styling like the verdict.
   const TIER_LABEL: Record<string, string> = {
     no_setup: 'no clear setup', notable: 'notable', confirmed: 'confirmed pattern',
@@ -433,7 +438,7 @@
     {#if !labelMode && result.chart.overlays.patterns.length}
       <div class="patterns">
         {#each result.chart.overlays.patterns as p}
-          <span class="pchip {p.state}">{p.type} · {p.state}</span>
+          <span class="pchip {p.state} {p.lifecycle}">{p.type} · {LIFE_CHIP[p.lifecycle ?? p.state] ?? p.state}</span>
         {/each}
       </div>
     {/if}
@@ -638,4 +643,5 @@
   .pchip.confirmed { border-color: #26a641; color: #26a641; }
   .pchip.failed { border-color: #6e7681; color: #6e7681; }
   .pchip.forming { border-color: #d29922; color: #d29922; }
+  .pchip.completed, .pchip.expired { border-color: #6e7681; color: #6e7681; }
 </style>

@@ -26,6 +26,7 @@ from src.market.precision import round_price
 from src.patterns.base import (
     BEARISH,
     BULLISH,
+    CONFIRMED,
     CONTINUATION,
     FORMING,
     NEUTRAL_DIR,
@@ -296,6 +297,50 @@ def _detect_channel(highs, lows, cfg, atr, closes=None) -> Pattern | None:
     )
 
 
+FRESH, IN_PLAY, COMPLETED, EXPIRED = "fresh", "in_play", "completed", "expired"
+
+
+def _lifecycle(p: Pattern, featured_df: pd.DataFrame, cfg: Config) -> None:
+    """What a pattern is NOW, after its breakout — so an old signal is never narrated as current.
+
+      forming   — not broken out yet (state forming)
+      failed    — state failed
+      completed — confirmed, and price has since REACHED the target (a high/low through it on any
+                  bar from the breakout candle to bar N): the move is done; history only
+      fresh     — confirmed within the last `patterns.fresh_bars` bars (and target not reached)
+      expired   — confirmed longer ago than `expire_duration_mult` × the pattern's own formation
+                  length, without reaching the target or failing: history only
+      in_play   — confirmed, not fresh, not completed, not expired: the breakout is still being tested
+
+    Look-ahead-safe: reads only bars <= N (the last row of `featured_df`)."""
+    n = len(featured_df)
+    if p.state == FORMING:
+        p.lifecycle = FORMING
+        return
+    if p.bars_since_state_change is not None:
+        p.state_bar = n - 1 - p.bars_since_state_change
+    if p.state != CONFIRMED:
+        p.lifecycle = p.state                          # "failed"
+        return
+    if p.state_bar is None:
+        p.lifecycle = IN_PLAY
+        return
+    since = p.bars_since_state_change
+    after = featured_df.iloc[p.state_bar:]
+    if p.target is not None and len(after):
+        hit = (after["high"] >= p.target) if p.direction == BULLISH else (after["low"] <= p.target)
+        if hit.any():
+            p.target_hit_bar = p.state_bar + int(hit.to_numpy().argmax())
+            p.lifecycle = COMPLETED
+            return
+    pc = cfg.patterns
+    if since <= pc.fresh_bars:
+        p.lifecycle = FRESH
+        return
+    duration = max(1, max(p.bars) - min(p.bars)) if p.bars else 1
+    p.lifecycle = EXPIRED if since > pc.expire_duration_mult * duration else IN_PLAY
+
+
 def _cls(rc: float, flat: float) -> str:
     if abs(rc) < flat:
         return "flat"
@@ -385,6 +430,7 @@ def find_patterns(
                 p.bars_since_state_change = run - 1 if run else None
         if p.bars:
             p.bars_since_completion = n_bars - 1 - max(p.bars)
+        _lifecycle(p, featured_df, cfg)
         hit = _structure_hit(p.breakout_level, structure_levels, fib, round_number, cfg) if has_structure else None
         p.confirmation = build_confirmation(
             p.direction, p.breakout_level, p.invalidation_level, featured_df,

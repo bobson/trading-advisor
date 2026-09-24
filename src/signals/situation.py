@@ -29,10 +29,10 @@ Tiers (`mtf_synthesis` is set only by the multi-timeframe synthesis path, never 
 Precedence: confirmed > no_setup > notable. Taken literally, §2's "away from levels" demotes even
 a mid-range trend+momentum agreement to no_setup — deliberate: the guide says a setup needs a place.
 
+COMPLETED / EXPIRED patterns (their target was reached, or the breakout went stale — see
+`chart_patterns._lifecycle`) are history: they never count toward any tier.
 FORMING patterns are context only: they never enter the tier (not as evidence, not as range
 structure), so a forming-only chart can never be `confirmed` or be lifted out of `no_setup`.
-Limitation: there is no "bars since confirmation" yet (ROADMAP A5), so an old confirmed pattern
-still counts as confirmed.
 """
 
 from __future__ import annotations
@@ -74,10 +74,17 @@ def _votes(confluence: dict) -> dict[str, str]:
     return {s["name"]: s["direction"] for s in confluence.get("signals", [])}
 
 
+# Life-cycle stages that are HISTORY, not a current read: the move completed (target reached) or the
+# breakout went stale (expired). They are context, never evidence for the tier.
+_HISTORY = ("completed", "expired")
+
+
 def _resolved_patterns(facts: dict) -> list[dict]:
-    """Directional patterns that have RESOLVED (confirmed or failed). Forming ones are excluded."""
+    """Directional patterns that have RESOLVED and are still CURRENT (confirmed fresh/in play, or
+    failed). Forming ones are excluded, and so are completed/expired ones (history)."""
     return [p for p in (facts.get("chart_patterns") or [])
-            if p.get("state") in ("confirmed", "failed") and p.get("direction") in _DIRECTIONAL]
+            if p.get("state") in ("confirmed", "failed") and p.get("direction") in _DIRECTIONAL
+            and p.get("lifecycle") not in _HISTORY]
 
 
 def _meets_confirmed_shape(p: dict, bias: str) -> bool:

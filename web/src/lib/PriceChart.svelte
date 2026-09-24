@@ -108,6 +108,18 @@
     'three white soldiers': '3WS', 'three black crows': '3BC',
   }
   const candleCode = (label: string) => CANDLE_CODES[label] ?? label
+  // Short names for chart-pattern markers at the breakout candle.
+  const PATTERN_ABBR: Record<string, string> = {
+    'double top': 'DTop', 'double bottom': 'DBot', 'head and shoulders': 'H&S',
+    'inverse head and shoulders': 'iH&S', 'ascending triangle': 'AscTri', 'descending triangle': 'DescTri',
+    'symmetric triangle': 'SymTri', 'sideways channel': 'Range', 'ascending channel': 'AscCh',
+    'descending channel': 'DescCh',
+  }
+  const patternAbbr = (t: string) => PATTERN_ABBR[t] ?? t
+  const LIFE_TEXT: Record<string, string> = {
+    fresh: '✓ breakout (fresh)', in_play: '✓ breakout (in play)', completed: '✓ breakout (done)',
+    expired: '✓ breakout (expired)', failed: '✗ failed',
+  }
   // Short tag for the level a 1–2 candle pattern tagged ("support zone 1.14–1.15" -> "sup").
   const levelAbbr = (level: string | null) => {
     if (!level) return ''
@@ -119,7 +131,9 @@
   }
 
   const patternStyle = (p: Pattern) => {
-    if (p.state === 'failed') return { color: '#6e7681', width: 1, dashed: true }
+    // failed, completed and expired are all HISTORY — drawn thin and grey so they don't read as current
+    if (p.state === 'failed' || p.lifecycle === 'completed' || p.lifecycle === 'expired')
+      return { color: '#6e7681', width: 1, dashed: true }
     if (p.state === 'confirmed')
       return { color: p.direction === 'bearish' ? '#f85149' : '#26a641', width: 2, dashed: false }
     return { color: '#d29922', width: 2, dashed: true } // forming
@@ -218,6 +232,7 @@
     // as a line series, styled by state. The boundaries ARE the breakout/invalidation levels, so we
     // don't also draw horizontal lines for those (that was redundant clutter) — only the projected
     // target gets a single tag.
+    const markers: any[] = []
     if (!labelMode && toggles.patterns) for (const p of ov.patterns) {
       const st = patternStyle(p)
       for (const ln of p.lines ?? []) {
@@ -228,7 +243,24 @@
         })
         bl.setData(dedupeByTime(ln.map((pt) => ({ time: pt.time, value: pt.price }))) as any)
       }
-      if (p.target != null)
+      // Carry the breakout level forward to the candle that broke it (or failed it), and mark that
+      // candle — so "confirmed 2 bars ago" points at something visible.
+      const lastPt = Math.max(...p.points.map((q) => q.time))
+      if (p.state_time != null && p.breakout_level != null && p.state_time > lastPt) {
+        const ext = main.addLineSeries({ color: st.color, lineWidth: 1, lineStyle: 2,
+          lastValueVisible: false, priceLineVisible: false, crosshairMarkerVisible: false })
+        ext.setData([{ time: lastPt, value: p.breakout_level }, { time: p.state_time, value: p.breakout_level }] as any)
+      }
+      if (p.state_time != null) {
+        const up = p.direction === 'bullish'
+        markers.push({ time: p.state_time, position: up ? 'belowBar' : 'aboveBar', color: st.color,
+          shape: up ? 'arrowUp' : 'arrowDown', text: `${patternAbbr(p.type)} ${LIFE_TEXT[p.lifecycle ?? p.state] ?? ''}` })
+      }
+      if (p.target_hit_time != null)
+        markers.push({ time: p.target_hit_time, position: p.direction === 'bullish' ? 'aboveBar' : 'belowBar',
+          color: st.color, shape: 'circle', text: `${patternAbbr(p.type)} target hit` })
+      // Only CURRENT patterns show their target on the price axis; history doesn't need one.
+      if (p.target != null && !['completed', 'expired', 'failed'].includes(p.lifecycle ?? p.state))
         series.createPriceLine({ price: p.target, color: st.color, lineWidth: 1, lineStyle: 1,
           axisLabelVisible: true, title: `${p.type} target` } as any)
     }
@@ -244,7 +276,6 @@
       tln.setData(dedupeByTime(tl.points.map((pt) => ({ time: pt.time, value: pt.price }))) as any)
     }
 
-    const markers: any[] = []
     if (!labelMode && toggles.swings) for (const s of ov.swings)
       markers.push({ time: s.time, position: s.kind === 'high' ? 'aboveBar' : 'belowBar',
         color: '#8b949e', shape: 'circle' })
