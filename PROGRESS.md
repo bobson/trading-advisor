@@ -92,6 +92,9 @@ apply if `config.yaml` omits them.
   practice API, `WTICO_USD`, because Twelve Data's free plan refuses WTI. OANDA is not verified live
   until `OANDA_API_TOKEN` is added; without it oil is skipped and the skip is recorded. Gold and oil
   are in `COMMODITIES`, not `PAIRS`, so the encyclopedia, verdict records and scanner are unchanged.
+- **Oil skipped (user decision, 2026-09-26):** OANDA redirects new sign-ups to FTMO (no API), and
+  Twelve Data's free plan refuses WTI, so WTI/USD is out of the watchlist. The OANDA provider stays
+  in the code, unused. Oil's record starts on the day a source is added.
 - **Spec vs code:** "next level / nearest level above-below" = the S/R ZONES (near edge ahead, far
   edge behind; close ± 3 ATR when there's no zone). `nearest_levels` includes round numbers, which
   sit a fraction of an ATR away and would decide almost every read on its first bar.

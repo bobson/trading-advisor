@@ -179,8 +179,9 @@ class AlertsConfig(_Strict):
 
 class MorningReportConfig(_Strict):
     # ROADMAP A8 — the daily forward record (scripts/morning_report.py, fired 08:00 Europe/Skopje).
-    symbols: list[str] = Field(default_factory=lambda: ["BTC/USDT", "ETH/USDT", "SOL/USDT", "EUR/USD",
-                                                        "XAU/USD", "WTI/USD"])
+    # Oil (WTI/USD) is not in the default list: Twelve Data's free plan refuses it and OANDA now
+    # redirects new sign-ups to FTMO (no API). The OANDA provider stays for if a token is ever available.
+    symbols: list[str] = Field(default_factory=lambda: ["BTC/USDT", "ETH/USDT", "SOL/USDT", "EUR/USD", "XAU/USD"])
     timeframes: list[str] = Field(default_factory=lambda: ["30m", "1h", "4h", "1d"])
     # Review horizon per timeframe, in BARS (so forex/commodity weekends skip naturally).
     horizons: dict[str, int] = Field(default_factory=lambda: {"30m": 48, "1h": 24, "4h": 42, "1d": 21})
