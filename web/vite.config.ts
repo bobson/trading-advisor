@@ -5,5 +5,7 @@ import { svelte } from '@sveltejs/vite-plugin-svelte'
 // (e.g. VITE_API_BASE=https://your-domain/trading).
 export default defineConfig({
   plugins: [svelte()],
+  // Where the built page is served from (e.g. /wizard/ behind nginx). Default: the site root.
+  base: process.env.VITE_BASE || '/',
   server: { port: 5173 },
 })

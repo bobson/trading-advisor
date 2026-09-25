@@ -6,7 +6,7 @@ Wants=network-online.target
 
 [Service]
 Type=oneshot
-User=YOUR_USER
+User=bobson
 WorkingDirectory=/srv/trading-wizard
 ExecStart=/srv/trading-wizard/.venv/bin/python scripts/morning_report.py --trigger schedule
 TimeoutStartSec=45min

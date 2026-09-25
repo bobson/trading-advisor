@@ -1,5 +1,5 @@
 // Typed client for the Phase-24 API. Keep these types in step with src/service/serialize.py.
-const API_BASE = (import.meta as any).env?.VITE_API_BASE ?? 'http://127.0.0.1:8000'
+const API_BASE = (import.meta as any).env?.VITE_API_BASE || 'http://127.0.0.1:8000'
 
 export interface Pair { symbol: string; asset_class: string; label: string }
 export interface Candle { time: number; open: number; high: number; low: number; close: number; volume: number | null }

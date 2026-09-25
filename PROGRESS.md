@@ -64,6 +64,23 @@ apply if `config.yaml` omits them.
 
 ## Log (newest first)
 
+### Deployment step 1 — automatic deploys from GitHub (user request)
+- **Done:** 2026-09-26 · **merged to `main`.**
+- `.github/workflows/deploy.yml`: after CI passes on a push to `main` (or the manual button), it builds
+  the frontend on GitHub and SSHes to the droplet. There it runs `deploy/deploy.sh <commit>`, which
+  waits for a running morning report (same lock file), resets to exactly that commit, installs deps,
+  restarts the API and checks `/health`. Then it rsyncs `web/dist`.
+- `vite.config.ts` reads `VITE_BASE`, so the page can live under a sub-path if ever needed.
+- **Adapted to the real droplet (user, 2026-09-26):** runs as the existing `bobson` user next to
+  bosfoot, behind the existing **Caddy** on **wizard.bosfoot.com** (page at `/`, API at `/api` →
+  127.0.0.1:8010), with Caddy `basic_auth` as the lock (the page doesn't send `X-API-Key`). DEPLOY.md
+  was rewritten in that order (DNS → code → API service → Caddy → auto-deploy → morning timer).
+  `deploy/trading-wizard.service` was added; both units use `User=bobson`.
+- Verified locally: the workflow YAML parses, the build works with `VITE_BASE`/`VITE_API_BASE`, and a
+  dry run of `deploy.sh` (throwaway clone, stubbed sudo/systemctl/curl) reset to the commit and
+  passed the health check. It waited 3 s while the morning lock was held. The real GitHub → droplet
+  run is untested until the secrets exist (DEPLOY.md "Automatic deploys", steps A1–C2).
+
 ### ROADMAP A8 — Morning report: the forward record
 - **Done:** 2026-09-25 · branch `feature/morning-report` · **merged to `main`.**
 - **FORWARD RECORD DAY ONE: _not started yet_.** Fill in the date of the first run on the droplet.

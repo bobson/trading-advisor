@@ -1,0 +1,60 @@
+name: Deploy
+
+# Deploy to the DigitalOcean droplet after CI passes on a push to main.
+# A failed CI run never deploys. Setup (keys, secrets, the droplet side): DEPLOY.md
+# "Automatic deploys".
+on:
+  workflow_run:
+    workflows: [CI]
+    types: [completed]
+    branches: [main]
+  workflow_dispatch:            # manual "Run workflow" button (deploys the current main)
+
+concurrency:
+  group: deploy-droplet
+  cancel-in-progress: false     # never cut a deploy off halfway
+
+jobs:
+  deploy:
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      (github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.event == 'push')
+    runs-on: ubuntu-latest
+    env:
+      SHA: ${{ github.event.workflow_run.head_sha || github.sha }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ env.SHA }}
+
+      # The frontend is built here (no Node needed on the droplet) and copied up as static files.
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+      - name: Build frontend
+        working-directory: web
+        env:
+          VITE_API_BASE: ${{ vars.VITE_API_BASE }}   # /api  (Caddy forwards wizard.bosfoot.com/api/* to the API)
+          VITE_BASE: ${{ vars.VITE_BASE }}           # unset = the site root (wizard.bosfoot.com/)
+        run: |
+          npm ci
+          npm run build
+
+      - name: SSH key
+        run: |
+          install -m 700 -d ~/.ssh
+          echo "${{ secrets.DEPLOY_SSH_KEY }}" > ~/.ssh/id_ed25519
+          chmod 600 ~/.ssh/id_ed25519
+          echo "${{ secrets.DEPLOY_KNOWN_HOSTS }}" > ~/.ssh/known_hosts
+
+      - name: Update code + restart the API on the droplet
+        run: |
+          ssh ${{ secrets.DEPLOY_USER }}@${{ secrets.DEPLOY_HOST }} \
+            "/srv/trading-wizard/deploy/deploy.sh ${SHA}"
+
+      - name: Copy the built frontend
+        run: |
+          rsync -az --delete web/dist/ \
+            ${{ secrets.DEPLOY_USER }}@${{ secrets.DEPLOY_HOST }}:/srv/trading-wizard/web/dist/

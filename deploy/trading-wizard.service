@@ -1,0 +1,15 @@
+# The Trading Wizard API (uvicorn on 127.0.0.1:8010; Caddy forwards wizard.bosfoot.com/api/* here).
+[Unit]
+Description=Trading Wizard API
+After=network.target
+
+[Service]
+User=bobson
+WorkingDirectory=/srv/trading-wizard
+Environment=API_HOST=127.0.0.1
+Environment=API_PORT=8010
+ExecStart=/srv/trading-wizard/.venv/bin/python scripts/serve.py
+Restart=on-failure
+
+[Install]
+WantedBy=multi-user.target
