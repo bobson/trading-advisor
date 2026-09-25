@@ -5,6 +5,7 @@
   import LabelPanel from './lib/LabelPanel.svelte'
   import Encyclopedia from './lib/Encyclopedia.svelte'
   import Scanner from './lib/Scanner.svelte'
+  import Morning from './lib/Morning.svelte'
   import {
     getPairs, getTimeframes, getAnalysis, getTrades, getPosition, postTrade, deleteTrade,
     getTradesBaseline, qualityText, recordText,
@@ -13,8 +14,9 @@
   } from './lib/api'
 
   // #/encyclopedia[/<type>] opens the encyclopedia directly (linkable pages).
-  let view = $state<'analysis' | 'risk' | 'encyclopedia' | 'scanner'>(
+  let view = $state<'analysis' | 'risk' | 'encyclopedia' | 'scanner' | 'morning'>(
     typeof location === 'undefined' ? 'analysis'
+    : location.hash.startsWith('#/morning') ? 'morning'
     : location.hash.startsWith('#/encyclopedia') ? 'encyclopedia'
     : location.hash.startsWith('#/scanner') ? 'scanner' : 'analysis')
   let pairs = $state<Pair[]>([])
@@ -283,6 +285,7 @@
   <nav class="views">
     <button class:active={view === 'analysis'} onclick={() => (view = 'analysis')}>Analysis</button>
     <button class:active={view === 'risk'} onclick={() => (view = 'risk')}>Risk calculator</button>
+    <button class:active={view === 'morning'} onclick={() => { view = 'morning'; location.hash = '#/morning' }}>Morning report</button>
     <button class:active={view === 'scanner'} onclick={() => { view = 'scanner'; location.hash = '#/scanner' }}>Scanner</button>
     <button class:active={view === 'encyclopedia'} onclick={() => { view = 'encyclopedia'; location.hash = '#/encyclopedia' }}>Encyclopedia</button>
   </nav>
@@ -562,6 +565,8 @@
   {:else if !error}
     <p class="hint">Pick a pair and timeframe, then press Analyze.</p>
   {/if}
+  {:else if view === 'morning'}
+    <Morning onOpen={openLive} />
   {:else if view === 'scanner'}
     <Scanner onOpen={openLive} />
   {:else if view === 'encyclopedia'}

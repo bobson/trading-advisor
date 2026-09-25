@@ -269,3 +269,35 @@ export function recordText(r: PatternRecord | null | undefined): string {
     d === 0 ? `${label}: no cases` : `${label} ${n} of ${d}` + (rate != null && d >= 20 ? ` (${Math.round(rate * 100)}%)` : ' — too few to rate')
   return `${part('reached target', r.target_hit_n, r.target_n, r.follow_through_rate)} · ${part('failed', r.failed_n, r.judged_n, r.failure_rate)}`
 }
+
+// --- ROADMAP A8: the morning report (forward record) ---
+export interface ForwardRead {
+  id: number; symbol: string; timeframe: string; bar_time: number; price: number
+  tier: string; bias: string; aligned: number; agreeing: number
+  read_kind: 'directional' | 'range'; direction: string | null
+  invalidation: number | null; next_level: number | null; near_above: number | null; near_below: number | null
+  range_low: number | null; range_high: number | null; source_above: string; source_below: string
+  horizon: number; rule_version: number; outcome: string | null; run_date: string; resolved_run_date: string | null
+  baseline_direction: string | null; baseline_outcome: string | null
+  engine_commit: string; engine_dirty: number; facts_hash: string
+  patterns: { type: string; direction: string; lifecycle: string | null }[]
+}
+export interface ScoreSide { n: number; counts: Record<string, number>; rate: number | null }
+export interface ScoreRow {
+  rule_version: number; timeframe: string; tier: string; read_kind: string
+  engine: ScoreSide; baseline: ScoreSide | null
+}
+export interface MorningRun {
+  run_date: string; status: string; trigger: string | null; started_at: number | null; finished_at: number | null
+  attempts: number; new_reads: number; resolved: number
+  skipped: { symbol: string; timeframe: string; reason: string }[] | string | null; engine_commit: string | null
+}
+export interface MorningReport {
+  run_date: string | null; run: MorningRun | null; runs: MorningRun[]; gaps: string[]; first_run: string | null
+  review: ForwardRead[]; grid: ForwardRead[]; syntheses: { symbol: string; text: string; model: string }[]
+  pending: Record<string, number>; scoreboard: ScoreRow[]
+  watchlist: { symbols: string[]; timeframes: string[]; horizons: Record<string, number> }
+  next_run: string; schedule: string; rule: { version: number; text: string }
+}
+export const getMorning = (date?: string) => get<MorningReport>(`/morning${date ? `?date=${date}` : ''}`)
+export const runMorning = () => send<{ started: boolean }>('POST', '/morning/run')

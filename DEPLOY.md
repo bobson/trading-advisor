@@ -74,3 +74,36 @@ auto-generated API explorer), and `/trading/analysis?symbol=BTC/USDT&timeframe=1
   `explain` path), `ALLOWED_ORIGINS` (your frontend URL, comma-separated — CORS default is only
   localhost), and optionally `RATE_LIMIT_PER_MIN` (default 60). The API logs a warning at startup
   if no `API_KEY` is set. The Svelte frontend then sends the key as the `X-API-Key` header.
+
+## Morning report — the forward record (ROADMAP A8)
+
+A daily run at **08:00 Europe/Skopje** that reviews past reads, then freezes today's reads
+(`scripts/morning_report.py`). It needs an always-on machine, which is why it lives here and not on a
+laptop. It writes to the same `data/wizard.db` the API reads, so the report page is at `#/morning`.
+
+1. **Keys in `.env`:** `TWELVEDATA_API_KEY` (EUR/USD and gold) and `OANDA_API_TOKEN` (WTI oil, from a
+   free OANDA practice account: My Account → Manage API Access). A missing key just skips that
+   market, and the skip is recorded.
+2. **Install the timer** (copy both files, set `User=` in the service to the user that owns
+   `/srv/trading-wizard`):
+
+   ```bash
+   sudo cp deploy/trading-wizard-morning.service deploy/trading-wizard-morning.timer /etc/systemd/system/
+   sudo systemctl daemon-reload
+   sudo systemctl enable --now trading-wizard-morning.timer
+   systemctl list-timers trading-wizard-morning.timer     # NEXT should say 08:00 CEST/CET
+   ```
+
+   `Persistent=false`: if the droplet is down at 08:00, that morning is **not** run late. It shows
+   as a gap.
+3. **Day one:** run it once by hand and read the report. Record that date in PROGRESS.md; it's day
+   one of the forward record.
+
+   ```bash
+   sudo systemctl start trading-wizard-morning.service     # or: .venv/bin/python scripts/morning_report.py
+   journalctl -u trading-wizard-morning.service -n 30
+   ```
+
+Manual trigger later: the same command, or the **Run now** button on the report page. A second run
+on the same day adds nothing new; it only retries markets that failed. Every deploy (`git pull`)
+changes the engine commit stored on new reads, so the record splits cleanly by engine version.

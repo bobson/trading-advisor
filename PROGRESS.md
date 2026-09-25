@@ -6,8 +6,8 @@ A state file for the "learning instrument" build. Source of truth for what's nex
 **ROADMAP progress:** A1 ✓ (merged, `645231c`), A2 ✓ (merged, `800e12a`; docs `1003735`), A3 ✓ (merged), A4 ✓ (merged), A5 ✓ (merged), A6 ✓ (merged), A7 ✓ (merged), B1 ✓ (merged — labelling mode
 built; the ≥30 labelled charts are the user's ongoing work), B2 tooling ✓ (merged — `eval_detectors.py`;
 its measurement + tuning run as soon as ≥30 charts are labelled — the user has decided NOT to label, so
-it stays unmeasured). B3 ✓ (merged), B4 ✓ (merged), B5 ✓ (merged). **Next: C1** (the integrity guard).
-Order from here, by the user's decision: C1 → D1…D6 → **A8 last**. Drawing tools: deferred.
+it stays unmeasured). B3 ✓ (merged), B4 ✓ (merged), B5 ✓ (merged), A8 ✓ (merged — forward record starts on the first droplet run). **Next: C1** (the integrity guard).
+Order from here: C1 → D1…D6. Drawing tools: deferred.
 
 ## Current state
 
@@ -28,7 +28,7 @@ default) and **ROADMAP B1** (gold-set labelling mode — `gold_labels` table), p
 **1–2 candle patterns at levels** chart markers, the **ROADMAP B2** evaluation instrument, the **pattern life cycle** (fresh / in play /
 completed / expired), and **ROADMAP B3** (the Empirical Pattern Encyclopedia — `encyclopedia_stats` +
 Encyclopedia view), plus **better pattern detection + the Pattern scanner + history beside every
-find** (user request), **ROADMAP B4** (verdict records beside the verdict), and **ROADMAP B5** (quality as calibrated bands; guide §3 re-ranked by measurement). **461 tests green,
+find** (user request), **ROADMAP B4** (verdict records beside the verdict), and **ROADMAP B5** (quality as calibrated bands; guide §3 re-ranked by measurement), and **ROADMAP A8** (the morning report / forward record). **486 tests green,
 ruff + svelte-check clean.**
 
 **Standing facts:** patterns and 3-candle candlesticks stay OUT of the confidence score (facts
@@ -63,6 +63,46 @@ apply if `config.yaml` omits them.
 ---
 
 ## Log (newest first)
+
+### ROADMAP A8 — Morning report: the forward record
+- **Done:** 2026-09-25 · branch `feature/morning-report` · **merged to `main`.**
+- **FORWARD RECORD DAY ONE: _not started yet_.** Fill in the date of the first run on the droplet.
+  Every test run so far used a scratch DB.
+- **What it does:** every day at 08:00 Europe/Skopje (`deploy/trading-wizard-morning.timer`, a
+  systemd timer on the droplet) `scripts/morning_report.py` does three things. (1) Review: judges
+  every past read whose horizon has passed. (2) Read: freezes a read for each watchlist market ×
+  30m/1h/4h/1d, from closed candles only. (3) Synthesis: optional, one Claude call per symbol, off by
+  default. Tables: `forward_reads`, `forward_runs`, `forward_syntheses`, `forward_rules` in
+  `data/wizard.db`. Page: `#/morning` (review, today's grid, synthesis, scoreboard beside a coin
+  flip). Manual trigger: the same script, or **Run now** (`POST /morning/run`).
+- **Guarantees:**
+  - Duplicate protection is in the schema, not in Python: UNIQUE(run_date, symbol, timeframe) and
+    UNIQUE(symbol, timeframe, bar_time), plus a file lock.
+  - Missed mornings are recorded as `gap` rows and never backfilled (the timer has
+    `Persistent=false`).
+  - Forex, gold and oil skip a day when there's no new closed candle.
+  - The read function receives only candles and config, so the review can't feed the read.
+  - Each read stores the engine commit, a dirty flag and a config hash.
+- **Outcome rule v1** (`src/forward/rule.py`, text hash pinned by a test):
+  - Directional reads (tier ≠ no_setup and a bullish/bearish bias): judged by first touch on
+    highs/lows.
+  - No-setup reads: correct if price stayed inside the zones.
+  - Horizons in bars: 30m 48 · 1h 24 · 4h 42 · 1d 21.
+- **Data:** gold comes from Twelve Data (verified live on the free plan). Oil comes from OANDA's
+  practice API, `WTICO_USD`, because Twelve Data's free plan refuses WTI. OANDA is not verified live
+  until `OANDA_API_TOKEN` is added; without it oil is skipped and the skip is recorded. Gold and oil
+  are in `COMMODITIES`, not `PAIRS`, so the encyclopedia, verdict records and scanner are unchanged.
+- **Spec vs code:** "next level / nearest level above-below" = the S/R ZONES (near edge ahead, far
+  edge behind; close ± 3 ATR when there's no zone). `nearest_levels` includes round numbers, which
+  sit a fraction of an ATR away and would decide almost every read on its first bar.
+- **Verified:**
+  - A live manual run into a scratch DB gave 20 reads in 2 minutes (oil skipped: no token).
+  - Page checked in the browser at 1400px and 400px, with live reads and with a demo DB of judged
+    reads, a gap and the scoreboard.
+  - `systemd-analyze calendar` gives 06:00 UTC before 25 Oct and 07:00 UTC after.
+  - The first real firing at 08:00 can only be confirmed on the droplet.
+- **User's check:** set up the timer (DEPLOY.md), run it once by hand and read the report. Look again
+  after a week (first 4h reviews) and after a month (first 1d reviews).
 
 ### ROADMAP B5 — Calibrate quality + re-rank the guide
 - **Done:** 2026-09-25 · **merged to `main`.**

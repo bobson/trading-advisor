@@ -16,6 +16,7 @@ in the auto-generated /docs before wiring the frontend.
 from __future__ import annotations
 
 import logging
+import os
 import time
 from dataclasses import asdict
 
@@ -26,7 +27,7 @@ from pydantic import BaseModel
 from src.backtest.base_rate import load_base_rates
 from src.config import load_config
 from src.context import gather_context
-from src.data.registry import list_pairs
+from src.data.registry import all_pairs
 from src.derivatives import gather_derivatives
 from src.service.analyze import advise
 from src.service.serialize import serialize_analysis
@@ -94,7 +95,7 @@ def health() -> dict:
 
 @app.get("/pairs", dependencies=_GUARDS)
 def pairs() -> list[dict]:
-    return [{"symbol": p.symbol, "asset_class": p.asset_class, "label": p.label} for p in list_pairs()]
+    return [{"symbol": p.symbol, "asset_class": p.asset_class, "label": p.label} for p in all_pairs()]
 
 
 @app.get("/timeframes", dependencies=_GUARDS)
@@ -461,3 +462,39 @@ def _verdict_rows() -> list[dict]:
         return load(conn)
     finally:
         conn.close()
+
+
+# --- ROADMAP A8: the morning report (forward record) ----------------------------------------------
+# The morning job writes these tables; the API only reads them, plus a "run now" that starts the SAME
+# script in its own process (its file lock stops overlap with the 08:00 timer run).
+_MORNING_DB = os.getenv("MORNING_DB")          # None -> the app DB (data/wizard.db); set for a scratch DB
+
+
+def _morning_db() -> str:
+    return _MORNING_DB or _TRADES_DB or "data/wizard.db"
+
+
+@app.get("/morning", dependencies=_GUARDS)
+def morning(date: str | None = None) -> dict:
+    """The morning report for `date` (a Europe/Skopje run date; default = the latest run)."""
+    from src.forward.record import connect as forward_connect
+    from src.forward.report import build_report
+    conn = forward_connect(_morning_db())
+    try:
+        return build_report(conn, cfg, date)
+    finally:
+        conn.close()
+
+
+@app.post("/morning/run", dependencies=_GUARDS)
+def morning_run() -> dict:
+    """Manual trigger: starts scripts/morning_report.py in the background (returns at once). The
+    script's lock makes a second concurrent run exit without doing anything."""
+    import subprocess
+    import sys
+    from pathlib import Path
+    root = Path(__file__).resolve().parents[2]
+    subprocess.Popen([sys.executable, str(root / "scripts" / "morning_report.py"), "--db", _morning_db(),
+                      "--trigger", "api"], cwd=root, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+                     start_new_session=True)
+    return {"started": True}

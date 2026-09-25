@@ -74,11 +74,12 @@ instructing it better. So **the guide shrinks as Layer 1 grows.**
 | B3 Empirical Pattern Encyclopedia | ✅ Done (merged, 2026-09-24) |
 | B4 Data adjacency | ✅ Done (merged, 2026-09-24) |
 | B5 Calibrate quality + re-rank the guide | ✅ Done (merged, 2026-09-25) |
-| Tests | 461 green, ruff + svelte-check clean |
+| A8 Morning report: the forward record | ✅ Done (merged, 2026-09-25); record starts on the first droplet run |
+| Tests | 486 green, ruff + svelte-check clean |
 
 **Remaining, in order:**
 
-~~`A1`~~ ✅ `→` ~~`A2`~~ ✅ `→` ~~`A3`~~ ✅ `→` ~~`A4`~~ ✅ `→` ~~`A5`~~ ✅ `→` ~~`A6`~~ ✅ `→` ~~`A7`~~ ✅ `→ A8 → A5 → A6 → A7 → A8` *(honesty & precision hardening, then start the forward record)*
+~~`A1`~~ ✅ `→` ~~`A2`~~ ✅ `→` ~~`A3`~~ ✅ `→` ~~`A4`~~ ✅ `→` ~~`A5`~~ ✅ `→` ~~`A6`~~ ✅ `→` ~~`A7`~~ ✅ `→` ~~`A8`~~ ✅ *(honesty & precision hardening, then start the forward record)*
 `→ B1 → B2 → B3 → B4 → B5` *(measure the detectors, then the patterns)*
 `→ C1` *(integrity, enforced)*
 `→ D1 → D2 → D3 → D4 → D5 → D6` *(the learning loop)*

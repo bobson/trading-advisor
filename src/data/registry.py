@@ -48,7 +48,26 @@ PAIRS: list[Pair] = [
     Pair("GBP/USD", FOREX, "British Pound / US Dollar"),
 ]
 
-_BY_SYMBOL = {p.symbol: p for p in PAIRS}
+# ROADMAP A8: gold and oil — traded 24/5 over the counter with tick (not real) volume, so they use
+# the forex asset class (the market adaptation then flags volume, sessions and weekend gaps). Kept
+# OUT of `PAIRS` on purpose: the encyclopedia / verdict-record builds and the scanner default to
+# `list_pairs()`, and must not silently mix commodities into their all-markets rows or spend
+# Twelve Data credits on every scan. The UI and the morning report reach them via `all_pairs()`.
+COMMODITIES: list[Pair] = [
+    Pair("XAU/USD", FOREX, "Gold (spot) / US Dollar"),
+    Pair("WTI/USD", FOREX, "Crude oil WTI / US Dollar"),
+]
+
+# Symbols whose candles come from a different provider than their asset class's default.
+# WTI isn't on Twelve Data's free plan -> OANDA (practice account).
+PROVIDER_OVERRIDE = {"WTI/USD": "oanda"}
+
+_BY_SYMBOL = {p.symbol: p for p in PAIRS + COMMODITIES}
+
+
+def all_pairs() -> list[Pair]:
+    """Every registered pair, commodities included (the UI's picker and the morning report)."""
+    return list(PAIRS) + list(COMMODITIES)
 
 
 def list_pairs(asset_class: str | None = None) -> list[Pair]:
@@ -67,7 +86,10 @@ def asset_class_for(symbol: str) -> str:
 
 
 def provider_for(symbol: str, cfg: Config) -> DataProvider:
-    """The data provider for a symbol, chosen by its asset class."""
+    """The data provider for a symbol, chosen by its asset class (or a per-symbol override)."""
+    if PROVIDER_OVERRIDE.get(symbol) == "oanda":
+        from src.data.oanda import OandaProvider
+        return OandaProvider(token=cfg.oanda_api_token)
     if asset_class_for(symbol) == FOREX:
         return ForexProvider(api_key=cfg.twelvedata_api_key)
     return CryptoProvider(exchange_id=cfg.market.exchange)

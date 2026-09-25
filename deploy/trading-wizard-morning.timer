@@ -1,0 +1,13 @@
+# ROADMAP A8 — fire the morning report every day at 08:00 Europe/Skopje (DST-aware: systemd
+# evaluates the wall-clock time in that zone). Persistent=false: if the droplet was down at 08:00,
+# the morning is NOT run late — it becomes a gap in the record (never backfilled).
+[Unit]
+Description=Trading Wizard morning report at 08:00 Europe/Skopje
+
+[Timer]
+OnCalendar=*-*-* 08:00:00 Europe/Skopje
+Persistent=false
+AccuracySec=1min
+
+[Install]
+WantedBy=timers.target

@@ -71,6 +71,12 @@ timeframes:                  # Phase 23 — selectable timeframes + their author
   selectable: [15m, 30m, 1h, 4h, 1d]   # 5m deliberately excluded (mostly noise)
   weights: {15m: 0.6, 30m: 0.7, 1h: 1.0, 4h: 1.2, 1d: 1.4}  # higher TF = more weight
 
+morning_report:              # ROADMAP A8 — daily forward record, 08:00 Europe/Skopje (scripts/morning_report.py)
+  symbols: [BTC/USDT, ETH/USDT, SOL/USDT, EUR/USD, XAU/USD, WTI/USD]
+  timeframes: [30m, 1h, 4h, 1d]
+  horizons: {30m: 48, 1h: 24, 4h: 42, 1d: 21}   # review after this many BARS
+  synthesis: false           # true = one Claude multi-timeframe read per symbol (~6 calls/day)
+
 alerts:                      # #7 — watchlist scanned by scripts/watch.py (run via cron)
   symbols: [BTC/USDT, ETH/USDT, SOL/USDT, XRP/USDT]
   timeframe: 1h

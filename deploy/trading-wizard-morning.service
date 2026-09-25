@@ -1,0 +1,12 @@
+# ROADMAP A8 — one morning-report run (review, then read). Started by the .timer at 08:00 Skopje.
+[Unit]
+Description=Trading Wizard morning report (forward record)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+User=YOUR_USER
+WorkingDirectory=/srv/trading-wizard
+ExecStart=/srv/trading-wizard/.venv/bin/python scripts/morning_report.py --trigger schedule
+TimeoutStartSec=45min

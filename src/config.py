@@ -177,6 +177,19 @@ class AlertsConfig(_Strict):
     min_confidence: float = 0.5  # only alert on setups at least this confident (avoid spam)
 
 
+class MorningReportConfig(_Strict):
+    # ROADMAP A8 — the daily forward record (scripts/morning_report.py, fired 08:00 Europe/Skopje).
+    symbols: list[str] = Field(default_factory=lambda: ["BTC/USDT", "ETH/USDT", "SOL/USDT", "EUR/USD",
+                                                        "XAU/USD", "WTI/USD"])
+    timeframes: list[str] = Field(default_factory=lambda: ["30m", "1h", "4h", "1d"])
+    # Review horizon per timeframe, in BARS (so forex/commodity weekends skip naturally).
+    horizons: dict[str, int] = Field(default_factory=lambda: {"30m": 48, "1h": 24, "4h": 42, "1d": 21})
+    run_at: str = "08:00"                      # local time in `timezone`
+    timezone: str = "Europe/Skopje"
+    synthesis: bool = False                    # one Claude multi-timeframe synthesis per symbol (costs credits)
+    twelvedata_pause_s: float = 8.0            # free plan allows 8 requests/minute
+
+
 class DerivativesConfig(_Strict):
     # Phase 22: crypto-only positioning context (funding rate + open interest) shown as FACTS.
     # Gated to crypto in code; forex has no perp funding/OI. No vote yet (pending a study).
@@ -256,6 +269,8 @@ class Config(_Strict):
     timeframes: TimeframesConfig = Field(default_factory=TimeframesConfig)
     # Optional (#7 alerts): defaults apply if config.yaml omits the `alerts:` block.
     alerts: AlertsConfig = Field(default_factory=AlertsConfig)
+    # Optional (ROADMAP A8): defaults apply if config.yaml omits the `morning_report:` block.
+    morning_report: MorningReportConfig = Field(default_factory=MorningReportConfig)
     # Optional (Feature 6): defaults apply if config.yaml omits the `regime:` block.
     regime: RegimeConfig = Field(default_factory=RegimeConfig)
     # Optional (Feature 10): defaults apply if config.yaml omits the `costs:` block.
@@ -268,6 +283,7 @@ class Config(_Strict):
     anthropic_api_key: Optional[str] = None
     finnhub_api_key: Optional[str] = None  # Phase 21: economic calendar + news (optional)
     twelvedata_api_key: Optional[str] = None  # Phase 26: forex OHLC (optional; crypto needs none)
+    oanda_api_token: Optional[str] = None     # A8: WTI oil candles (free OANDA practice account)
     webhook_url: Optional[str] = None  # #7 alerts: Discord/Slack-style webhook to get pinged
     # #8 API lockdown (env-injected; safe defaults for local dev).
     api_key: Optional[str] = None      # when set, the API requires X-API-Key on data endpoints
@@ -294,6 +310,7 @@ def load_config(path: str | Path = DEFAULT_CONFIG_PATH) -> Config:
         "anthropic_api_key": os.getenv("ANTHROPIC_API_KEY"),
         "finnhub_api_key": os.getenv("FINNHUB_API_KEY"),
         "twelvedata_api_key": os.getenv("TWELVEDATA_API_KEY"),
+        "oanda_api_token": os.getenv("OANDA_API_TOKEN"),
         "webhook_url": os.getenv("WEBHOOK_URL"),
         "api_key": os.getenv("API_KEY"),
         "rate_limit_per_min": int(os.getenv("RATE_LIMIT_PER_MIN", "60")),
