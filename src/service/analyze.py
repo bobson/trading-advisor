@@ -149,6 +149,8 @@ def advise(
     # in the backtest). Default None -> tests/backtest touch no network.
     if context is not None:
         facts = {**facts, "context": context}
+        from src.risk.caution import refresh_event_risk
+        refresh_event_risk(facts, req)                   # R1: judge news risk once the calendar is here
     if derivatives is not None:
         facts = {**facts, "derivatives": derivatives}
     # Rec #2: attach the historical track record for THIS setup's bias (honest, not a forecast).

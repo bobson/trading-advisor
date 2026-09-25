@@ -83,13 +83,14 @@ instructing it better. So **the guide shrinks as Layer 1 grows.**
 | B4 Data adjacency | ✅ Done (merged, 2026-09-24) |
 | B5 Calibrate quality + re-rank the guide | ✅ Done (merged, 2026-09-25) |
 | A8 Morning report: the forward record | ✅ Done (merged, 2026-09-25); record live since 2026-09-25 (day one) |
-| Tests | 486 green, ruff + svelte-check clean |
+| R1 Caution conditions as Layer 1 facts | ✅ Done (merged, 2026-09-26) |
+| Tests | 501 green, ruff + svelte-check clean |
 
 **Remaining, in order:**
 
 ~~`A1`~~ ✅ `→` ~~`A2`~~ ✅ `→` ~~`A3`~~ ✅ `→` ~~`A4`~~ ✅ `→` ~~`A5`~~ ✅ `→` ~~`A6`~~ ✅ `→` ~~`A7`~~ ✅ `→` ~~`A8`~~ ✅ *(honesty & precision hardening, then start the forward record)*
 `→ B1 → B2 → B3 → B4 → B5` *(measure the detectors, then the patterns)*
-`→ R1 → R2 → R3 → R4` *(risk filters: when not to enter, when to exit; proposed 2026-09-26, order to confirm)*
+`→` ~~`R1`~~ ✅ `→ R2 → R3 → R4` *(risk filters: when not to enter, when to exit; order confirmed 2026-09-26)*
 `→ C1` *(integrity, enforced)*
 `→ D1 → D2 → D3 → D4 → D5 → D6` *(the learning loop)*
 

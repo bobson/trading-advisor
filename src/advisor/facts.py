@@ -407,6 +407,9 @@ def build_facts(featured_df: pd.DataFrame, swings: pd.DataFrame, cfg: Config) ->
     # ROADMAP A3: the situation tier is decided HERE (Layer 1), from the finished facts — it picks
     # the explanation's template and word budget, and Layer 2 may not change it.
     facts["situation"] = classify_situation(facts, cfg)
+    # ROADMAP R1: caution conditions — the risk around the read, never its direction; no vote.
+    from src.risk.caution import caution_conditions
+    facts["caution"] = caution_conditions(facts, featured_df, cfg)
     return facts
 
 
@@ -702,6 +705,24 @@ def facts_to_prompt(facts: dict) -> str:
     else:
         add("  - derivatives positioning: not available for this read (not fetched, or not a crypto perp)")
     add("")
+
+    # --- CAUTION (ROADMAP R1) -------------------------------------------------------------
+    caution = facts.get("caution")
+    if caution:
+        add("CAUTION CONDITIONS (the RISK around this read, never its direction; not votes; UNMEASURED "
+            "until ROADMAP R3 — say 'unmeasured' if you mention one):")
+        on = [x for x in caution if x["active"]]
+        for x in on:
+            add(f"  - ACTIVE {x['label']}: {x['detail']}")
+        if not on:
+            add("  - none active")
+        off = [x["label"].lower() for x in caution if x["active"] is False]
+        if off:
+            add("  - not present: " + "; ".join(off))
+        na = [f"{x['label'].lower()} ({x['detail']})" for x in caution if x["active"] is None]
+        if na:
+            add("  - can't be judged here: " + "; ".join(na))
+        add("")
 
     # --- CONFLUENCE VERDICT ---------------------------------------------------------------
     conf_pct = f"{c['confidence'] * 100:.0f}%"

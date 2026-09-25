@@ -69,8 +69,13 @@ export interface Situation {
   reasons: string[]; word_budget: number; template: string
 }
 
+// ROADMAP R1: the risk around a read, never its direction. active null = can't be judged here.
+export interface CautionEntry {
+  code: string; label: string; active: boolean | null; detail: string; value: unknown; status: string
+}
 export interface Analysis {
   market: { symbol: string; timeframe: string; last_close: number }
+  caution?: CautionEntry[]
   confluence: Confluence
   situation?: Situation
   base_rate: BaseRate | null

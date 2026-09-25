@@ -6,8 +6,8 @@ A state file for the "learning instrument" build. Source of truth for what's nex
 **ROADMAP progress:** A1 ✓ (merged, `645231c`), A2 ✓ (merged, `800e12a`; docs `1003735`), A3 ✓ (merged), A4 ✓ (merged), A5 ✓ (merged), A6 ✓ (merged), A7 ✓ (merged), B1 ✓ (merged — labelling mode
 built; the ≥30 labelled charts are the user's ongoing work), B2 tooling ✓ (merged — `eval_detectors.py`;
 its measurement + tuning run as soon as ≥30 charts are labelled — the user has decided NOT to label, so
-it stays unmeasured). B3 ✓ (merged), B4 ✓ (merged), B5 ✓ (merged), A8 ✓ (merged — forward record live since 2026-09-25 on wizard.bosfoot.com). **Next: C1** (the integrity guard).
-Order from here: C1 → D1…D6. Drawing tools: deferred.
+it stays unmeasured). B3 ✓ (merged), B4 ✓ (merged), B5 ✓ (merged), A8 ✓ (merged — forward record live since 2026-09-25 on wizard.bosfoot.com), R1 ✓ (merged). **Next: R2** (freeze the caution flags into the forward record).
+Order from here (user-confirmed 2026-09-26): R2 → R3 → R4 → C1 (slim) → D1 → D6; D2–D5 on demand. Drawing tools: deferred.
 
 ## Current state
 
@@ -63,6 +63,32 @@ apply if `config.yaml` omits them.
 ---
 
 ## Log (newest first)
+
+### ROADMAP R1 — Caution conditions as Layer 1 facts
+- **Done:** 2026-09-26 · branch `feature/caution-conditions` · **merged to `main`.**
+- `src/risk/caution.py` is the eighth part of `build_facts`: `facts["caution"]` = eight conditions, each
+  {code, label, active, detail, value, status="unmeasured"}. `active` None = can't be judged here, and
+  the detail says why. No vote, no confluence or tier change (the snapshot diff adds only the
+  `caution` key).
+  - `no_expansion`: fresh breakout with neither volume ≥1.2× nor ATR rising on the breakout bar.
+  - `stretched`: ≥3 ATR from the 50-MA.
+  - `volatility_extreme`: ATR in the top or bottom decile of its last 100 bars.
+  - `stop_in_noise`: the read's invalidation <1 ATR away.
+  - `no_room`: after the cost model, the next level is closer than the invalidation.
+  - `htf_against`: the highest directional higher-timeframe trend vote, the weekly included (from
+    `mtf_signals`).
+  - `event_risk`: a high-impact event within 6 h, judged only in the live path once the calendar is
+    injected; "unavailable" without `FINNHUB_API_KEY`, never guessed.
+  - `thin_market`: forex or gold after a weekend gap, or intraday in the Sydney hours.
+- The read's direction and levels are the forward record's (`read_direction`, `forward.rule.levels_for`),
+  so R2 can freeze exactly these values. The thresholds are a-priori config (`caution:`); R3 may tune
+  them only on the older 70%.
+- Facts text: a "CAUTION CONDITIONS" block (framed as risk, not direction; "unmeasured") before the
+  verdict. No analyst-guide change was needed (rule 5). UI: a Caution panel under the verdict record
+  (active ones in amber, then not present / can't judge).
+- Verified: 13 new tests, including one per condition (fires / doesn't) and a look-ahead guard on real
+  candles that saw ≥3 conditions active. 500 other tests pass. Browser-checked on XRP 1d (3 active)
+  and EUR/USD 1h (thin market) at 1400 and 400 px.
 
 ### Roadmap: Phase R added (user direction, 2026-09-26)
 - The user's goal, stated plainly: direction is a coin flip; the value is knowing **when not to enter

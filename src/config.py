@@ -177,6 +177,18 @@ class AlertsConfig(_Strict):
     min_confidence: float = 0.5  # only alert on setups at least this confident (avoid spam)
 
 
+class CautionConfig(_Strict):
+    # ROADMAP R1 — caution conditions (risk around a read, never its direction). A-priori thresholds,
+    # ATR-scaled; ROADMAP R3 may tune them on the OLDER 70% of history only.
+    stretched_atr: float = 3.0            # close this many ATR from the slow MA = stretched
+    volatility_high_pct: float = 0.9      # ATR above this rolling percentile = unusually high
+    volatility_low_pct: float = 0.1       # ... below this = unusually low
+    stop_noise_atr: float = 1.0           # invalidation closer than this many ATR = inside normal noise
+    event_hours: float = 6.0              # a high-impact event within this many hours
+    breakout_volume_expand: float = 1.2   # breakout-bar volume ≥ this × its MA = expansion
+    atr_expand_lookback: int = 5          # breakout-bar ATR vs this many bars earlier
+
+
 class MorningReportConfig(_Strict):
     # ROADMAP A8 — the daily forward record (scripts/morning_report.py, fired 08:00 Europe/Skopje).
     # Oil (WTI/USD) is not in the default list: Twelve Data's free plan refuses it and OANDA now
@@ -270,6 +282,8 @@ class Config(_Strict):
     timeframes: TimeframesConfig = Field(default_factory=TimeframesConfig)
     # Optional (#7 alerts): defaults apply if config.yaml omits the `alerts:` block.
     alerts: AlertsConfig = Field(default_factory=AlertsConfig)
+    # Optional (ROADMAP R1): defaults apply if config.yaml omits the `caution:` block.
+    caution: CautionConfig = Field(default_factory=CautionConfig)
     # Optional (ROADMAP A8): defaults apply if config.yaml omits the `morning_report:` block.
     morning_report: MorningReportConfig = Field(default_factory=MorningReportConfig)
     # Optional (Feature 6): defaults apply if config.yaml omits the `regime:` block.

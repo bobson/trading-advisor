@@ -345,6 +345,25 @@
       </p>
     {/if}
 
+    {#if result.caution?.length}
+      <!-- ROADMAP R1: risk conditions around the read (never its direction). Unmeasured until R3. -->
+      {@const on = result.caution.filter((c) => c.active)}
+      <section class="caution panel" class:has={on.length}>
+        <h3>⚠ Caution <span class="cnote">the risk around this read, not its direction · not yet measured</span></h3>
+        {#if on.length}
+          <ul>
+            {#each on as c}<li><b>{c.label}</b> — {c.detail}</li>{/each}
+          </ul>
+        {:else}
+          <p class="none">No caution condition active on this read.</p>
+        {/if}
+        <p class="cfoot">
+          {#if result.caution.some((c) => c.active === false)}Not present: {result.caution.filter((c) => c.active === false).map((c) => c.label.toLowerCase()).join(' · ')}.{/if}
+          {#if result.caution.some((c) => c.active === null)}<br />Can't judge: {result.caution.filter((c) => c.active === null).map((c) => `${c.label.toLowerCase()} (${c.detail.replace(/^(unavailable|not applicable): /, '')})`).join(' · ')}.{/if}
+        </p>
+      </section>
+    {/if}
+
     <!-- Paper-trading simulator: log a simulated Buy/Sell, see the position + PnL. Fills are live
          spot prices but no slippage/fees are modelled — it's your discipline, not a real account. -->
     <section class="trade panel">
@@ -627,6 +646,14 @@
     .panels { grid-template-columns: 1fr; }
   }
   .panel { border: 1px solid #30363d; border-radius: 8px; padding: 14px; margin-top: 14px; }
+  .caution.has { border-color: #9e6a03; }
+  .caution h3 { margin: 0 0 6px; font-size: 13px; color: #d29922; text-transform: uppercase; letter-spacing: .04em; }
+  .caution .cnote { text-transform: none; letter-spacing: 0; color: #8b949e; font-weight: 400; font-size: 12px; margin-left: 6px; }
+  .caution ul { margin: 0; padding-left: 18px; }
+  .caution li { margin: 3px 0; font-size: 14px; }
+  .caution li b { color: #e3b341; font-weight: 600; }
+  .caution .none { margin: 0; font-size: 14px; color: #8b949e; }
+  .caution .cfoot { margin: 8px 0 0; font-size: 12px; color: #6e7681; }
   .panel h2 { margin: 0 0 8px; font-size: 16px; }
   pre { white-space: pre-wrap; margin: 0; color: #c9d1d9; }
 
