@@ -75,6 +75,7 @@ CREATE TABLE IF NOT EXISTS forward_reads (
     source_above TEXT, source_below TEXT,   -- zone | atr
     sup_lower REAL, sup_upper REAL, res_lower REAL, res_upper REAL,
     patterns TEXT,                          -- JSON [{type, direction, lifecycle}]
+    caution TEXT,                           -- R2: JSON {code: true|false|null} at the read; NULL = not recorded
     facts_hash TEXT NOT NULL,
     engine_commit TEXT, engine_dirty INTEGER, config_hash TEXT,
     horizon INTEGER NOT NULL, rule_version INTEGER NOT NULL,
@@ -110,6 +111,8 @@ def connect(path: str | Path = "data/wizard.db"):
     cols = {r[1] for r in conn.execute("PRAGMA table_info(forward_runs)")}
     if "attempt_log" not in cols:                      # DBs created before the column existed
         conn.execute("ALTER TABLE forward_runs ADD COLUMN attempt_log TEXT")
+    if "caution" not in {r[1] for r in conn.execute("PRAGMA table_info(forward_reads)")}:
+        conn.execute("ALTER TABLE forward_reads ADD COLUMN caution TEXT")  # R2; older reads stay NULL
     for v, text in RULE_TEXT.items():
         conn.execute("INSERT OR IGNORE INTO forward_rules VALUES (?,?,?,?)", (v, text, rule_hash(v), int(time.time())))
     conn.commit()
@@ -194,6 +197,8 @@ def freeze_read(df: pd.DataFrame, symbol: str, timeframe: str, cfg: Config) -> t
         "res_lower": resist["lower"] if resist else None, "res_upper": resist["upper"] if resist else None,
         "patterns": json.dumps([{"type": p["type"], "direction": p["direction"], "lifecycle": p.get("lifecycle")}
                                 for p in f.get("chart_patterns") or []]),
+        # R2: the caution conditions AT the read (true / false / null = can't be judged), frozen with it
+        "caution": json.dumps({c["code"]: c["active"] for c in f.get("caution") or []}),
         "facts_hash": facts_hash(f),
         "horizon": cfg.morning_report.horizons[timeframe], "rule_version": RULE_VERSION,
     }

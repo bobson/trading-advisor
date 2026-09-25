@@ -286,6 +286,12 @@ export interface ForwardRead {
   baseline_direction: string | null; baseline_outcome: string | null
   engine_commit: string; engine_dirty: number; facts_hash: string
   patterns: { type: string; direction: string; lifecycle: string | null }[]
+  caution: Record<string, boolean | null> | null   // R2: flags frozen at the read; null = not recorded
+}
+export interface CautionSplitRow {
+  rule_version: number; read_kind: 'directional' | 'range'; code: string; label: string; cant_judge: number
+  flagged: { engine: ScoreSide; baseline: ScoreSide | null }
+  not_flagged: { engine: ScoreSide; baseline: ScoreSide | null }
 }
 export interface ScoreSide { n: number; counts: Record<string, number>; rate: number | null }
 export interface ScoreRow {
@@ -309,6 +315,8 @@ export interface MorningReport {
   pending: Record<string, number>; scoreboard: ScoreRow[]
   watchlist: { symbols: string[]; timeframes: string[]; horizons: Record<string, number> }
   next_run: string; schedule: string; rule: { version: number; text: string }
+  caution_split?: { rows: CautionSplitRow[]; not_recorded: number }
+  caution_labels?: Record<string, string>
 }
 export const getMorning = (date?: string) => get<MorningReport>(`/morning${date ? `?date=${date}` : ''}`)
 export const runMorning = () => send<{ started: boolean }>('POST', '/morning/run')

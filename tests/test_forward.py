@@ -20,7 +20,7 @@ from src.forward.record import (
     freeze_read,
     run_morning,
 )
-from src.forward.report import build_report, scoreboard
+from src.forward.report import build_report, caution_split, scoreboard
 from src.forward.schedule import next_run, run_date
 
 FIXTURE = Path(__file__).parent / "fixtures" / "btc_1h_sample.csv"
@@ -366,3 +366,70 @@ def test_api_morning_report_and_manual_trigger(cfg, candles, monkeypatch, tmp_pa
     monkeypatch.setattr("subprocess.Popen", lambda args, **kw: started.append(args))
     assert client.post("/morning/run").json() == {"started": True}
     assert "morning_report.py" in started[0][1] and db in started[0] and "api" in started[0]
+
+
+# --- ROADMAP R2: caution flags frozen with every read -----------------------------------------------
+
+def test_every_new_read_freezes_its_caution_flags(cfg, candles):
+    import json
+
+    from src.risk.caution import LABELS
+    conn = connect(":memory:")
+    _run(cfg, conn, Feed(candles, 300))
+    for r in conn.execute("SELECT caution FROM forward_reads"):
+        flags = json.loads(r["caution"])
+        assert list(flags) == list(LABELS)
+        assert all(v in (True, False, None) for v in flags.values())
+
+
+def test_a_reads_table_from_before_r2_gets_the_column_and_old_reads_show_not_recorded(cfg, candles, tmp_path):
+    import sqlite3
+    db = str(tmp_path / "pre_r2.db")
+    conn = connect(db)
+    _run(cfg, conn, Feed(candles, 300))
+    conn.close()
+    raw = sqlite3.connect(db)                                  # rebuild the table without the column
+    cols = [r[1] for r in raw.execute("PRAGMA table_info(forward_reads)") if r[1] != "caution"]
+    raw.executescript(f"CREATE TABLE old AS SELECT {', '.join(cols)} FROM forward_reads; DROP TABLE forward_reads; "
+                      "ALTER TABLE old RENAME TO forward_reads;")
+    raw.commit(); raw.close()
+    conn = connect(db)
+    assert "caution" in {r[1] for r in conn.execute("PRAGMA table_info(forward_reads)")}
+    assert conn.execute("SELECT COUNT(*) FROM forward_reads WHERE caution IS NULL").fetchone()[0] == 2
+    feed = Feed(candles, 324)
+    run_morning(cfg, conn, now=feed.now(), candles_for=feed, engine=ENGINE)      # resolves the old reads
+    split = build_report(conn, cfg, now=feed.now())["caution_split"]
+    assert split["not_recorded"] == 2 and split["rows"] == []
+
+
+def _judged(kind, outcome, base, flags):
+    return {"rule_version": 1, "read_kind": kind, "outcome": outcome, "baseline_outcome": base, "caution": flags}
+
+
+def test_caution_split_compares_flagged_with_not_flagged_reads():
+    rows = ([_judged("directional", R.INVALIDATED, R.FOLLOWED, {"stop_in_noise": True})] * 3
+            + [_judged("directional", R.FOLLOWED, R.INVALIDATED, {"stop_in_noise": False})] * 2
+            + [_judged("directional", R.EXPIRED, R.EXPIRED, {"stop_in_noise": None})]
+            + [_judged("range", R.MISSED, None, {"stretched": True})]
+            + [{**_judged("directional", R.FOLLOWED, R.FOLLOWED, None)}])            # pre-R2
+    out = caution_split(rows)
+    assert out["not_recorded"] == 1
+    sin = next(r for r in out["rows"] if r["code"] == "stop_in_noise")
+    assert sin["flagged"]["engine"]["counts"][R.INVALIDATED] == 3
+    assert sin["not_flagged"]["engine"]["counts"][R.FOLLOWED] == 2
+    assert sin["flagged"]["baseline"]["counts"][R.FOLLOWED] == 3                 # coin flip on the same reads
+    assert sin["cant_judge"] == 1 and sin["flagged"]["engine"]["rate"] is None   # < 20 cases: counts only
+    rng = next(r for r in out["rows"] if r["code"] == "stretched")
+    assert rng["read_kind"] == "range" and rng["flagged"]["engine"]["counts"][R.MISSED] == 1
+    assert rng["flagged"]["baseline"] is None
+
+
+def test_report_carries_the_caution_split_after_a_review(cfg, candles):
+    conn, feed = connect(":memory:"), Feed(candles, 300)
+    _run(cfg, conn, feed)
+    feed.k.update({"BTC/USDT": 324, "EUR/USD": 324})
+    _run(cfg, conn, feed)
+    rep = build_report(conn, cfg, now=feed.now())
+    assert rep["caution_split"]["not_recorded"] == 0 and rep["caution_split"]["rows"]
+    assert set(rep["caution_labels"]) >= {"stop_in_noise", "no_room"}
+    assert all(r["caution"] is not None for r in rep["grid"])

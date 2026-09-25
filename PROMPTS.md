@@ -1,23 +1,22 @@
 # Trading Wizard — Step-by-Step Prompts
 
-Work top to bottom. Each step: create the branch, paste the prompt, do **your check**, then run the
+Work top to bottom, on `main` (no branches since 2026-09-26). Each step: paste the prompt, do **your check**, then run the
 standard cycle below. Full specs for every step are in `ROADMAP.md §6`.
 
 ---
 
 ## The standard cycle (after every step)
 
-**1. Merge and push**
+**1. Claude finishes the docs** (it does this by itself at the end of each step): PROGRESS.md gets
+the date, what the "done when" check showed, any deviations from ROADMAP.md and why, and findings worth
+remembering; the step is marked done (merged) in ROADMAP.md §4; then it gives a short commit message.
+
+**2. You test it** in the browser (locally), then commit and push. **A push to `main` deploys to
+wizard.bosfoot.com after CI passes**, so push only finished, tested steps:
 ```bash
-git checkout main
-git merge <branch-name>
+git add -A && git commit -m "<message>"
 git push origin main
 ```
-
-**2. Update PROGRESS.md** — paste, filling in the step:
-> Step [ID] ([name]) is merged. Update PROGRESS.md: date, branch, what the "done when" check showed,
-> any deviations from ROADMAP.md and why, and any finding worth remembering. Update the current-state
-> section and mark the step done in ROADMAP.md §4.
 
 **3. Every ~3 steps**, ask for a tour:
 > Walk me through what the app can do now from a user's point of view — how to run it, what I see,
@@ -45,7 +44,6 @@ git push origin main
 # Phase A — Honesty & precision hardening
 
 ## A1 — Human verification pass
-**Branch:** `fix/verification-pass`
 
 > ROADMAP step A1. Before I do the visual checks, fix what blocks them:
 > 1. On SOL/USDT daily an "ascending channel · forming" badge appears, but only the swing-point zigzag
@@ -68,7 +66,6 @@ git push origin main
 ---
 
 ## A2 — Verdict reframe + no-edge disclosure
-**Branch:** `feature/verdict-reframe`
 
 > ROADMAP step A2. The verdict header ("Bias: bullish · confidence 55% · SETUP FLAGGED" in green) reads
 > as odds to a beginner, and it's what most sessions see. Change it:
@@ -89,7 +86,6 @@ git push origin main
 ---
 
 ## A3 — Situation tier in Layer 1
-**Branch:** `feature/situation-tier`
 
 > ROADMAP step A3. Right now Claude decides whether a chart is "no setup", "notable" or "confirmed", and
 > that choice sets its own word budget. Move it into Layer 1:
@@ -110,7 +106,6 @@ charts and see whether the tier matches your own sense of "nothing here" vs "som
 ---
 
 ## A4 — Support/resistance as zones + freshness
-**Branch:** `feature/sr-zones`
 
 > ROADMAP step A4. A single S/R line at 76,132 implies false precision. Change S/R to zones:
 > - Each level becomes a band: centre, ATR-scaled width, touch count, first and last touch bar,
@@ -128,7 +123,6 @@ charts and see whether the tier matches your own sense of "nothing here" vs "som
 ---
 
 ## A5 — Facts payload hardening
-**Branch:** `feature/facts-hardening`
 
 > ROADMAP step A5. Make the facts sent to Claude complete enough that it never has to guess or calculate:
 > - Explicit absences: "no divergence detected", "no confirmed pattern", etc. — never silent omission.
@@ -149,7 +143,6 @@ explain the chart from that text alone, without doing any maths?
 ---
 
 ## A6 — Analyst Guide revision
-**Branch:** `feature/guide-revision`
 
 > ROADMAP step A6. Revise `src/advisor/analyst-guide-system-prompt.md` to fix these contradictions and
 > gameable rules:
@@ -179,7 +172,6 @@ fact there? Are the conditional reads symmetric (a level above *and* below)?
 ---
 
 ## A7 — Honest baselines
-**Branch:** `feature/honest-baselines`
 
 > ROADMAP step A7. Two baselines so luck is visible:
 > 1. Paper trading: beside the P&L, add a random-entry baseline band — many random entries on the same
@@ -194,7 +186,6 @@ fact there? Are the conditional reads symmetric (a level above *and* below)?
 ---
 
 ## A8 — Morning report: the forward record
-**Branch:** `feature/morning-report`
 
 > ROADMAP step A8 — read the full spec there first. Build a daily morning report that creates a
 > forward record of the engine's reads:
@@ -236,7 +227,6 @@ PROGRESS.md; that's day one of the forward record.
 # Phase B — Measure the detectors, then the patterns
 
 ## B1 — Detector gold set (labelling mode)
-**Branch:** `feature/gold-set`
 
 > ROADMAP step B1. Build a labelling mode in the scrub view so I can mark what my eye sees:
 > - At a chosen bar, I can mark patterns (type + key points) and S/R zones.
@@ -254,7 +244,6 @@ eventually. Mark only what you genuinely see; "nothing here" is a valid label.
 ---
 
 ## B2 — Detector precision/recall + tuning
-**Branch:** `feature/detector-eval`
 
 > ROADMAP step B2. Create `scripts/eval_detectors.py`:
 > - Compare detector outputs to my gold labels at the same bars, with ATR-scaled matching.
@@ -273,7 +262,6 @@ it's one of the most important findings of the project.
 ---
 
 ## B3 — Feature 3: Empirical Pattern Encyclopedia
-**Branch:** `feature/encyclopedia`
 
 > ROADMAP step B3. Build the encyclopedia:
 > - `scripts/build_encyclopedia.py` reusing the existing look-ahead-safe backtest walk (no second walker).
@@ -292,7 +280,6 @@ it's one of the most important findings of the project.
 ---
 
 ## B4 — Data adjacency
-**Branch:** `feature/data-adjacency`
 
 > ROADMAP step B4. Put measured records next to anything directional:
 > - Beside the verdict: how that verdict type actually resolved historically, e.g. "categories aligned
@@ -309,7 +296,6 @@ how much you trust the verdict?
 ---
 
 ## B5 — Calibrate quality + re-rank the guide
-**Branch:** `feature/calibration`
 
 > ROADMAP step B5.
 > 1. Map raw pattern quality scores to observed follow-through per pattern type, using the encyclopedia.
@@ -326,7 +312,6 @@ how much you trust the verdict?
 # Phase R — Risk filters: when not to enter, and when to exit
 
 ## R1 — Caution conditions as Layer 1 facts
-**Branch:** `feature/caution-conditions`
 
 > ROADMAP step R1 — read Phase R in full first, including its honesty rule. Build `src/risk/caution.py`:
 > a pure, look-ahead-safe function returning `facts["caution"]` = [{code, detail, value, status}] for
@@ -343,7 +328,6 @@ how much you trust the verdict?
 any that feel wrong; that's a detector bug, not a finding.
 
 ## R2 — Freeze the flags into the forward record
-**Branch:** `feature/forward-caution`
 
 > ROADMAP step R2. Store the caution codes on every new `forward_reads` row (new column, migrated
 > automatically on the droplet DB; older reads show "not recorded"). Keep outcome rule v1 unchanged.
@@ -354,7 +338,6 @@ any that feel wrong; that's a detector bug, not a finding.
 **Your check:** after deploying, look at the next morning's report: every read should list its flags.
 
 ## R3 — Measure each condition on history
-**Branch:** `feature/measure-caution`
 
 > ROADMAP step R3 — follow Phase R's honesty rule exactly. `scripts/measure_caution.py` reuses the one
 > backtest walk. For each directional read and pattern breakout, record the conditions present and:
@@ -370,7 +353,6 @@ any that feel wrong; that's a detector bug, not a finding.
 valid result, and the survivors are the valuable ones.
 
 ## R4 — Exits: how far against, how far for
-**Branch:** `feature/excursions`
 
 > ROADMAP step R4. From the same walk and split: MAE and MFE distributions in ATR per timeframe ×
 > regime × setup type. Derive a noise floor (stop distance below which stops were mostly hit by noise)
@@ -387,7 +369,6 @@ noise? If so, how much wider would it need to be, and what does that do to your 
 # Phase C — Integrity, enforced
 
 ## C1 — Feature 7 rebuilt: the integrity guard
-**Branch:** `feature/integrity-guard`
 
 > ROADMAP step C1. Replace the advisory number-checker with real enforcement:
 > - `explain()` returns structured claims: {text, fact_id, role, direction}, with roles read / why /
@@ -412,7 +393,6 @@ back? Record the counts — they measure how often Claude drifts from the facts.
 # Phase D — The learning loop
 
 ## D1 — Feature 4: Prediction journal + calibration
-**Branch:** `feature/journal`
 
 > ROADMAP step D1. Build the prediction journal:
 > - Before the explanation is revealed, I log: direction, confidence 0–100, invalidation price, horizon
@@ -433,7 +413,6 @@ this feature pays off over months, not days.
 ---
 
 ## D2 — Feature 11: Pre-registration
-**Branch:** `feature/prereg`
 
 > ROADMAP step D2. Build pre-registration:
 > - `src/research/prereg.py` and an append-only SQLite `experiments` table.
@@ -450,7 +429,6 @@ this feature pays off over months, not days.
 ---
 
 ## D3 — Feature 13a: News & macro context
-**Branch:** `feature/news-context`
 
 > ROADMAP step D3. Build the context panel:
 > - Extend the calendar with consensus / previous / actual; add a headline source (headline + link only,
@@ -468,7 +446,6 @@ this feature pays off over months, not days.
 ---
 
 ## D4 — Feature 13b: Event study
-**Branch:** `feature/event-study`
 
 > ROADMAP step D4. Build the event study:
 > - SQLite `events` table seeded from calendar history plus major geopolitical events.
@@ -487,7 +464,6 @@ this feature pays off over months, not days.
 ---
 
 ## D5 — Feature 12: Behavioural circuit breaker
-**Branch:** `feature/circuit-breaker`
 
 > ROADMAP step D5. Extend the journal with declared rules:
 > - `src/journal/rules.py`: a versioned rule set (max risk per trade, max open positions, required regime,
@@ -505,7 +481,6 @@ this feature pays off over months, not days.
 ---
 
 ## D6 — Feature 5: Blind training mode
-**Branch:** `feature/blind-mode`
 
 > ROADMAP step D6. Build blind training:
 > - Pick a random historical bar where a pattern reached confirmed (filter by type and regime).

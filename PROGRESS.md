@@ -6,8 +6,8 @@ A state file for the "learning instrument" build. Source of truth for what's nex
 **ROADMAP progress:** A1 ✓ (merged, `645231c`), A2 ✓ (merged, `800e12a`; docs `1003735`), A3 ✓ (merged), A4 ✓ (merged), A5 ✓ (merged), A6 ✓ (merged), A7 ✓ (merged), B1 ✓ (merged — labelling mode
 built; the ≥30 labelled charts are the user's ongoing work), B2 tooling ✓ (merged — `eval_detectors.py`;
 its measurement + tuning run as soon as ≥30 charts are labelled — the user has decided NOT to label, so
-it stays unmeasured). B3 ✓ (merged), B4 ✓ (merged), B5 ✓ (merged), A8 ✓ (merged — forward record live since 2026-09-25 on wizard.bosfoot.com), R1 ✓ (merged). **Next: R2** (freeze the caution flags into the forward record).
-Order from here (user-confirmed 2026-09-26): R2 → R3 → R4 → C1 (slim) → D1 → D6; D2–D5 on demand. Drawing tools: deferred.
+it stays unmeasured). B3 ✓ (merged), B4 ✓ (merged), B5 ✓ (merged), A8 ✓ (merged — forward record live since 2026-09-25 on wizard.bosfoot.com), R1 ✓ (merged), R2 ✓ (merged). **Next: R3** (measure each caution condition on history, 70/30 split).
+Order from here (user-confirmed 2026-09-26): R3 → R4 → C1 (slim) → D1 → D6; D2–D5 on demand. Drawing tools: deferred.
 
 ## Current state
 
@@ -63,6 +63,23 @@ apply if `config.yaml` omits them.
 ---
 
 ## Log (newest first)
+
+### ROADMAP R2 — Caution flags frozen into the forward record
+- **Done:** 2026-09-26 · on `main` · **merged.**
+- Every new `forward_reads` row stores `caution` = JSON {code: true/false/null} from the same facts
+  the read came from. The column is added automatically to existing DBs (the droplet's), and reads
+  from before R2 stay NULL ("not recorded"). Outcome rule v1 is unchanged, as are the facts hash and
+  idempotency.
+- The report gains a **Caution split** (`report.caution_split`): per rule version × read kind ×
+  condition, the judged reads it flagged vs the ones it didn't, pooled across timeframes. It shows
+  outcome counts beside the coin flip on the same reads, a rate only with 20+ on a side, a "can't
+  judge" count, and how many judged reads predate R2. The grid shows "⚠ N cautions" per read (hover
+  lists them); the review lists each judged read's flags.
+- Verified: 4 new tests (flags stored for all 8 codes; a pre-R2 table is migrated and its reads count
+  as not recorded; the split math incl. the coin flip and can't-judge; report wiring). 505 tests
+  pass. Browser-checked on a demo DB (6 mornings of fixture candles) at 1400 and 400 px.
+- **The forward test of Phase R starts with the first morning after this deploy.** The first 30m/1h
+  splits arrive the next day, 4h after ~a week, 1d after ~a month; rates need 20+ reads per side.
 
 ### ROADMAP R1 — Caution conditions as Layer 1 facts
 - **Done:** 2026-09-26 · branch `feature/caution-conditions` · **merged to `main`.**

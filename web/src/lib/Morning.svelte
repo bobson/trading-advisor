@@ -43,6 +43,12 @@
   const skipped = $derived(Array.isArray(report?.run?.skipped) ? report!.run!.skipped : [])
   const rate = (r: number | null) => (r == null ? '' : ` · ${Math.round(r * 100)}%`)
   const DIR_OUT = ['followed_through', 'invalidated', 'expired', 'ambiguous']
+  // R2: the caution conditions frozen with each read
+  const flagsOn = (r: ForwardRead) => Object.entries(r.caution ?? {}).filter(([, v]) => v).map(([k]) => report?.caution_labels?.[k] ?? k)
+  const sideText = (x: { engine: { n: number; counts: Record<string, number>; rate: number | null } }, kind: string) =>
+    x.engine.n === 0 ? '—' : kind === 'directional'
+      ? `${x.engine.counts.followed_through} followed · ${x.engine.counts.invalidated} invalidated · ${x.engine.counts.expired + x.engine.counts.ambiguous} other (${x.engine.n})${rate(x.engine.rate)}`
+      : `${x.engine.counts.correct} correct · ${x.engine.counts.missed_move} missed (${x.engine.n})${rate(x.engine.rate)}`
   const BENIGN = ['already read today', 'no new closed candle since the last read']
   const clock = (t: number) => new Date(t * 1000).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
   const attemptText = (a: { trigger: string; status: string; new_reads: number; resolved: number; skipped: { reason: string }[] }) => {
@@ -94,7 +100,9 @@
             <tr>
               <td><b>{r.symbol}</b> <span class="muted">{r.timeframe}</span></td>
               <td class="muted">{r.run_date}<br /><span class="small">{TIER[r.tier] ?? r.tier} · {r.horizon} bars</span></td>
-              <td>{readText(r)}</td>
+              <td>{readText(r)}
+                {#if r.caution === null}<br /><span class="small muted">cautions: not recorded (before R2)</span>
+                {:else if flagsOn(r).length}<br /><span class="small warn">⚠ {flagsOn(r).join(' · ')}</span>{/if}</td>
               <td><span class="chip {OUT[r.outcome ?? '']?.[1]}">{OUT[r.outcome ?? '']?.[0] ?? r.outcome}</span></td>
               <td class="muted small">{r.baseline_direction} → {OUT[r.baseline_outcome ?? '']?.[0] ?? '—'}</td>
             </tr>
@@ -125,6 +133,7 @@
                     <span class="tier {r.tier}">{TIER[r.tier] ?? r.tier}</span>
                     {#if r.read_kind === 'directional'}<span class="dir {r.direction}">{arrow(r.direction)} {r.direction}</span>{/if}
                     <span class="small muted">{fmt(r.price)}</span>
+                    {#if flagsOn(r).length}<span class="warn small" title={flagsOn(r).join('\n')}>⚠ {flagsOn(r).length} caution{flagsOn(r).length > 1 ? 's' : ''}</span>{/if}
                   </button>
                 {:else}
                   {@const why = skipped.find((s) => s.symbol === sym && s.timeframe === tf)?.reason}
@@ -171,6 +180,26 @@
     {:else}
       <p class="muted small">No read has been judged yet.</p>
     {/if}
+    <h3>Caution split <span class="muted small">— did reads a caution flagged really go worse? (all timeframes pooled)</span></h3>
+    {#if report.caution_split?.rows.length}
+      <div class="tablewrap"><table>
+        <thead><tr><th>caution</th><th>reads</th><th>when flagged</th><th>when not flagged</th></tr></thead>
+        <tbody>
+          {#each report.caution_split.rows as c}
+            <tr>
+              <td>{c.label}{#if report.rule.version !== c.rule_version} <span class="muted">v{c.rule_version}</span>{/if}</td>
+              <td class="muted">{c.read_kind}</td>
+              <td>{sideText(c.flagged, c.read_kind)}{#if c.flagged.baseline && c.flagged.engine.n}<br /><span class="small muted">coin flip: {c.flagged.baseline.counts.followed_through} followed · {c.flagged.baseline.counts.invalidated} invalidated</span>{/if}</td>
+              <td>{sideText(c.not_flagged, c.read_kind)}{#if c.not_flagged.baseline && c.not_flagged.engine.n}<br /><span class="small muted">coin flip: {c.not_flagged.baseline.counts.followed_through} followed · {c.not_flagged.baseline.counts.invalidated} invalidated</span>{/if}</td>
+            </tr>
+          {/each}
+        </tbody>
+      </table></div>
+      <p class="muted small">Cautions are still unmeasured (ROADMAP R3). A % appears only with 20+ reads on a side.
+        {#if report.caution_split.not_recorded}{report.caution_split.not_recorded} judged read(s) are from before cautions were recorded.{/if}</p>
+    {:else}
+      <p class="muted small">No judged read with recorded cautions yet{report.caution_split?.not_recorded ? ` (${report.caution_split.not_recorded} judged before cautions were recorded)` : ''}.</p>
+    {/if}
     {#if report.gaps.length}<p class="muted small">Missed mornings (gaps, never backfilled): {report.gaps.join(', ')}</p>{/if}
     <details><summary class="small">How reads are judged — rule v{report.rule.version}</summary><pre>{report.rule.text}</pre></details>
   {/if}
@@ -198,6 +227,7 @@
   .tier.confirmed { color: #c9d1d9; font-weight: 600; }
   .dir.bullish { color: #3fb950; }
   .dir.bearish { color: #f85149; }
+  .warn { color: #d29922; }
   .chip { border: 1px solid #30363d; border-radius: 10px; padding: 1px 8px; font-size: 12px; white-space: nowrap; }
   .chip.good { color: #3fb950; border-color: #238636; }
   .chip.bad { color: #f85149; border-color: #da3633; }

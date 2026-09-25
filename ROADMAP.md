@@ -84,13 +84,14 @@ instructing it better. So **the guide shrinks as Layer 1 grows.**
 | B5 Calibrate quality + re-rank the guide | ✅ Done (merged, 2026-09-25) |
 | A8 Morning report: the forward record | ✅ Done (merged, 2026-09-25); record live since 2026-09-25 (day one) |
 | R1 Caution conditions as Layer 1 facts | ✅ Done (merged, 2026-09-26) |
-| Tests | 501 green, ruff + svelte-check clean |
+| R2 Caution flags frozen into the forward record | ✅ Done (merged, 2026-09-26) |
+| Tests | 505 green, ruff + svelte-check clean |
 
 **Remaining, in order:**
 
 ~~`A1`~~ ✅ `→` ~~`A2`~~ ✅ `→` ~~`A3`~~ ✅ `→` ~~`A4`~~ ✅ `→` ~~`A5`~~ ✅ `→` ~~`A6`~~ ✅ `→` ~~`A7`~~ ✅ `→` ~~`A8`~~ ✅ *(honesty & precision hardening, then start the forward record)*
 `→ B1 → B2 → B3 → B4 → B5` *(measure the detectors, then the patterns)*
-`→` ~~`R1`~~ ✅ `→ R2 → R3 → R4` *(risk filters: when not to enter, when to exit; order confirmed 2026-09-26)*
+`→` ~~`R1`~~ ✅ `→` ~~`R2`~~ ✅ `→ R3 → R4` *(risk filters: when not to enter, when to exit; order confirmed 2026-09-26)*
 `→ C1` *(integrity, enforced)*
 `→ D1 → D2 → D3 → D4 → D5 → D6` *(the learning loop)*
 
@@ -124,7 +125,7 @@ score** until measured; regime is standalone (not a vote).
 
 ## 6. Remaining — in build order
 
-One step per branch, tests alongside, SQLite at `data/wizard.db`, ATR-scaled tolerances,
+Built on `main` (a push deploys, so push only finished steps), tests alongside, SQLite at `data/wizard.db`, ATR-scaled tolerances,
 look-ahead-safe, merged only when **Done when** passes. Prompts for each are in `PROMPTS.md`.
 
 ### Phase A — Honesty & precision hardening *(do first; mostly small)*
@@ -443,7 +444,8 @@ live alerting / real-time; anything that implies prediction.
 
 ## 8. Conventions (every step)
 
-- One step per branch; merge only when **Done when** passes.
+- Work on `main`; push a step only when its **Done when** passes. A push to `main` deploys to
+  wizard.bosfoot.com after CI, so never push work in progress. (One-branch-per-step dropped 2026-09-26.)
 - Tests alongside code, runnable under `pytest -m "not network"`.
 - SQLite at `data/wizard.db` via stdlib `sqlite3` — no Postgres, no ORM.
 - **Never fixed-% thresholds** — ATR-scaled tolerances.
