@@ -2,7 +2,7 @@
   // Pattern scanner: every pair × the chosen timeframes, patterns worth a look NOW — fresh breakouts,
   // patterns about to break out, and ones still in play — each with how that pattern type has done
   // historically (counts; a % only with 20+ cases). What happened before, not odds for this one.
-  import { getScan, recordText, type ScanResult, type ScanRow } from './api'
+  import { getScan, qualityText, recordText, type ScanResult, type ScanRow } from './api'
 
   let { onOpen }: { onOpen?: (symbol: string, timeframe: string) => void } = $props()
 
@@ -64,6 +64,7 @@
                  + (r.target != null ? ` · target ${fmt(r.target)}` : '') + ` · last close ${fmt(r.last_close)}`}
               </div>
               <div class="record small">History: {recordText(r.record)}</div>
+              <div class="record small muted">This one's {qualityText(r.quality_band)}</div>
               <button class="open" onclick={() => onOpen?.(r.symbol, r.timeframe)}>open chart ▶</button>
             </div>
           {/each}

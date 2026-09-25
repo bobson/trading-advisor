@@ -21,6 +21,7 @@ export interface Pattern {
   state_time?: number | null         // the breakout (or failure) candle
   target_hit_time?: number | null    // the candle that reached the target (completed patterns)
   record?: PatternRecord | null      // measured history of this pattern type (encyclopedia)
+  quality_band?: QualityBand | null  // B5: the raw quality score calibrated into low/medium/high
 }
 export interface Divergence { kind: string; reason: string; times: number[] }
 export interface CandlePattern { time: number; direction: string; label: string }
@@ -220,6 +221,7 @@ export interface EncRow {
   move_n: number; move_atr_median: number | null; move_atr_q1: number | null; move_atr_q3: number | null
   resolved_n: number; bars_to_resolution_median: number | null
   built_at: number
+  quality_cuts?: [number, number] | null   // B5 band boundaries (split='all' rows)
   examples?: { symbol: string; timeframe: string; bar: number; direction: string; outcome: string; move_atr: number | null }[]
 }
 export interface EncIndex { built_at: number | null; params: Record<string, number>; types: EncRow[] }
@@ -227,6 +229,7 @@ export interface Textbook { shape: string | null; trigger: string | null; claims
 export interface EncPage {
   pattern_type: string; rows: EncRow[]; textbook: Textbook | null
   detector_precision: Record<string, { precision: number | null; n: number; status: string }>
+  quality_meaning?: Record<string, string>   // B5, per timeframe, decided by Layer 1
 }
 export const getEncyclopedia = () => get<EncIndex>('/encyclopedia')
 export const getEncyclopediaPage = (t: string) => get<EncPage>(`/encyclopedia/${encodeURIComponent(t)}`)
@@ -240,12 +243,26 @@ export interface ScanRow {
   symbol: string; timeframe: string; type: string; direction: string; lifecycle: string
   bars_since_breakout: number | null; breakout_level: number | null; invalidation_level: number | null
   target: number | null; last_close: number; distance_atr: number | null; quality: number
-  last_time: number; record: PatternRecord | null
+  last_time: number; record: PatternRecord | null; quality_band: QualityBand | null
 }
 export interface ScanResult { rows: ScanRow[]; skipped: { symbol: string; timeframe: string; reason: string }[]; markets: number; scanned_at: number }
 export const getScan = (timeframes: string[]) => get<ScanResult>(`/scan?timeframes=${timeframes.join(',')}`)
 
 // "target 35 of 85 (41%) · failed 46 of 85 (54%)" — a % only with 20+ judged cases.
+// ROADMAP B5 — quality as a calibrated band: low/medium/high = bottom/middle/top third of this
+// pattern type's past scores, with what the patterns in that band did. Never the raw 0.62.
+export interface QualityBand extends PatternRecord {
+  band: 'low' | 'medium' | 'high'; cuts: [number, number]; raw: number
+  decided_n: number | null; confirmed_n: number | null; confirmation_rate: number | null
+  meaning: string
+}
+export function qualityText(q: QualityBand | null | undefined): string {
+  if (!q) return 'quality: not calibrated yet'
+  const [lo, hi] = q.cuts
+  const range = { low: `score below ${lo}`, medium: `score ${lo}–${hi}`, high: `score ${hi} and up` }[q.band]
+  return `quality ${q.band} band (${range}) — in that band ${recordText(q)}`
+}
+
 export function recordText(r: PatternRecord | null | undefined): string {
   if (!r) return 'no history yet (rebuild the encyclopedia)'
   const part = (label: string, n: number, d: number, rate: number | null) =>

@@ -164,9 +164,10 @@ def advise(
         facts = {**facts, "verdict_record": record_for(verdict_records, m.symbol, m.timeframe, c["bias"],
                                                        c["agreeing_categories"], c["triggered"])}
     if pattern_records is not None:
-        from src.research.scanner import pattern_record
+        from src.research.scanner import pattern_quality, pattern_record
         for p in facts["chart_patterns"]:
             p["record"] = pattern_record(pattern_records, p["type"], m.timeframe)
+            p["quality_band"] = pattern_quality(pattern_records, p["type"], m.timeframe, p["quality"])
     if base_rate is not None:
         entry = base_rate_entry(base_rate, facts["confluence"]["bias"])
         if entry:

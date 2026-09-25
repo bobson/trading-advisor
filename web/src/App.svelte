@@ -7,7 +7,7 @@
   import Scanner from './lib/Scanner.svelte'
   import {
     getPairs, getTimeframes, getAnalysis, getTrades, getPosition, postTrade, deleteTrade,
-    getTradesBaseline, recordText,
+    getTradesBaseline, qualityText, recordText,
     type Pair, type Analysis, type PanelToggles, type Trade, type TradePnl, type Position,
     type TradeBaseline, type GoldLabels,
   } from './lib/api'
@@ -477,7 +477,8 @@
       </div>
       <!-- The measured history beside every CURRENT pattern (history-stage ones don't need it). -->
       {#each result.chart.overlays.patterns.filter((p) => ['forming', 'fresh', 'in_play'].includes(p.lifecycle ?? '')) as p}
-        <p class="phist">{p.type} ({timeframe}) — history after a breakout: {recordText(p.record)}</p>
+        <p class="phist">{p.type} ({timeframe}) — history after a breakout: {recordText(p.record)}
+          <br /><span class="pqual">This one's {qualityText(p.quality_band)}{p.quality_band ? `; ${p.quality_band.meaning}` : ''}</span></p>
       {/each}
     {/if}
 
@@ -687,4 +688,5 @@
   .pchip.forming { border-color: #d29922; color: #d29922; }
   .pchip.completed, .pchip.expired { border-color: #6e7681; color: #6e7681; }
   .phist { margin: 2px 0; font-size: 12px; color: #8b949e; }
+  .pqual { color: #6e7681; }
 </style>

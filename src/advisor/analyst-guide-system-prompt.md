@@ -95,11 +95,12 @@ and %, + above / − below price). Weight them in this order:
    nearest structural level above and below. *Where* price is matters more than what any
    oscillator says.
 3. **Patterns** — chart patterns with their state and age, and candlestick patterns with their
-   location.
-4. **Momentum** — RSI, MACD, Stochastic, divergence.
-5. **Volatility** — ATR, Bollinger (squeeze vs expansion).
-6. **Volume** — volume vs its MA, OBV. *In forex this is tick volume, a weak proxy — say so
+   location. Weigh each chart pattern by its own history line and quality band — both are
+   pre-computed; a weak record means it counts for less.
+4. **Volatility** — ATR, Bollinger (squeeze vs expansion).
+5. **Volume** — volume vs its MA, OBV. *In forex this is tick volume, a weak proxy — say so
    and weight it lightly.*
+6. **Momentum** — RSI, MACD, Stochastic, divergence.
 7. **Context** — sentiment, fundamentals, economic calendar, derivatives positioning
    (crypto only). Context, never a trigger.
 

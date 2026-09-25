@@ -34,6 +34,46 @@ def pattern_record(rows: list[dict], pattern_type: str, timeframe: str) -> dict 
     return None
 
 
+_BAND_KEYS = ("sample_size", "judged_n", "target_n", "target_hit_n", "follow_through_rate", "failed_n", "failure_rate",
+              "decided_n", "confirmed_n", "confirmation_rate")
+
+
+def _top(rows: list[dict], pattern_type: str, timeframe: str, split: str) -> dict | None:
+    return next((r for r in rows if r["pattern_type"] == pattern_type and r["timeframe"] == timeframe
+                 and r["symbol"] == "all" and r["regime"] == "all" and r["split"] == split), None)
+
+
+def quality_meaning(rows: list[dict], pattern_type: str, timeframe: str) -> str:
+    """ROADMAP B5 — whether a higher quality score meant anything for this type, decided HERE (Layer 1)
+    from the encyclopedia: the high band vs the low band after a breakout. Both bands need MIN_N (20)
+    judged cases; otherwise 'too few cases to tell'."""
+    hi, lo = _top(rows, pattern_type, timeframe, "quality=high"), _top(rows, pattern_type, timeframe, "quality=low")
+    if not hi or not lo or hi.get("failure_rate") is None or lo.get("failure_rate") is None:
+        return "too few cases to tell whether a higher score meant fewer failures"
+    if hi["failure_rate"] < lo["failure_rate"]:
+        return (f"higher-scored ones failed less often ({hi['failure_rate'] * 100:.0f}% vs "
+                f"{lo['failure_rate'] * 100:.0f}% for the low band)")
+    return (f"a higher score did NOT mean fewer failures ({hi['failure_rate'] * 100:.0f}% vs "
+            f"{lo['failure_rate'] * 100:.0f}% for the low band)")
+
+
+def pattern_quality(rows: list[dict], pattern_type: str, timeframe: str, quality: float | None) -> dict | None:
+    """ROADMAP B5 — the raw 0–1 geometry score translated into its calibrated band: low / medium /
+    high = the bottom / middle / top third of this pattern type's past scores on this timeframe (all
+    markets, the cut points the encyclopedia build used), with what the patterns in that band did.
+    None when the encyclopedia has no bands for the type (old build, too few cases, or every score
+    identical)."""
+    from src.research.encyclopedia import quality_band
+    top = _top(rows, pattern_type, timeframe, "all")
+    cuts = (top or {}).get("quality_cuts")
+    band = quality_band(quality, cuts)
+    if band is None:
+        return None
+    row = _top(rows, pattern_type, timeframe, f"quality={band}") or {}
+    return {"band": band, "cuts": cuts, "raw": quality, **{k: row.get(k) for k in _BAND_KEYS},
+            "meaning": quality_meaning(rows, pattern_type, timeframe)}
+
+
 def _distance_atr(p, close: float, atr: float) -> float | None:
     """How far price is from the breakout, in ATR (0 once broken). Neutral coils: the nearer edge."""
     if not atr or p.breakout_level is None:
@@ -60,6 +100,7 @@ def scan_market(df: pd.DataFrame, symbol: str, timeframe: str, cfg: Config, reco
             "target": p.target, "last_close": close, "distance_atr": _distance_atr(p, close, atr),
             "quality": p.quality, "last_time": int(pd.Timestamp(df.index[-1]).timestamp()),
             "record": pattern_record(records, p.type, timeframe),
+            "quality_band": pattern_quality(records, p.type, timeframe, p.quality),
         })
     return out
 

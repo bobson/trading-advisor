@@ -466,6 +466,20 @@ def _pattern_record_text(r: dict | None) -> str:
             + part("failed", r["failed_n"], r["judged_n"], r["failure_rate"]))
 
 
+def _band_range(q: dict) -> str:
+    lo, hi = q["cuts"]
+    return {"low": f"score below {lo}", "medium": f"score {lo}–{hi}", "high": f"score {hi} and up"}[q["band"]]
+
+
+def _quality_text(p: dict) -> str:
+    """ROADMAP B5 — quality as its calibrated band with counts, never the raw 0–1 score."""
+    q = p.get("quality_band")
+    if not q:
+        return "quality: not calibrated (no measured bands for this pattern type) — don't lean on it"
+    return (f"quality: {q['band']} band ({_band_range(q)}; bands split past {p['type']}s by shape score) — in that band "
+            f"{_pattern_record_text(q)}; {q['meaning']}")
+
+
 def _bars(n) -> str:
     """'1 bar' / 'N bars' (and 'n/a' when unknown)."""
     return "n/a bars" if n is None else f"{n} bar" if n == 1 else f"{n} bars"
@@ -483,7 +497,7 @@ def facts_to_prompt(facts: dict) -> str:
     """Render the facts dict as a readable text block for the model (and for debugging).
 
     ROADMAP A5: sections follow the analyst guide's §3 priority order — (1) trend & regime,
-    (2) structure, (3) patterns, (4) momentum, (5) volatility, (6) volume, (7) context — then the
+    (2) structure, (3) patterns, (4) volatility, (5) volume, (6) momentum, (7) context — then the
     confluence verdict. Every distance is pre-computed (ATR units and %, + above / − below price)
     and every absence is stated, so the model never calculates or infers what is missing."""
     m = facts["market"]
@@ -587,8 +601,9 @@ def facts_to_prompt(facts: dict) -> str:
             sup_ = [k for k, v in conf.items() if v == "supports"]
             con = [k for k, v in conf.items() if v == "contradicts"]
             dd = p.get("distances") or {}
-            add(f"  [{_stage(p)} · {p['direction']}] {p['type']} ({p['kind']}, quality {p['quality']}) — "
+            add(f"  [{_stage(p)} · {p['direction']}] {p['type']} ({p['kind']}) — "
                 f"{_stage_text(p)}; shape formed until {_bars(p.get('bars_since_completion'))} ago")
+            add(f"      {_quality_text(p)}")
             if "record" in p:
                 add(f"      history of this pattern type after a breakout: {_pattern_record_text(p['record'])}")
             add(f"      breakout {p['breakout_level']} ({_d(dd.get('breakout'))}), invalidation "
@@ -607,19 +622,8 @@ def facts_to_prompt(facts: dict) -> str:
         add("  - Candlestick (last closed bar): no pattern")
     add("")
 
-    # --- (4) MOMENTUM ---------------------------------------------------------------------
-    mo = facts["momentum"]
-    add("4. MOMENTUM")
-    add(f"  - RSI: {mo['rsi']} ({mo['rsi_zone']})")
-    add(f"  - MACD: {mo['macd']} vs signal {mo['macd_signal']} ({mo['macd_state']})")
-    add(f"  - Stochastic: %K {mo['stochastic_k']} / %D {mo['stochastic_d']} ({mo['stochastic_zone']})"
-        if mo.get("stochastic_k") is not None else "  - Stochastic: not available")
-    div = facts.get("divergence")
-    add(f"  - RSI divergence ({div['kind']}): {div['reason']}" if div else "  - RSI divergence: none detected")
-    add("")
-
-    # --- (5) VOLATILITY -------------------------------------------------------------------
-    add("5. VOLATILITY")
+    # --- (4) VOLATILITY -----------------------------------------------------------------
+    add("4. VOLATILITY")
     if vt:
         add(f"  - ATR: {vt['atr']} ({vt['atr_pct']}% of price)")
         add(f"  - Bollinger: %B {vt['bollinger_pct_b']} ({vt['bollinger_position']})")
@@ -627,15 +631,26 @@ def facts_to_prompt(facts: dict) -> str:
         add("  - not available")
     add("")
 
-    # --- (6) VOLUME -----------------------------------------------------------------------
+    # --- (5) VOLUME -----------------------------------------------------------------------
     vol = facts.get("volume")
-    add("6. VOLUME:")
+    add("5. VOLUME:")
     if vol:
         state = "above average (confirming the move)" if vol["confirmed"] else "below the confirmation bar (thin)"
         obv = "" if vol.get("obv_rising") is None else f"; OBV {'rising' if vol['obv_rising'] else 'falling'}"
         add(f"  - Last bar {vol['last']} vs {vol['average']} average = {vol['ratio']}x — {state}{obv}")
     else:
         add("  - no volume data available")
+    add("")
+
+    # --- (6) MOMENTUM ---------------------------------------------------------------------
+    mo = facts["momentum"]
+    add("6. MOMENTUM")
+    add(f"  - RSI: {mo['rsi']} ({mo['rsi_zone']})")
+    add(f"  - MACD: {mo['macd']} vs signal {mo['macd_signal']} ({mo['macd_state']})")
+    add(f"  - Stochastic: %K {mo['stochastic_k']} / %D {mo['stochastic_d']} ({mo['stochastic_zone']})"
+        if mo.get("stochastic_k") is not None else "  - Stochastic: not available")
+    div = facts.get("divergence")
+    add(f"  - RSI divergence ({div['kind']}): {div['reason']}" if div else "  - RSI divergence: none detected")
     add("")
 
     # --- (7) CONTEXT ----------------------------------------------------------------------

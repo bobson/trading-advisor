@@ -73,7 +73,8 @@ instructing it better. So **the guide shrinks as Layer 1 grows.**
 | B2 Detector precision/recall + tuning | ✅ Instrument merged (2026-09-24); measurement + tuning pending labels |
 | B3 Empirical Pattern Encyclopedia | ✅ Done (merged, 2026-09-24) |
 | B4 Data adjacency | ✅ Done (merged, 2026-09-24) |
-| Tests | 450 green, ruff + svelte-check clean |
+| B5 Calibrate quality + re-rank the guide | ✅ Done (merged, 2026-09-25) |
+| Tests | 461 green, ruff + svelte-check clean |
 
 **Remaining, in order:**
 

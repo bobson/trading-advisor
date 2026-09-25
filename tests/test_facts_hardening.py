@@ -215,10 +215,25 @@ def test_opposing_fact_is_rendered_or_its_absence_stated(real):
 
 def test_prompt_follows_the_guides_priority_order(real):
     _, _, text = real
-    heads = ["1. TREND & REGIME", "2. STRUCTURE", "3. PATTERNS", "4. MOMENTUM", "5. VOLATILITY",
-             "6. VOLUME", "7. MARKET CONTEXT", "CONFLUENCE VERDICT"]
+    heads = ["1. TREND & REGIME", "2. STRUCTURE", "3. PATTERNS", "4. VOLATILITY",
+             "5. VOLUME", "6. MOMENTUM", "7. MARKET CONTEXT", "CONFLUENCE VERDICT"]
     positions = [text.index(h) for h in heads]
     assert positions == sorted(positions)
+
+
+def test_facts_sections_follow_the_guides_section_3_list(real):
+    """B5: the guide's §3 numbered list and the facts text are one order — reorder one, the other
+    must follow (the guide says the facts 'arrive already ordered by priority')."""
+    import re
+
+    from src.advisor.explain import ANALYST_GUIDE
+    sec3 = ANALYST_GUIDE.split("## 3.")[1].split("## 4.")[0]
+    guide = re.findall(r"^(\d)\. \*\*([A-Za-z]+)", sec3, flags=re.M)
+    _, _, text = real
+    facts = re.findall(r"^(\d)\. ([A-Z &]+)", text, flags=re.M)[:7]
+    assert [n for n, _ in guide] == [n for n, _ in facts]
+    assert all(w.upper() in head for (_, w), (_, head) in zip(guide, facts))
+    assert [w for _, w in guide] == ["Trend", "Structure", "Patterns", "Volatility", "Volume", "Momentum", "Context"]
 
 
 def test_weekly_votes_are_information_only(cfg):

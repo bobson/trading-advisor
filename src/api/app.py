@@ -387,6 +387,7 @@ def encyclopedia_page(pattern_type: str) -> dict:
     the textbook claim from docs/patterns-research.md, and the detector's measured precision (B2 —
     'unmeasured' until gold labels exist)."""
     from src.research.encyclopedia import load_rows
+    from src.research.scanner import quality_meaning
     from src.research.textbook import textbook_claim
     conn = _trades_conn()
     try:
@@ -398,7 +399,8 @@ def encyclopedia_page(pattern_type: str) -> dict:
     precision = {tf: table.get(f"{pattern_type}|{tf}") or {"precision": None, "n": 0, "status": "unmeasured"}
                  for tf in tfs}
     return {"pattern_type": pattern_type, "rows": rows, "textbook": textbook_claim(pattern_type),
-            "detector_precision": precision}
+            "detector_precision": precision,
+            "quality_meaning": {tf: quality_meaning(rows, pattern_type, tf) for tf in tfs}}     # B5
 
 
 # --- Pattern scanner + records beside every find ---------------------------------------------------
@@ -406,7 +408,8 @@ def _encyclopedia_top_rows() -> list[dict]:
     from src.research.encyclopedia import load_rows
     conn = _trades_conn()
     try:
-        return [r for r in load_rows(conn) if r["symbol"] == "all" and r["regime"] == "all" and r["split"] == "all"]
+        return [r for r in load_rows(conn) if r["symbol"] == "all" and r["regime"] == "all"
+                and (r["split"] == "all" or r["split"].startswith("quality="))]      # + B5 quality bands
     finally:
         conn.close()
 
@@ -414,10 +417,11 @@ def _encyclopedia_top_rows() -> list[dict]:
 def _attach_records(patterns: list[dict], timeframe: str) -> None:
     if not patterns:
         return
-    from src.research.scanner import pattern_record
+    from src.research.scanner import pattern_quality, pattern_record
     rows = _encyclopedia_top_rows()
     for p in patterns:
         p["record"] = pattern_record(rows, p["type"], timeframe)
+        p["quality_band"] = pattern_quality(rows, p["type"], timeframe, p.get("quality"))
 
 
 _SCAN_CACHE: dict = {}

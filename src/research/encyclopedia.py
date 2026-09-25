@@ -66,6 +66,7 @@ class Instance:
     pending_breakout: bool = False    # forming, and the data ended before its breakout window closed
     upper_line: tuple | None = None   # (slope, intercept) — sloped boundaries are judged bar by bar
     lower_line: tuple | None = None
+    quality: float | None = None      # the detector's raw geometry score when first seen (B5 bands)
     move_atr: float | None = None
     bars_to_resolution: int | None = None
     profile: dict = field(default_factory=dict)
@@ -172,7 +173,7 @@ def collect_instances(df: pd.DataFrame, cfg: Config, symbol: str, timeframe: str
             inst = Instance(p.type, symbol, timeframe, key[1], i, p.state,
                             str(reg) if reg is not None and not pd.isna(reg) else "unknown",
                             p.direction, p.breakout_level, p.invalidation_level, p.target,
-                            upper_line=p.upper_line, lower_line=p.lower_line)
+                            upper_line=p.upper_line, lower_line=p.lower_line, quality=float(p.quality))
             if p.state == "forming":
                 stop = min(len(df), i + 1 + max_wait)
                 _resolve_breakout(inst, closes, i + 1, stop, window_complete=(i + 1 + max_wait <= len(df)))
@@ -229,9 +230,42 @@ def _stats(group: list[Instance], *, split: str) -> dict:
     }
 
 
+QUALITY_BANDS = ("low", "medium", "high")
+
+
+def quality_cuts(instances: list[Instance]) -> list[float] | None:
+    """ROADMAP B5 — the tertile boundaries of raw quality for ONE (pattern type, timeframe), from the
+    patterns first seen while forming (the population the rates come from). None when there are too
+    few, or the detector gives every instance the same score (nothing to band)."""
+    qs = [x.quality for x in instances if x.first_state == "forming" and x.quality is not None]
+    if len(qs) < 3 or min(qs) == max(qs):
+        return None
+    lo, hi = float(np.percentile(qs, 100 / 3)), float(np.percentile(qs, 200 / 3))
+    if lo == min(qs):                # a third or more tied at the floor (e.g. clamped 0): the whole tie is LOW
+        lo = min(q for q in qs if q > lo)
+        hi = max(hi, lo)
+    return [round(lo, 3), round(hi, 3)]
+
+
+def quality_band(quality: float | None, cuts: list[float] | None) -> str | None:
+    """low / medium / high against the type's cut points. Equal cut points (ties at a clamped value)
+    leave 'medium' empty — never an error."""
+    if quality is None or not cuts:
+        return None
+    lo, hi = cuts
+    return "low" if quality < lo else "high" if quality >= hi else "medium"
+
+
 def aggregate(instances: list[Instance], *, examples_per_market: int = 4) -> list[dict]:
     """Rows keyed (pattern_type, timeframe, symbol, regime, split) — per symbol and regime AND rolled
-    up to symbol='all' / regime='all'. Splits: 'all' plus '<category>=supports|not' per category."""
+    up to symbol='all' / regime='all'. Splits: 'all'; '<category>=supports|not' per category (over
+    CONFIRMED patterns); and 'quality=low|medium|high' (over ALL instances in the band, so the
+    confirmation rate is measured too). The band cut points are computed once per (type, timeframe),
+    pooled across markets, and stored on every split='all' row as `quality_cuts`."""
+    by_type: dict[tuple, list[Instance]] = defaultdict(list)
+    for x in instances:
+        by_type[(x.pattern_type, x.timeframe)].append(x)
+    cuts = {k: quality_cuts(v) for k, v in by_type.items()}
     groups: dict[tuple, list[Instance]] = defaultdict(list)
     for x in instances:
         for sym in (x.symbol, ALL):
@@ -240,10 +274,14 @@ def aggregate(instances: list[Instance], *, examples_per_market: int = 4) -> lis
     rows = []
     for (ptype, tf, sym, reg), group in groups.items():
         base = {"pattern_type": ptype, "timeframe": tf, "symbol": sym, "regime": reg}
-        row = {**base, **_stats(group, split=ALL)}
+        row = {**base, **_stats(group, split=ALL), "quality_cuts": cuts[(ptype, tf)]}
         if reg == ALL:
             row["examples"] = _examples(group, examples_per_market)
         rows.append(row)
+        if cuts[(ptype, tf)]:
+            for band in QUALITY_BANDS:
+                members = [x for x in group if quality_band(x.quality, cuts[(ptype, tf)]) == band]
+                rows.append({**base, **_stats(members, split=f"quality={band}")})
         confirmed = [x for x in group if x.confirmed_bar is not None]      # split rows: see _stats
         for cat in SPLIT_CATEGORIES:
             for val, members in (("supports", [x for x in confirmed if x.profile.get(cat) == "supports"]),

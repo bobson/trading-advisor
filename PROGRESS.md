@@ -6,8 +6,8 @@ A state file for the "learning instrument" build. Source of truth for what's nex
 **ROADMAP progress:** A1 ✓ (merged, `645231c`), A2 ✓ (merged, `800e12a`; docs `1003735`), A3 ✓ (merged), A4 ✓ (merged), A5 ✓ (merged), A6 ✓ (merged), A7 ✓ (merged), B1 ✓ (merged — labelling mode
 built; the ≥30 labelled charts are the user's ongoing work), B2 tooling ✓ (merged — `eval_detectors.py`;
 its measurement + tuning run as soon as ≥30 charts are labelled — the user has decided NOT to label, so
-it stays unmeasured). B3 ✓ (merged), B4 ✓ (merged). **Next: B5** (calibrate quality + re-rank the guide).
-Order from here, by the user's decision: B5 → C1 → D1…D6 → **A8 last**. Drawing tools: deferred.
+it stays unmeasured). B3 ✓ (merged), B4 ✓ (merged), B5 ✓ (merged). **Next: C1** (the integrity guard).
+Order from here, by the user's decision: C1 → D1…D6 → **A8 last**. Drawing tools: deferred.
 
 ## Current state
 
@@ -28,7 +28,7 @@ default) and **ROADMAP B1** (gold-set labelling mode — `gold_labels` table), p
 **1–2 candle patterns at levels** chart markers, the **ROADMAP B2** evaluation instrument, the **pattern life cycle** (fresh / in play /
 completed / expired), and **ROADMAP B3** (the Empirical Pattern Encyclopedia — `encyclopedia_stats` +
 Encyclopedia view), plus **better pattern detection + the Pattern scanner + history beside every
-find** (user request), and **ROADMAP B4** (verdict records beside the verdict). **450 tests green,
+find** (user request), **ROADMAP B4** (verdict records beside the verdict), and **ROADMAP B5** (quality as calibrated bands; guide §3 re-ranked by measurement). **461 tests green,
 ruff + svelte-check clean.**
 
 **Standing facts:** patterns and 3-candle candlesticks stay OUT of the confidence score (facts
@@ -63,6 +63,48 @@ apply if `config.yaml` omits them.
 ---
 
 ## Log (newest first)
+
+### ROADMAP B5 — Calibrate quality + re-rank the guide
+- **Done:** 2026-09-25 · **merged to `main`.**
+- **Quality bands.** Each instance's raw geometry score is stored in the encyclopedia. For each
+  pattern type and timeframe, the bottom/middle/top third of its past scores (pooled across markets)
+  becomes a low/medium/high band. Each band gets its own `quality=<band>` rows (all patterns seen
+  forming, so the breakout rate is measured too), and the cut points are stored as `quality_cuts`.
+  If a third or more of the scores are tied at the floor (e.g. the clamped 0 on triangles), the whole
+  tie counts as low.
+- **Where it shows.** Layer 1 (`scanner.quality_meaning`) decides whether a higher score meant fewer
+  failures: high band vs low band, each needing 20+ cases, otherwise "too few cases to tell". The band
+  and its counts appear on the chart pattern lines, in the Scanner, and in a new table on the
+  Encyclopedia page. The prompt shows the band with its counts and never the raw 0.62; without an
+  encyclopedia it says "not calibrated". The band is injected in `advise`/API like the B4 records, so
+  it's kept out of `build_facts` and the snapshot is unchanged.
+- **What the bands found (1d, all markets):** a higher score meant fewer failures for only 1 of 12 types:
+  sideways channel (54% vs 65%). For double bottoms (59% vs 44%), double tops (64% vs 64%) and
+  symmetric triangles (69% vs 64%), a higher score did NOT mean fewer failures. The other 8 types
+  have too few cases per band to tell. So on its own the raw score says almost nothing, which is
+  why it now shows as a band with its counts. The rebuild left all 3,636 existing encyclopedia rows
+  byte-identical (only the band rows were added).
+- **Spec vs code:** B2 detector precision does not exist yet (0 gold labels; the user chose not to
+  label), so the re-rank uses only the encyclopedia. Trend, structure and context can't be measured
+  from it and keep their places.
+
+**§3 re-rank — justification** (crypto markets only, because forex volume is always 0 and would
+fall into "not supported"; 1d, every judged pattern breakout; a category "supported" = it backed the
+breakout at the breakout candle; overlapping cases, so not independent):
+
+| § 3 item | Old → new | Evidence | Reached target (supported vs not) | Failed (supported vs not) | Consistent across pattern types? |
+|---|---|---|---|---|---|
+| Trend & regime | 1 → 1 | unmeasured (B2 has no labels); regime barely changed outcomes (failed 61–68% in every regime) | — | — | — |
+| Structure | 2 → 2 | unmeasured (B2 has no labels) | — | — | — |
+| Patterns | 3 → 3 | now weighted by each pattern's own record + quality band | — | — | — |
+| **Volatility** | 5 → **4** | clearest effect | 39% (49/125) vs 20% (17/85) | 50% (75/150) vs 70% (90/128) | yes: fewer failures in 4 of 5 types with 5+ cases per side |
+| **Volume** | 6 → **5** | helped pooled, mixed within types | 37% (51/138) vs 21% (15/72) | 55% (95/174) vs 67% (70/104) | mixed: fewer failures in 2 types, more in 2, same in 1 |
+| **Momentum** | 4 → **6** | uninformative at breakouts: it backed 263 of 278, so almost never absent | 32% (66/206) vs 0 of 4 | 58% (153/263) vs 12 of 15 (too few) | can't tell |
+| Candlestick (inside Patterns) | stays | no consistent effect | 35% (15/43) vs 31% (51/167) | 62% vs 59% | no: fewer failures in 2 types, more in 3 |
+| Context | 7 → 7 | unmeasured | — | — | — |
+
+The facts text follows the same order (sections 4 volatility, 5 volume, 6 momentum). A test reads
+the guide's §3 list and checks that the facts sections match it.
 
 ### Chart labels — plain text, no coloured axis tags (user request)
 - **Done:** 2026-09-25 · frontend only (`web/src/lib/PriceChart.svelte`) · **merged to `main`.**

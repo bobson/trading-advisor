@@ -46,6 +46,8 @@
   const main = $derived(row('all'))
   const examples = $derived(page?.rows.find((r) => r.timeframe === tf && r.symbol === sym && r.regime === 'all' && r.split === 'all')?.examples ?? [])
   const precision = $derived(page?.detector_precision?.[tf])
+  // B5: quality band boundaries — pooled across markets, so always read from the all-markets row
+  const cuts = $derived(page?.rows.find((r) => r.timeframe === tf && r.symbol === 'all' && r.regime === 'all' && r.split === 'all')?.quality_cuts)
 
   // A rate is a percentage ONLY with 20+ cases; otherwise the raw counts.
   function rate(r: number | null, num: number, den: number) {
@@ -170,6 +172,32 @@
           </tbody>
         </table>
       </div>
+
+      {#if cuts}
+        <div class="panel">
+          <h4>Split by the detector's quality score <span class="muted small">(bands split this type's past scores into
+            thirds — ties can leave a band empty; all patterns seen forming, not just confirmed ones)</span></h4>
+          {#if page?.quality_meaning?.[tf]}<p class="small">All markets: {page.quality_meaning[tf]}.</p>{/if}
+          <table class="split">
+            <thead><tr><th>band</th><th>score range</th><th>broke out</th><th>reached target</th><th>failed</th><th>move after</th></tr></thead>
+            <tbody>
+              {#each ['low', 'medium', 'high'] as band}
+                {@const r = row(`quality=${band}`)}
+                <tr>
+                  <td>{band}</td>
+                  <td class="muted">{band === 'low' ? `below ${cuts[0]}` : band === 'high' ? `${cuts[1]} and up` : `${cuts[0]} – ${cuts[1]}`}</td>
+                  {#if r}
+                    <td class:thin={rate(r.confirmation_rate, r.confirmed_n, r.decided_n).thin}>{rate(r.confirmation_rate, r.confirmed_n, r.decided_n).text}</td>
+                    <td class:thin={rate(r.follow_through_rate, r.target_hit_n, r.target_n).thin}>{rate(r.follow_through_rate, r.target_hit_n, r.target_n).text}</td>
+                    <td class:thin={rate(r.failure_rate, r.failed_n, r.judged_n).thin}>{rate(r.failure_rate, r.failed_n, r.judged_n).text}</td>
+                    <td class:thin={moveText(r).thin}>{moveText(r).text}</td>
+                  {:else}<td class="thin" colspan="4">no cases in this band</td>{/if}
+                </tr>
+              {/each}
+            </tbody>
+          </table>
+        </div>
+      {/if}
 
       <div class="panel">
         <h4>Examples <span class="muted small">(opens the chart at the breakout candle — history to the right stays hidden)</span></h4>
