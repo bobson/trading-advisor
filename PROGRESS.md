@@ -64,6 +64,16 @@ apply if `config.yaml` omits them.
 
 ## Log (newest first)
 
+### Roadmap: Phase R added (user direction, 2026-09-26)
+- The user's goal, stated plainly: direction is a coin flip; the value is knowing **when not to enter
+  and when to exit**. ROADMAP §2 gained that principle and §6 a new **Phase R — Risk filters**:
+  R1 caution conditions as Layer 1 facts → R2 freeze them into the forward record (early, since forward
+  data takes months) → R3 measure each on a fixed 70/30 time split (keep only conditions that hold in
+  the held-back part and in most markets) → R4 exits (MAE/MFE noise floor, typical run). Prompts are in
+  PROMPTS.md. Placed before C1 in the remaining order, which is still to be confirmed with the user.
+- Honest framing kept: risk size and costs are measurable, direction isn't. A filter is never
+  presented as an edge; one that only cuts trading is reported as a cost saving.
+
 ### Deployment step 1 — automatic deploys from GitHub (user request)
 - **Done:** 2026-09-26 · **merged to `main`.**
 - `.github/workflows/deploy.yml`: after CI passes on a push to `main` (or the manual button), it builds

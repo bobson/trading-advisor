@@ -35,6 +35,14 @@ identified accurately (measured against your own hand-labelled charts), stated e
 with their known reliability. Forecast precision is what the testing ruled out; nothing in this
 roadmap tries to recover it.
 
+**Where the remaining value is: when NOT to enter, and when to exit (Phase R).** Direction is a
+coin flip, but two things are not. **Risk is predictable:** the *size* of moves clusters (calm follows
+calm, wild follows wild), so how far price is likely to swing against a position can be estimated even
+though its direction can't. **Costs are certain:** with no edge, every trade loses its spread and fees
+on average, so avoiding bad conditions saves money even though it predicts nothing. Phase R turns
+"too risky to enter" into measured Layer 1 facts: each caution condition is kept only if the setups
+it flags really did worse, on held-back history and then on the forward record.
+
 ## 3. What the design review found (why the order changed)
 
 - **The biggest honesty leak is deterministic UI, not the AI.** "Bias: bullish · confidence 55% ·
@@ -81,6 +89,7 @@ instructing it better. So **the guide shrinks as Layer 1 grows.**
 
 ~~`A1`~~ ✅ `→` ~~`A2`~~ ✅ `→` ~~`A3`~~ ✅ `→` ~~`A4`~~ ✅ `→` ~~`A5`~~ ✅ `→` ~~`A6`~~ ✅ `→` ~~`A7`~~ ✅ `→` ~~`A8`~~ ✅ *(honesty & precision hardening, then start the forward record)*
 `→ B1 → B2 → B3 → B4 → B5` *(measure the detectors, then the patterns)*
+`→ R1 → R2 → R3 → R4` *(risk filters: when not to enter, when to exit; proposed 2026-09-26, order to confirm)*
 `→ C1` *(integrity, enforced)*
 `→ D1 → D2 → D3 → D4 → D5 → D6` *(the learning loop)*
 
@@ -280,6 +289,92 @@ pattern type; show quality as a calibrated band (low/medium/high) with counts. R
 priority list using measured detector precision (B2) and encyclopedia results — least reliable moves down.
 **Done when:** quality displays its calibrated meaning; the new §3 order is justified by a table in
 `PROGRESS.md`.
+
+### Phase R — Risk filters: when not to enter, and when to exit
+
+**Why this phase exists.** Every test says the engine can't call direction (backtest ~50%, ML AUC 0.51,
+verdict records 49–51%). A beginner's real losses rarely come from picking the wrong direction on a
+coin flip. They come from entering when the odds of a *bad* outcome are stacked: a stop inside normal
+noise, a target that doesn't cover costs, a breakout nobody is behind, a news spike. Those conditions
+are about **risk size and costs, which are measurable**, not about direction. This phase finds them,
+measures them honestly, and shows them beside every read. It never says "enter", only "these
+conditions have gone badly before, and here is the count".
+
+**The honesty rule for this phase.** "Flagged setups did worse" is itself a claim about the future, so
+every condition must earn its place:
+1. It is defined BEFORE it is measured, in Layer 1, ATR-scaled and look-ahead-safe.
+2. It is measured on a fixed time split: thresholds may be tuned only on the older 70%; the newer 30%
+   is looked at once and its result is the one reported.
+3. It must hold in the held-back 30% AND in most markets, not just pooled. With ~8 conditions tested,
+   one fluke "finding" is expected by chance; only consistent ones count.
+4. It is frozen into the forward record, so months later it is tested on data nobody could have
+   fitted to.
+5. A condition that fails any of this stays visible as plain information ("stretched 3.1 ATR from the
+   50-MA"), labelled *unmeasured* or *no measured effect*, and never as a caution.
+6. Even with no effect on outcomes, a filter that cuts trading without making the rest worse has real
+   value: it saves costs. That is reported separately and never dressed up as an edge.
+
+**R1 — Caution conditions as Layer 1 facts.** `src/risk/caution.py`: a pure function of the facts and
+featured frame (bars ≤ N only) returning `facts["caution"] = [{code, detail, value, status}]`. First set:
+- `no_expansion`: a breakout (pattern confirmed within `fresh_bars`) without volume OR volatility
+  expansion on the breakout bar. *The one measured hint so far: crypto breakouts without volatility
+  expansion failed 70% (90/128) vs 50% (75/150) with it, in 4 of 5 pattern types (B5 table).*
+- `stretched`: close more than k × ATR from the slow MA (overextended; a snap-back risk).
+- `volatility_extreme`: ATR in the top (or bottom) decile of its own rolling history, so a normal-size
+  position is really an oversized (or undersized) bet.
+- `stop_in_noise`: the read's invalidation level is closer than ~1 × ATR, so it is likely to be hit by
+  ordinary swings.
+- `no_room`: the distance to the next level in the read's direction, after the cost model
+  (`backtest/costs.py`), is smaller than the distance to invalidation (reward below risk after costs).
+- `htf_against`: the higher-timeframe trend opposes the read.
+- `event_risk`: a high-impact economic event within N hours (needs the calendar, `FINNHUB_API_KEY`;
+  `unavailable` without it, never guessed).
+- `thin_market`: forex or gold in the weekend or session gap, or the first bars after a weekend gap.
+
+Each carries `status`: `unmeasured` until R3. Shown in the facts text and a **Caution** panel in the UI
+(plain words plus the number, e.g. "stop only 0.6 ATR away: inside normal noise"). No vote, no change
+to the confluence score or tier yet.
+**Done when:** every condition has a look-ahead guard test (mutate future bars → unchanged) and a
+fixture where it fires and one where it doesn't; the Caution panel is browser-verified; the snapshot
+diff is reviewed.
+
+**R2 — Freeze the flags into the forward record.** *Do this right after R1, because forward data
+takes months.* Add the caution codes to every new `forward_reads` row (new column, migrated
+automatically; older reads show "not recorded"). The report's scoreboard gains a split: reads with
+caution flags vs without, per flag, with counts beside the coin flip. The outcome rule is unchanged
+(still v1).
+**Done when:** new reads store their flags; the report shows the split (counts only below 20);
+idempotency and review tests still pass; browser-verified.
+
+**R3 — Measure each condition on history (the honest test).** `scripts/measure_caution.py` reuses THE
+walk (`backtest.evaluate.walk`, no second walker). For each directional read and each pattern breakout
+it records the conditions present and the outcome over the horizon:
+failure (invalidation first), follow-through (next level first), **adverse excursion** (how far price
+went against, in ATR), and **stopped by noise** (a 1 × ATR stop hit before any 1 × ATR move in favour).
+Compared flagged vs unflagged per condition × timeframe × market, on the fixed 70/30 split. Output: a
+`caution_stats` table and a PROGRESS.md table. Each condition's `status` becomes `helps` (worse
+outcomes when present, holding in the held-back 30% and in most markets), `no_effect`, or
+`insufficient` (n < 20). Only `helps` conditions appear as cautions in the UI, each with its record
+("breakouts like this failed 90 of 128 times (70%) vs 75 of 150 (50%) without"). The rest move to
+plain info.
+**Done when:** the table is in PROGRESS.md with the held-back numbers; statuses are stored and read by
+the app; a test shows a planted condition is found and a random one is not (the same two-sided
+honesty check the ML harness used).
+
+**R4 — Exits: how far against, how far for.** Per timeframe × regime × setup type, the distribution of
+**maximum adverse excursion** (how far trades went against before the outcome) and **maximum favourable
+excursion** (how far they ran before giving back), in ATR, from the same walk and split. This gives
+two numbers a beginner can use: a **noise floor** ("stops tighter than 0.8 ATR were hit by noise in
+61 of 100 cases") and a **typical run** ("half the moves gave back after 1.4 ATR"). Reuse the exit-rule
+lab (Feature 8, `backtest/exits.py`) with the cost model to compare exits on the held-back 30%.
+Shown as facts, and in the risk calculator as a warning when the chosen stop is inside the noise floor.
+Ranges with counts, never a recommended trade.
+**Done when:** the MAE/MFE table (held-back) is in PROGRESS.md; the risk calculator warns on a stop
+inside the noise floor (browser-verified); the facts carry the noise floor and typical run with counts.
+
+**What this phase cannot do.** It cannot make a coin flip win. It can keep a trader out of the worst
+conditions, size positions for the volatility actually present, and trade less when trading costs
+more than it could earn. Those three are the honest edge available to a retail trader.
 
 ### Phase C — Integrity, enforced
 

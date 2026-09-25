@@ -323,6 +323,67 @@ how much you trust the verdict?
 
 ---
 
+# Phase R — Risk filters: when not to enter, and when to exit
+
+## R1 — Caution conditions as Layer 1 facts
+**Branch:** `feature/caution-conditions`
+
+> ROADMAP step R1 — read Phase R in full first, including its honesty rule. Build `src/risk/caution.py`:
+> a pure, look-ahead-safe function returning `facts["caution"]` = [{code, detail, value, status}] for
+> no_expansion, stretched, volatility_extreme, stop_in_noise, no_room (after the cost model),
+> htf_against, event_risk (unavailable without FINNHUB_API_KEY, never guessed), thin_market.
+> ATR-scaled thresholds in config, never fixed %. Every status starts as `unmeasured`. Add them to the
+> facts text and a Caution panel in the UI in plain words with the number. No vote and no tier change.
+>
+> Tests: a look-ahead guard per condition (mutate future bars → unchanged, with the condition ACTIVE
+> before asserting); a fixture where each fires and one where it doesn't. Show me the snapshot diff
+> before regenerating. Verify the panel in the browser. Summarise in under 15 lines.
+
+**Your check:** open three charts you know well. Do the cautions match what your eye says is risky? Note
+any that feel wrong; that's a detector bug, not a finding.
+
+## R2 — Freeze the flags into the forward record
+**Branch:** `feature/forward-caution`
+
+> ROADMAP step R2. Store the caution codes on every new `forward_reads` row (new column, migrated
+> automatically on the droplet DB; older reads show "not recorded"). Keep outcome rule v1 unchanged.
+> On the morning report, add a scoreboard split: per caution flag, flagged vs not flagged, outcome counts
+> beside the coin flip, rates only with 20+. Tests: migration, flags stored, idempotency still holds.
+> Verify in the browser. Summarise in under 15 lines.
+
+**Your check:** after deploying, look at the next morning's report: every read should list its flags.
+
+## R3 — Measure each condition on history
+**Branch:** `feature/measure-caution`
+
+> ROADMAP step R3 — follow Phase R's honesty rule exactly. `scripts/measure_caution.py` reuses the one
+> backtest walk. For each directional read and pattern breakout, record the conditions present and:
+> failure, follow-through, adverse excursion in ATR, and stopped-by-noise (1 × ATR stop hit before a
+> 1 × ATR move in favour). Fixed 70/30 time split: tune thresholds on the older 70% only; report the
+> held-back 30% once. Per condition × timeframe × market, counts always, a rate only with 20+. Status per
+> condition: helps / no_effect / insufficient; "helps" must hold in the held-back part AND most markets.
+> Store in `caution_stats`; the app shows only "helps" conditions as cautions, with their record.
+> Tests: a planted condition is found, a random one is not. Put the table in PROGRESS.md. Summarise in
+> under 15 lines.
+
+**Your check:** read the table. Which conditions survived? Expect most to show no effect; that's a
+valid result, and the survivors are the valuable ones.
+
+## R4 — Exits: how far against, how far for
+**Branch:** `feature/excursions`
+
+> ROADMAP step R4. From the same walk and split: MAE and MFE distributions in ATR per timeframe ×
+> regime × setup type. Derive a noise floor (stop distance below which stops were mostly hit by noise)
+> and a typical run, with counts. Compare exit rules on the held-back 30% with the exit lab and cost
+> model. Show both numbers in the facts, and in the risk calculator warn when the stop is inside the
+> noise floor. Ranges with counts, never a recommended trade. Verify in the browser. Table in
+> PROGRESS.md. Summarise in under 15 lines.
+
+**Your check:** put in a trade you'd actually take. Does the calculator say your stop is inside the
+noise? If so, how much wider would it need to be, and what does that do to your position size?
+
+---
+
 # Phase C — Integrity, enforced
 
 ## C1 — Feature 7 rebuilt: the integrity guard
