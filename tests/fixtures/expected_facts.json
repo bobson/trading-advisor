@@ -7,6 +7,86 @@
     "direction": "bearish",
     "pattern": "shooting star"
   },
+  "caution": [
+    {
+      "active": false,
+      "code": "no_expansion",
+      "detail": "double top broke out 2 bar(s) ago with volume 2.00\u00d7 its average and ATR +5% over 5 bars \u2014 expansion present",
+      "label": "Breakout without expansion",
+      "status": "unmeasured",
+      "value": {
+        "atr_change_pct": 5.4,
+        "pattern": "double top",
+        "volume_ratio": 2.0
+      }
+    },
+    {
+      "active": false,
+      "code": "stretched",
+      "detail": "0.5 ATR below the 50-MA (flag at 3)",
+      "label": "Stretched from the average",
+      "status": "unmeasured",
+      "value": -0.47
+    },
+    {
+      "active": false,
+      "code": "volatility_extreme",
+      "detail": "ATR is higher than 12% of the last 100 bars",
+      "label": "Volatility at an extreme",
+      "status": "unmeasured",
+      "value": {
+        "kind": null,
+        "percentile": 0.13
+      }
+    },
+    {
+      "active": false,
+      "code": "stop_in_noise",
+      "detail": "invalidation 64273.8 is 1.44 ATR away (noise under 1 ATR; level from zone)",
+      "label": "Invalidation inside normal noise",
+      "status": "unmeasured",
+      "value": {
+        "distance_atr": 1.44,
+        "invalidation": 64273.82
+      }
+    },
+    {
+      "active": true,
+      "code": "no_room",
+      "detail": "to the next level 63828.9: 0.14 ATR after ~0.35 ATR of costs, vs 1.44 ATR to invalidation",
+      "label": "Not enough room after costs",
+      "status": "unmeasured",
+      "value": {
+        "cost_atr": 0.35,
+        "reward_atr": 0.14,
+        "risk_atr": 1.44
+      }
+    },
+    {
+      "active": false,
+      "code": "htf_against",
+      "detail": "higher-timeframe trends are neutral: 4h neutral",
+      "label": "Higher timeframe against the read",
+      "status": "unmeasured",
+      "value": null
+    },
+    {
+      "active": null,
+      "code": "event_risk",
+      "detail": "unavailable: no economic calendar (needs FINNHUB_API_KEY)",
+      "label": "High-impact news soon",
+      "status": "unmeasured",
+      "value": null
+    },
+    {
+      "active": null,
+      "code": "thin_market",
+      "detail": "not applicable: crypto trades around the clock",
+      "label": "Thin market",
+      "status": "unmeasured",
+      "value": null
+    }
+  ],
   "chart_patterns": [
     {
       "bars": [
