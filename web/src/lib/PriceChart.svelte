@@ -119,7 +119,7 @@
   // B4: beside a measured target, how often that pattern type reached it ("· hit 35/80").
   const targetRecord = (p: Pattern) => {
     const r = p.record
-    return r && r.target_n ? ` · hit ${r.target_hit_n}/${r.target_n}` : ' · no record'
+    return r && r.target_n ? ` (${r.target_hit_n}/${r.target_n})` : ''
   }
   const LIFE_TEXT: Record<string, string> = {
     fresh: '✓ breakout (fresh)', in_play: '✓ breakout (in play)', completed: '✓ breakout (done)',
@@ -202,35 +202,36 @@
     if (toggles.ma) for (const ma of data.mas ?? []) {
       const maLine = main.addLineSeries({
         color: ma.key === 'long' ? '#e3b341' : '#58a6ff', lineWidth: 2,
-        priceLineVisible: false, lastValueVisible: true, title: `MA${ma.period}`,
+        priceLineVisible: false, lastValueVisible: false,       // no label (user: not needed for MAs)
         crosshairMarkerVisible: false,
       })
       maLine.setData(align(ma.values) as any)
     }
 
-    // Support/resistance ZONES (A4): a shaded band per zone, drawn under the candles, plus an
-    // axis tag at its centre (no line — a single line is the false precision zones replace).
-    // Stale zones (no reversal for a long time) are fainter and tagged "stale".
+    // Plain-text labels drawn in the pane (no coloured axis tags): S1(8), R2(3), Fib 38, TL, targets.
+    const labels: { price: number; text: string; color: string }[] = []
+
+    // Support/resistance ZONES (A4): a shaded band per zone, drawn under the candles, labelled
+    // S1/S2… (support, nearest first) and R1/R2… (resistance) with the touch count. Stale zones
+    // (no reversal for a long time) are fainter, band and label alike.
     if (!labelMode && toggles.levels && ov.levels.length) {
       series.attachPrimitive(new ZoneBands(ov.levels.map((lv) => ({
         lower: lv.lower, upper: lv.upper,
         color: (lv.role === 'support' ? '#26a641' : '#f85149') + (lv.stale ? '14' : '30'),
       }))) as any)
-      for (const lv of ov.levels)
-        series.createPriceLine({
-          price: lv.price, color: lv.role === 'support' ? '#26a641' : '#f85149',
-          lineVisible: false, axisLabelVisible: true,
-          title: `${lv.role} zone (${lv.touches})${lv.stale ? ' stale' : ''}`,
-        } as any)
+      const rank = { support: 0, resistance: 0 } as Record<string, number>
+      for (const lv of ov.levels) {            // serialize orders each side nearest-first
+        rank[lv.role] += 1
+        labels.push({ price: lv.price, text: `${lv.role === 'support' ? 'S' : 'R'}${rank[lv.role]}(${lv.touches})`,
+          color: (lv.role === 'support' ? '#3fb950' : '#f85149') + (lv.stale ? '99' : '') })
+      }
     }
 
     if (!labelMode && toggles.fib && ov.fibonacci)
       for (const [ratio, price] of Object.entries(ov.fibonacci.levels)) {
         if (![0.382, 0.5, 0.618].includes(Number(ratio))) continue   // key retracements only, less clutter
-        series.createPriceLine({
-          price, color: '#8b949e', lineWidth: 1, lineStyle: 2,
-          axisLabelVisible: true, title: `fib ${(Number(ratio) * 100).toFixed(1)}%`,
-        } as any)
+        series.createPriceLine({ price, color: '#8b949e', lineWidth: 1, lineStyle: 2, axisLabelVisible: false } as any)
+        labels.push({ price, text: `Fib ${Math.round(Number(ratio) * 100)}`, color: '#8b949e' })
       }
 
     // Patterns: draw each ACTUAL boundary (channel/triangle boundaries, neckline, rectangle edges)
@@ -266,8 +267,10 @@
           color: st.color, shape: 'circle', text: `${patternAbbr(p.type)} target hit` })
       // Only CURRENT patterns show their target on the price axis; history doesn't need one.
       if (p.target != null && !['completed', 'expired', 'failed'].includes(p.lifecycle ?? p.state))
-        series.createPriceLine({ price: p.target, color: st.color, lineWidth: 1, lineStyle: 1,
-          axisLabelVisible: true, title: `${p.type} target${targetRecord(p)}` } as any)
+      {
+        series.createPriceLine({ price: p.target, color: st.color, lineWidth: 1, lineStyle: 1, axisLabelVisible: false } as any)
+        labels.push({ price: p.target, text: `${patternAbbr(p.type)} target${targetRecord(p)}`, color: st.color })
+      }
     }
 
     // Two-point trendlines: support through two swing lows (teal), resistance through two swing
@@ -276,9 +279,10 @@
       const tln = main.addLineSeries({
         color: tl.kind === 'support' ? '#39c5cf' : '#db61a2', lineWidth: 2, lineStyle: 0,
         lastValueVisible: false, priceLineVisible: false, crosshairMarkerVisible: false,
-        title: `${tl.direction} ${tl.kind}`,
       })
       tln.setData(dedupeByTime(tl.points.map((pt) => ({ time: pt.time, value: pt.price }))) as any)
+      const end = tl.points[tl.points.length - 1]
+      if (end) labels.push({ price: end.price, text: 'TL', color: tl.kind === 'support' ? '#39c5cf' : '#db61a2' })
     }
 
     if (!labelMode && toggles.swings) for (const s of ov.swings)
@@ -362,8 +366,7 @@
       if (draft.zones.length)
         series.attachPrimitive(new ZoneBands(draft.zones.map((z) => ({ lower: z.lower, upper: z.upper, color: GOLD + '38' }))) as any)
       for (const z of draft.zones)
-        series.createPriceLine({ price: (z.lower + z.upper) / 2, color: GOLD, lineVisible: false,
-          axisLabelVisible: true, title: `your ${z.role}` } as any)
+        labels.push({ price: (z.lower + z.upper) / 2, text: `your ${z.role === 'support' ? 'S' : 'R'}`, color: GOLD })
       const drawPts = (pts: { time: number; price: number }[], color: string, dashed: boolean, label: string) => {
         const line = main.addLineSeries({ color, lineWidth: 2, lineStyle: dashed ? 2 : 0,
           lastValueVisible: false, priceLineVisible: false, crosshairMarkerVisible: false })
@@ -378,6 +381,7 @@
           lineStyle: 2, axisLabelVisible: true, title: 'zone edge 1' } as any)
       }
     }
+    if (labels.length) series.attachPrimitive(new TextLabels(labels) as any)
     markers.sort((a, b) => a.time - b.time)
     series.setMarkers(markers as any)
     if (labelMode && onChartClick) {
@@ -569,6 +573,60 @@
               ctx.fillStyle = z.color
               ctx.fillRect(0, top, scope.bitmapSize.width, h)
             }
+          }),
+        }),
+      }]
+    }
+  }
+
+  // Plain-text labels at given prices, right-aligned just inside the price pane, no background. Labels
+  // that would overlap are nudged apart vertically so they stay readable.
+  class TextLabels {
+    series: any = null
+    items: { price: number; text: string; color: string }[]
+    constructor(items: { price: number; text: string; color: string }[]) { this.items = items }
+    attached({ series }: any) { this.series = series }
+    detached() { this.series = null }
+    updateAllViews() {}
+    paneViews() {
+      const self = this
+      return [{
+        zOrder: () => 'top',
+        renderer: () => ({
+          draw: (target: any) => target.useMediaCoordinateSpace((scope: any) => {
+            if (!self.series) return
+            const ctx = scope.context
+            ctx.font = '11px -apple-system, system-ui, sans-serif'
+            ctx.textAlign = 'right'
+            ctx.textBaseline = 'bottom'
+            const rows = self.items
+              .map((it) => ({ ...it, y: self.series.priceToCoordinate(it.price) as number | null }))
+              .filter((it) => it.y != null && it.y > 8 && it.y < scope.mediaSize.height)
+              .sort((a, b) => (a.y as number) - (b.y as number))
+            // Keep >= GAP px between labels: crowded labels form a group spread evenly around the
+            // group's mean line position, so each label stays as close to its own line as possible.
+            const GAP = 12
+            const groups: { ys: number[]; top: number }[] = []
+            for (const r of rows) {
+              const want = (r.y as number) - 2
+              groups.push({ ys: [want], top: want })
+              while (groups.length > 1) {
+                const g = groups[groups.length - 1], prev = groups[groups.length - 2]
+                if (prev.top + prev.ys.length * GAP <= g.top) break
+                prev.ys.push(...g.ys); groups.pop()
+                const mean = prev.ys.reduce((a, b) => a + b, 0) / prev.ys.length
+                prev.top = mean - ((prev.ys.length - 1) * GAP) / 2
+              }
+            }
+            let k = 0
+            for (const g of groups) g.ys.forEach((_, j) => {
+              const r = rows[k++], x = scope.mediaSize.width - 6, y = g.top + j * GAP
+              ctx.lineWidth = 3                    // thin outline in the chart colour, so a line
+              ctx.strokeStyle = LAYOUT.background.color // running through stays readable (no box)
+              ctx.strokeText(r.text, x, y)
+              ctx.fillStyle = r.color
+              ctx.fillText(r.text, x, y)
+            })
           }),
         }),
       }]

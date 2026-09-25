@@ -64,6 +64,18 @@ apply if `config.yaml` omits them.
 
 ## Log (newest first)
 
+### Chart labels — plain text, no coloured axis tags (user request)
+- **Done:** 2026-09-25 · frontend only (`web/src/lib/PriceChart.svelte`) · **merged to `main`.**
+- Coloured tags on the right price axis are removed. The one exception is the current-price tag.
+- Moving averages have no label.
+- Levels are labelled inside the chart as plain coloured text: S1(3) / R2(5) for rank and touches,
+  Fib 62, TL, and "DBot target (35/80)" with the measured target record.
+- The labels come from a `TextLabels` primitive. Crowded labels are spread evenly around their
+  lines, and a thin outline in the chart's own colour keeps text readable over dotted lines
+  (no box behind the text).
+- Checked in the browser on BTC and XRP 1d at 1400px and 400px widths: no overlaps.
+  svelte-check shows 0 errors.
+
 ### ROADMAP B4 — Data adjacency: measured records beside every directional read
 - **Done:** 2026-09-24 · **branch:** `feature/data-adjacency` · **merged to `main`.**
 - **Done-when → PASS:** every directional verdict and every measured target carries an adjacent count
