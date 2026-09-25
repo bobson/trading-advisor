@@ -175,6 +175,35 @@ def test_running_twice_in_a_day_does_not_duplicate(cfg, candles):
     assert conn.execute("SELECT attempts FROM forward_runs").fetchone()[0] == 2
 
 
+def test_every_same_day_attempt_is_logged_and_the_first_trigger_is_kept(cfg, candles):
+    import json
+    conn, feed = connect(":memory:"), Feed(candles, 300)
+    run_morning(cfg, conn, now=feed.now(), candles_for=feed, engine=ENGINE, trigger="api")
+    run_morning(cfg, conn, now=feed.now() + timedelta(minutes=5), candles_for=feed, engine=ENGINE, trigger="schedule")
+    row = conn.execute("SELECT trigger, started_at, attempts, attempt_log, skipped FROM forward_runs").fetchone()
+    log = json.loads(row["attempt_log"])
+    assert row["trigger"] == "api" and row["attempts"] == 2
+    assert row["started_at"] == int(feed.now().timestamp())                    # the first attempt's start
+    assert [(a["attempt"], a["trigger"], a["new_reads"]) for a in log] == [(1, "api", 2), (2, "schedule", 0)]
+    assert log[0]["skipped"] == [] and {s["reason"] for s in log[1]["skipped"]} == {ALREADY_READ}
+    rep = build_report(conn, cfg, now=feed.now())
+    assert len(rep["run"]["attempt_log"]) == 2
+
+
+def test_a_database_from_before_the_attempt_log_gets_the_column(tmp_path):
+    import sqlite3
+    db = str(tmp_path / "old.db")
+    old = sqlite3.connect(db)
+    old.execute("CREATE TABLE forward_runs (run_date TEXT PRIMARY KEY, status TEXT NOT NULL, trigger TEXT, "
+                "started_at INTEGER, finished_at INTEGER, attempts INTEGER NOT NULL DEFAULT 0, new_reads INTEGER "
+                "NOT NULL DEFAULT 0, resolved INTEGER NOT NULL DEFAULT 0, skipped TEXT, engine_commit TEXT)")
+    old.execute("INSERT INTO forward_runs (run_date, status, attempts, new_reads) VALUES ('2026-09-25', 'ok', 2, 20)")
+    old.commit(); old.close()
+    conn = connect(db)
+    assert "attempt_log" in {r[1] for r in conn.execute("PRAGMA table_info(forward_runs)")}
+    assert conn.execute("SELECT new_reads FROM forward_runs").fetchone()[0] == 20       # data kept
+
+
 def test_weekend_market_with_no_new_closed_candle_is_skipped_not_reread(cfg, candles):
     conn, feed = connect(":memory:"), Feed(candles, 300)
     _run(cfg, conn, feed)

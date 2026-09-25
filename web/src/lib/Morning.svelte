@@ -43,6 +43,13 @@
   const skipped = $derived(Array.isArray(report?.run?.skipped) ? report!.run!.skipped : [])
   const rate = (r: number | null) => (r == null ? '' : ` · ${Math.round(r * 100)}%`)
   const DIR_OUT = ['followed_through', 'invalidated', 'expired', 'ambiguous']
+  const BENIGN = ['already read today', 'no new closed candle since the last read']
+  const clock = (t: number) => new Date(t * 1000).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+  const attemptText = (a: { trigger: string; status: string; new_reads: number; resolved: number; skipped: { reason: string }[] }) => {
+    const bad = a.skipped.filter((s) => !BENIGN.includes(s.reason)).length
+    const what = a.new_reads || a.resolved ? `${a.new_reads} new reads, ${a.resolved} judged` : 'nothing new'
+    return `${a.trigger === 'schedule' ? '08:00 timer' : a.trigger === 'api' ? 'Run now button' : 'by hand'} · ${a.status} · ${what}${bad ? ` · ${bad} market(s) failed` : ''}`
+  }
 </script>
 
 <section class="morning">
@@ -65,6 +72,12 @@
   </div>
   {#if error}<p class="error">{error}</p>{/if}
   {#if loading && !report}<p class="muted">Loading…</p>{/if}
+
+  {#if report?.run?.attempt_log?.length}
+    <p class="muted small attempts">Runs this morning:
+      {#each report.run.attempt_log as a, i}{i ? ' · ' : ' '}<span title={a.skipped.map((s) => `${s.symbol} ${s.timeframe}: ${s.reason}`).join('\n')}>{clock(a.started_at)} {attemptText(a)}</span>{/each}
+    </p>
+  {/if}
 
   {#if report && !report.run_date}
     <p class="muted">No morning has run yet. The first run is day one of the forward record.</p>

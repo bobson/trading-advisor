@@ -6,7 +6,7 @@ A state file for the "learning instrument" build. Source of truth for what's nex
 **ROADMAP progress:** A1 ✓ (merged, `645231c`), A2 ✓ (merged, `800e12a`; docs `1003735`), A3 ✓ (merged), A4 ✓ (merged), A5 ✓ (merged), A6 ✓ (merged), A7 ✓ (merged), B1 ✓ (merged — labelling mode
 built; the ≥30 labelled charts are the user's ongoing work), B2 tooling ✓ (merged — `eval_detectors.py`;
 its measurement + tuning run as soon as ≥30 charts are labelled — the user has decided NOT to label, so
-it stays unmeasured). B3 ✓ (merged), B4 ✓ (merged), B5 ✓ (merged), A8 ✓ (merged — forward record starts on the first droplet run). **Next: C1** (the integrity guard).
+it stays unmeasured). B3 ✓ (merged), B4 ✓ (merged), B5 ✓ (merged), A8 ✓ (merged — forward record live since 2026-09-25 on wizard.bosfoot.com). **Next: C1** (the integrity guard).
 Order from here: C1 → D1…D6. Drawing tools: deferred.
 
 ## Current state
@@ -83,8 +83,16 @@ apply if `config.yaml` omits them.
 
 ### ROADMAP A8 — Morning report: the forward record
 - **Done:** 2026-09-25 · branch `feature/morning-report` · **merged to `main`.**
-- **FORWARD RECORD DAY ONE: _not started yet_.** Fill in the date of the first run on the droplet.
-  Every test run so far used a scratch DB.
+- **FORWARD RECORD DAY ONE: 2026-09-25** (Europe/Skopje date). This was the first run on the droplet
+  (wizard.bosfoot.com): status ok, 20 reads (BTC, ETH, SOL, EUR/USD, gold × 30m/1h/4h/1d), engine
+  `803421985009`. The 08:00 timer is enabled (next firing 2026-09-26 06:00 UTC = 08:00 CEST). A
+  second same-day run added nothing ("already read today"), as designed. Check back ~2026-10-02 for
+  the first 4h reviews and ~2026-10-24 for the first 1d reviews.
+- **Run notes fix (2026-09-26):** a second same-day run used to overwrite the day's trigger and skip
+  notes (day one's row reads `schedule` / "already read today" for that reason). Now the first run's
+  trigger and start time are kept, and every run is appended to a new `attempt_log` column (added
+  automatically to existing DBs). The page shows "Runs this morning: …". The reads were never
+  affected.
 - **What it does:** every day at 08:00 Europe/Skopje (`deploy/trading-wizard-morning.timer`, a
   systemd timer on the droplet) `scripts/morning_report.py` does three things. (1) Review: judges
   every past read whose horizon has passed. (2) Read: freezes a read for each watchlist market ×

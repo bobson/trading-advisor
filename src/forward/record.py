@@ -56,8 +56,9 @@ CREATE TABLE IF NOT EXISTS forward_runs (
     attempts    INTEGER NOT NULL DEFAULT 0,
     new_reads   INTEGER NOT NULL DEFAULT 0,
     resolved    INTEGER NOT NULL DEFAULT 0,
-    skipped     TEXT,                      -- JSON [{symbol, timeframe, reason}]
-    engine_commit TEXT
+    skipped     TEXT,                      -- JSON [{symbol, timeframe, reason}] of the LATEST attempt
+    engine_commit TEXT,
+    attempt_log TEXT                       -- JSON, one entry per attempt (appended, never overwritten)
 );
 CREATE TABLE IF NOT EXISTS forward_reads (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -106,6 +107,9 @@ def connect(path: str | Path = "data/wizard.db"):
     if str(path) != ":memory:":
         conn.execute("PRAGMA journal_mode = WAL")
     conn.executescript(SCHEMA)
+    cols = {r[1] for r in conn.execute("PRAGMA table_info(forward_runs)")}
+    if "attempt_log" not in cols:                      # DBs created before the column existed
+        conn.execute("ALTER TABLE forward_runs ADD COLUMN attempt_log TEXT")
     for v, text in RULE_TEXT.items():
         conn.execute("INSERT OR IGNORE INTO forward_rules VALUES (?,?,?,?)", (v, text, rule_hash(v), int(time.time())))
     conn.commit()
@@ -249,8 +253,10 @@ def run_morning(cfg: Config, conn, *, now: datetime | None = None, trigger: str 
     candles_for = candles_for or default_candles(cfg)
     gaps = record_gaps(conn, date.fromisoformat(rd))
     conn.execute("INSERT OR IGNORE INTO forward_runs (run_date, status) VALUES (?, 'running')", (rd,))
-    conn.execute("UPDATE forward_runs SET status='running', trigger=?, started_at=?, attempts=attempts+1, "
-                 "engine_commit=? WHERE run_date=?", (trigger, int(now.timestamp()), engine["commit"], rd))
+    # The FIRST attempt's trigger and start time stay; every attempt is appended to attempt_log at the end.
+    conn.execute("UPDATE forward_runs SET status='running', trigger=COALESCE(trigger, ?), "
+                 "started_at=COALESCE(started_at, ?), attempts=attempts+1, engine_commit=? WHERE run_date=?",
+                 (trigger, int(now.timestamp()), engine["commit"], rd))
     conn.commit()
 
     watch = [(s, tf) for s in mr.symbols for tf in mr.timeframes]
@@ -305,9 +311,15 @@ def run_morning(cfg: Config, conn, *, now: datetime | None = None, trigger: str 
 
     failures = [s for s in skipped if s["reason"] not in _BENIGN]
     status = "ok" if not failures else ("failed" if not candles else "partial")
+    finished = int(time.time())
+    row = conn.execute("SELECT attempts, attempt_log FROM forward_runs WHERE run_date=?", (rd,)).fetchone()
+    log = json.loads(row["attempt_log"] or "[]")
+    log.append({"attempt": row["attempts"], "trigger": trigger, "started_at": int(now.timestamp()),
+                "finished_at": finished, "status": status, "new_reads": new_reads, "resolved": resolved,
+                "engine_commit": engine["commit"], "skipped": skipped})
     conn.execute("UPDATE forward_runs SET status=?, finished_at=?, new_reads=new_reads+?, resolved=resolved+?, "
-                 "skipped=? WHERE run_date=?",
-                 (status, int(time.time()), new_reads, resolved, json.dumps(skipped), rd))
+                 "skipped=?, attempt_log=? WHERE run_date=?",
+                 (status, finished, new_reads, resolved, json.dumps(skipped), json.dumps(log), rd))
     conn.commit()
     return {"run_date": rd, "status": status, "new_reads": new_reads, "resolved": resolved,
             "skipped": skipped, "gaps": gaps, "engine": engine}

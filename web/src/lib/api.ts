@@ -291,6 +291,12 @@ export interface MorningRun {
   run_date: string; status: string; trigger: string | null; started_at: number | null; finished_at: number | null
   attempts: number; new_reads: number; resolved: number
   skipped: { symbol: string; timeframe: string; reason: string }[] | string | null; engine_commit: string | null
+  attempt_log?: MorningAttempt[]
+}
+export interface MorningAttempt {
+  attempt: number; trigger: string; started_at: number; finished_at: number; status: string
+  new_reads: number; resolved: number; engine_commit: string
+  skipped: { symbol: string; timeframe: string; reason: string }[]
 }
 export interface MorningReport {
   run_date: string | null; run: MorningRun | null; runs: MorningRun[]; gaps: string[]; first_run: string | null

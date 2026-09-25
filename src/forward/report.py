@@ -70,8 +70,13 @@ def build_report(conn, cfg: Config, run_date: str | None = None, now: datetime |
     real = [r for r in runs if r["status"] != "gap"]
     day = run_date or (real[0]["run_date"] if real else None)
     run = next((r for r in runs if r["run_date"] == day), None)
-    if run and run.get("skipped"):
-        run["skipped"] = json.loads(run["skipped"])
+    if run:
+        run["skipped"] = json.loads(run["skipped"]) if run.get("skipped") else []
+        run["attempt_log"] = json.loads(run["attempt_log"]) if run.get("attempt_log") else []
+    for r in runs:
+        if r is not run:
+            r.pop("attempt_log", None)
+            r.pop("skipped", None)
     q = lambda sql, *a: [_read(r) for r in conn.execute(sql, a)]  # noqa: E731
     review = q("SELECT * FROM forward_reads WHERE resolved_run_date=? ORDER BY symbol, timeframe", day) if day else []
     grid = q("SELECT * FROM forward_reads WHERE run_date=? ORDER BY symbol, timeframe", day) if day else []
