@@ -104,6 +104,7 @@ def advise(
     reliability: Optional[dict] = None,
     verdict_records: Optional[list] = None,
     pattern_records: Optional[list] = None,
+    caution_stats: Optional[dict] = None,
     as_of_bar: Optional[int] = None,
     explanation_style: Optional[str] = None,
 ) -> AnalysisResult:
@@ -165,6 +166,9 @@ def advise(
         c = facts["confluence"]
         facts = {**facts, "verdict_record": record_for(verdict_records, m.symbol, m.timeframe, c["bias"],
                                                        c["agreeing_categories"], c["triggered"])}
+    if caution_stats:                                    # R3: measured status + record per caution
+        from src.risk.caution_stats import apply_stats
+        apply_stats(facts, caution_stats)
     if pattern_records is not None:
         from src.research.scanner import pattern_quality, pattern_record
         for p in facts["chart_patterns"]:

@@ -169,3 +169,19 @@ stored on new reads, so the record splits cleanly by engine version.
 - The API's own `API_KEY` lockdown (`X-API-Key` header) is not used here: the page doesn't send the
   header, and a key shipped in a public page wouldn't be secret anyway. Caddy's `basic_auth` is the
   lock. Keep `ALLOWED_ORIGINS=https://wizard.bosfoot.com` in `.env`.
+
+## Caution statistics (ROADMAP R3)
+
+The Caution panel shows what held-back history said about each condition. That comes from the
+`caution_stats` table, built by `scripts/measure_caution.py` (about an hour of CPU). **Never copy
+your local `wizard.db` over the droplet's**: it holds the live forward record. Copy only the raw
+cases file up, and rebuild the one table from it (seconds):
+
+```bash
+# on your computer, after running scripts/measure_caution.py locally
+scp data/caution_cases.json bobson@206.81.21.49:/srv/trading-wizard/data/
+# on the droplet (not around 08:00 Skopje, when the morning report runs)
+cd /srv/trading-wizard && .venv/bin/python scripts/measure_caution.py --from-cases data/caution_cases.json
+```
+
+The API reads the table on every request, so no restart is needed.

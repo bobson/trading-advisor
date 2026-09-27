@@ -72,6 +72,13 @@ export interface Situation {
 // ROADMAP R1: the risk around a read, never its direction. active null = can't be judged here.
 export interface CautionEntry {
   code: string; label: string; active: boolean | null; detail: string; value: unknown; status: string
+  record?: string            // R3: what held-back history said (live path only)
+}
+// R3: active conditions shown as cautions; the rest of the active ones are plain information.
+export const CAUTION_STATUSES = ['helps', 'by_construction', 'sizing', 'unmeasured']
+export const CAUTION_TAG: Record<string, string> = {
+  helps: 'measured', by_construction: 'arithmetic', sizing: 'sizing', unmeasured: 'not yet measured',
+  no_effect: 'no measured effect', insufficient: 'too little history', forward_only: 'untested',
 }
 export interface Analysis {
   market: { symbol: string; timeframe: string; last_close: number }
@@ -317,6 +324,7 @@ export interface MorningReport {
   next_run: string; schedule: string; rule: { version: number; text: string }
   caution_split?: { rows: CautionSplitRow[]; not_recorded: number }
   caution_labels?: Record<string, string>
+  caution_status?: Record<string, string>     // R3: what held-back history said per condition
 }
 export const getMorning = (date?: string) => get<MorningReport>(`/morning${date ? `?date=${date}` : ''}`)
 export const runMorning = () => send<{ started: boolean }>('POST', '/morning/run')

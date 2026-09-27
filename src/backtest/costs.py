@@ -55,6 +55,10 @@ def _session_mult(session: Optional[str]) -> float:
     return 1.2
 
 
+def _is_metal(symbol: str) -> bool:
+    return symbol.upper().startswith(("XAU", "XAG"))
+
+
 def _pip_size(symbol: str) -> float:
     return 0.01 if "JPY" in symbol.upper() else 0.0001
 
@@ -84,11 +88,15 @@ class CostModel:
     def trade_cost(self, bias: str, entry: float, atr_pct: float, holding_hours: float,
                    session: Optional[str] = None) -> TradeCost:
         c = self.c
-        if self.asset == FOREX:
+        if self.asset == FOREX and _is_metal(self.symbol):      # gold/silver: quoted in USD per ounce
+            spread = (c.metal_spread_usd / entry) * _session_mult(session)
+            fees = c.metal_commission_usd / entry
+        elif self.asset == FOREX:
             spread = (c.forex_spread_pips * _pip_size(self.symbol) / entry) * _session_mult(session)
+            fees = c.forex_commission_pips * _pip_size(self.symbol) / entry      # broker commission, not an exchange fee
         else:
             spread = c.crypto_spread_bps / 1e4
-        fees = 2 * c.taker_fee_bps / 1e4
+            fees = 2 * c.taker_fee_bps / 1e4
         slippage = 2 * c.slippage_atr_mult * max(0.0, atr_pct)
 
         funding = 0.0

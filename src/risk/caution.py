@@ -45,6 +45,25 @@ LABELS = {
 }
 
 
+# ROADMAP R3: once measured, an ACTIVE condition is shown as a caution only if history backs it
+# (`helps`), or it's a true arithmetic warning about the read's own levels (`by_construction`), or a
+# sizing fact. `no_effect`, `insufficient` and `forward_only` ones become plain information. Before
+# any measurement exists, everything is `unmeasured` and shown as a caution labelled so (R1 behaviour).
+CAUTION_STATUSES = ("helps", "by_construction", "sizing", UNMEASURED)
+STATUS_TAG = {"helps": "measured: flagged reads did worse on held-back history",
+              "by_construction": "arithmetic warning about this read's own levels",
+              "sizing": "sizing fact",
+              UNMEASURED: "unmeasured",
+              "no_effect": "no measured effect on held-back history",
+              "insufficient": "too little history to measure",
+              "forward_only": "untestable on history; only the forward record can test it"}
+
+
+def is_caution(entry: dict) -> bool:
+    """An ACTIVE entry that is shown as a caution (vs plain information)."""
+    return bool(entry.get("active")) and entry.get("status", UNMEASURED) in CAUTION_STATUSES
+
+
 def read_direction(facts: dict) -> str | None:
     """The read's direction, as the forward record defines it: tier not no_setup AND a directional
     bias. None = a no-setup (range) read."""

@@ -135,7 +135,14 @@ def build_report(conn, cfg: Config, run_date: str | None = None, now: datetime |
         "schedule": f"{mr.run_at} {mr.timezone}",
         "rule": {"version": RULE_VERSION, "text": RULE_TEXT[RULE_VERSION]},
         "caution_labels": _labels(),
+        "caution_status": _statuses(conn),
     }
+
+
+def _statuses(conn) -> dict:
+    """R3: what held-back history said about each condition (empty until measured)."""
+    from src.risk.caution_stats import load
+    return {code: s["status"] for code, s in load(conn).items()}
 
 
 def _labels() -> dict:

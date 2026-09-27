@@ -6,8 +6,8 @@ A state file for the "learning instrument" build. Source of truth for what's nex
 **ROADMAP progress:** A1 ✓ (merged, `645231c`), A2 ✓ (merged, `800e12a`; docs `1003735`), A3 ✓ (merged), A4 ✓ (merged), A5 ✓ (merged), A6 ✓ (merged), A7 ✓ (merged), B1 ✓ (merged — labelling mode
 built; the ≥30 labelled charts are the user's ongoing work), B2 tooling ✓ (merged — `eval_detectors.py`;
 its measurement + tuning run as soon as ≥30 charts are labelled — the user has decided NOT to label, so
-it stays unmeasured). B3 ✓ (merged), B4 ✓ (merged), B5 ✓ (merged), A8 ✓ (merged — forward record live since 2026-09-25 on wizard.bosfoot.com), R1 ✓ (merged), R2 ✓ (merged). **Next: R3** (measure each caution condition on history, 70/30 split).
-Order from here (user-confirmed 2026-09-26): R3 → R4 → C1 (slim) → D1 → D6; D2–D5 on demand. Drawing tools: deferred.
+it stays unmeasured). B3 ✓ (merged), B4 ✓ (merged), B5 ✓ (merged), A8 ✓ (merged — forward record live since 2026-09-25 on wizard.bosfoot.com), R1 ✓ (merged), R2 ✓ (merged), R3 ✓ (merged — no condition changed the coin flip; ~80% of reads have a stop inside noise and no room after costs). **Next: R4** (exits: MAE/MFE noise floor).
+Order from here (user-confirmed 2026-09-26): R4 → C1 (slim) → D1 → D6; D2–D5 on demand. Drawing tools: deferred.
 
 ## Current state
 
@@ -63,6 +63,57 @@ apply if `config.yaml` omits them.
 ---
 
 ## Log (newest first)
+
+### ROADMAP R3 — Caution conditions measured on history (the honest test)
+- **Done:** 2026-09-27 · on `main` · **merged.**
+- `src/risk/caution_stats.py` + `scripts/measure_caution.py`: THE walk. Every directional read records
+  its caution flags and the outcome over the timeframe's horizon: a ±1 ATR bracket (level-independent),
+  the rule-v1 outcome, adverse excursion and realised range. The split is per market, 70/30 by time,
+  purged at the boundary. **No thresholds were tuned** (the a-priori `caution:` values).
+- **Decision rules were fixed in the docstring before any result**, by kind:
+  - directional (`no_expansion`, `stretched`, `htf_against`, `thin_market` on forex/gold): `helps`
+    needs a held-back loss-rate lift ≥ 5 points with n ≥ 20 on both sides, the same sign in the tune
+    part, and most markets (≥ 2) agreeing, each with at least half the effect;
+  - `stop_in_noise` and `no_room` = `by_construction`;
+  - `volatility_extreme` = `sizing`;
+  - `event_risk` = `forward_only`.
+  - The honesty test caught a flaw first: a one-market effect passed because noise-sized positives
+    counted as agreement. The half-effect clause was added before any real result was aggregated.
+    Across 20 seeds: planted effect found 20/20, random flags 0/20, one-market effect 1/20.
+- **Results** (9,781 directional reads · 7 markets × 1h/4h/1d · held-back 30%, step 4):
+
+  | Condition | Flagged lost the ±1 ATR bracket | Unflagged | Status |
+  |---|---|---|---|
+  | Breakout without expansion | 30/61 (49%) | 1510/3029 (50%) | no_effect (0 markets eligible) |
+  | Stretched from the average | 310/681 (46%) | 1230/2409 (51%) | no_effect (flagged lost *less*) |
+  | Higher timeframe against | 171/333 (51%) | 1369/2757 (50%) | no_effect (3 of 6 markets) |
+  | Thin market (forex/gold) | 52/103 (50%) | 529/1049 (50%) | no_effect |
+  | Volatility extreme | next moves median 5.17 ATR (n=1021) | 5.32 ATR (n=2189) | sizing: ATR already adapts |
+  | Invalidation inside noise | invalidated first 981/2299 (43%) | 161/624 (26%) | by_construction |
+  | No room after costs | invalidated first 751/2339 (32%) | 391/584 (67%) | by_construction |
+  | News soon | no historical calendar | | forward_only |
+
+  **No condition changed the coin flip.** The encyclopedia hint (breakouts without expansion fail
+  more) didn't carry over to directional reads, where the flag is rare. **The real finding is about
+  the engine's own levels:** about 8 in 10 directional reads have an invalidation closer than 1 ATR
+  AND a next level that doesn't beat it after costs. Most reads aren't tradeable as structured. The
+  panel now says so on every such read.
+- **Display:** active conditions are cautions only if `helps`, `by_construction` or `sizing` (each
+  with its tag and a one-line record from history); `no_effect` / `insufficient` / `forward_only` ones
+  become "information only". Statuses are injected in `advise` / the API (never in `build_facts`, so
+  the snapshot is unchanged), and the morning report's caution split shows "history: …" per condition.
+- **Spec vs code (rule 2):** the spec keeps only proven (`helps`) conditions as cautions. `stop_in_noise`
+  and `no_room` can't be tested fairly (they're built from the read's own levels), so they stay
+  visible, labelled "arithmetic warning (not a finding)". `volatility_extreme` stays as a sizing fact.
+- **Bug fixed on the way (Feature 10 cost model):** the crypto taker fee (5 bps/side) was charged on
+  forex and gold, ~11 pips per EUR/USD round trip, 1.5 ATR on 1h. Forex now pays spread plus a
+  `forex_commission_pips` (0.6, round trip); gold pays a `metal_spread_usd` (0.30 $/oz) plus an
+  optional commission. This also lowers forex costs in every backtest and exit-lab report. The
+  forex/gold part of R3 was re-run after the fix and the verdicts didn't change. Forex "no room" is
+  still flagged on 87% of reads, so it's geometry, not costs.
+- Verified: 11 new R3 tests + 2 cost regressions, 518 tests pass. Browser-checked the panel (XRP 1d:
+  sizing + two arithmetic warnings with their records) and the report. **Droplet:** copy
+  `data/caution_cases.json` up and run `--from-cases` there (DEPLOY.md); never copy the whole DB.
 
 ### ROADMAP R2 — Caution flags frozen into the forward record
 - **Done:** 2026-09-26 · on `main` · **merged.**

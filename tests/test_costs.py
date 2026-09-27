@@ -26,7 +26,8 @@ def cfg():
 
 
 def _zero_costs(cfg, **over):
-    z = dict(crypto_spread_bps=0, forex_spread_pips=0, taker_fee_bps=0, slippage_atr_mult=0,
+    z = dict(crypto_spread_bps=0, forex_spread_pips=0, taker_fee_bps=0, forex_commission_pips=0,
+             metal_spread_usd=0, metal_commission_usd=0, slippage_atr_mult=0,
              funding_bps_8h=0, forex_financing_bps_day=0, tax_rate=0)
     z.update(over)
     return cfg.model_copy(update={"costs": CostsConfig(**z)})
@@ -68,6 +69,21 @@ def test_forex_spread_is_session_aware(cfg):
     overlap = m.trade_cost("bullish", 1.10, 0.0, 24, session="London/New York overlap").spread
     assert tokyo > overlap > 0                                 # Asian hours are wider
     assert m.trade_cost("bullish", 1.10, 0.0, 24).financing > 0   # forex has overnight financing
+
+
+def test_forex_pays_a_broker_commission_not_the_crypto_exchange_fee(cfg):
+    """Regression (found in R3): the 5 bps/side crypto taker fee was charged on forex — ~11 pips per
+    EUR/USD round trip. Forex now pays spread + a pip commission; about 1.6 pips in London."""
+    tc = CostModel("EUR/USD", cfg).trade_cost("bullish", 1.10, 0.0, 0, session="London")
+    assert tc.fees == pytest.approx(cfg.costs.forex_commission_pips * 0.0001 / 1.10)
+    pips = (tc.spread + tc.fees) * 1.10 / 0.0001
+    assert 1.0 < pips < 3.0
+
+
+def test_gold_spread_is_in_dollars_per_ounce(cfg):
+    tc = CostModel("XAU/USD", cfg).trade_cost("bullish", 4300.0, 0.0, 0, session="London")
+    assert tc.spread * 4300.0 == pytest.approx(cfg.costs.metal_spread_usd)
+    assert tc.fees == pytest.approx(cfg.costs.metal_commission_usd / 4300.0)
 
 
 # --- gross -> net + breakeven ---------------------------------------------------------------

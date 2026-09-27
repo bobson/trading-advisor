@@ -3,7 +3,7 @@
   // Skopje the reads are frozen; each is judged later against a fixed, versioned rule. Order: the
   // review (what resolved this morning) first, then today's reads, then the synthesis — the review is
   // shown beside the read, never fed into it. Counts always; a rate only with 20+ cases.
-  import { getMorning, runMorning, type ForwardRead, type MorningReport } from './api'
+  import { CAUTION_TAG, getMorning, runMorning, type ForwardRead, type MorningReport } from './api'
 
   let { onOpen }: { onOpen?: (symbol: string, timeframe: string) => void } = $props()
 
@@ -187,7 +187,8 @@
         <tbody>
           {#each report.caution_split.rows as c}
             <tr>
-              <td>{c.label}{#if report.rule.version !== c.rule_version} <span class="muted">v{c.rule_version}</span>{/if}</td>
+              <td>{c.label}{#if report.rule.version !== c.rule_version} <span class="muted">v{c.rule_version}</span>{/if}
+                {#if report.caution_status?.[c.code]}<br /><span class="small muted">history: {CAUTION_TAG[report.caution_status[c.code]] ?? report.caution_status[c.code]}</span>{/if}</td>
               <td class="muted">{c.read_kind}</td>
               <td>{sideText(c.flagged, c.read_kind)}{#if c.flagged.baseline && c.flagged.engine.n}<br /><span class="small muted">coin flip: {c.flagged.baseline.counts.followed_through} followed · {c.flagged.baseline.counts.invalidated} invalidated</span>{/if}</td>
               <td>{sideText(c.not_flagged, c.read_kind)}{#if c.not_flagged.baseline && c.not_flagged.engine.n}<br /><span class="small muted">coin flip: {c.not_flagged.baseline.counts.followed_through} followed · {c.not_flagged.baseline.counts.invalidated} invalidated</span>{/if}</td>
@@ -195,7 +196,8 @@
           {/each}
         </tbody>
       </table></div>
-      <p class="muted small">Cautions are still unmeasured (ROADMAP R3). A % appears only with 20+ reads on a side.
+      <p class="muted small">"history" = what the held-back 30% of past data said (ROADMAP R3); this table is the live
+        check of the same conditions. A % appears only with 20+ reads on a side.
         {#if report.caution_split.not_recorded}{report.caution_split.not_recorded} judged read(s) are from before cautions were recorded.{/if}</p>
     {:else}
       <p class="muted small">No judged read with recorded cautions yet{report.caution_split?.not_recorded ? ` (${report.caution_split.not_recorded} judged before cautions were recorded)` : ''}.</p>

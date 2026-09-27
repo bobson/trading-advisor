@@ -236,7 +236,10 @@ class CostsConfig(_Strict):
     enabled: bool = True
     crypto_spread_bps: float = 2.0        # round-trip order-book spread, bps of price (crypto)
     forex_spread_pips: float = 1.0        # base pip spread for majors (widened by session)
-    taker_fee_bps: float = 5.0            # exchange taker fee PER SIDE, bps
+    taker_fee_bps: float = 5.0            # CRYPTO exchange taker fee PER SIDE, bps (never charged on forex/metals)
+    forex_commission_pips: float = 0.6    # forex broker commission, ROUND TRIP, in pips (~$6 per 100k)
+    metal_spread_usd: float = 0.30        # gold/silver round-trip spread, USD per ounce (widened by session)
+    metal_commission_usd: float = 0.0     # gold/silver commission, round trip, USD per ounce
     slippage_atr_mult: float = 0.05       # slippage per side = mult × (ATR / price) — volatility-scaled
     funding_bps_8h: float = 1.0           # perp funding per 8h, bps of notional (crypto; longs pay when +)
     forex_financing_bps_day: float = 0.5  # overnight/weekend financing per day, bps (forex CFD)

@@ -8,7 +8,7 @@
   import Morning from './lib/Morning.svelte'
   import {
     getPairs, getTimeframes, getAnalysis, getTrades, getPosition, postTrade, deleteTrade,
-    getTradesBaseline, qualityText, recordText,
+    getTradesBaseline, qualityText, recordText, CAUTION_STATUSES, CAUTION_TAG,
     type Pair, type Analysis, type PanelToggles, type Trade, type TradePnl, type Position,
     type TradeBaseline, type GoldLabels,
   } from './lib/api'
@@ -346,16 +346,26 @@
     {/if}
 
     {#if result.caution?.length}
-      <!-- ROADMAP R1: risk conditions around the read (never its direction). Unmeasured until R3. -->
-      {@const on = result.caution.filter((c) => c.active)}
+      <!-- ROADMAP R1 + R3: the risk around the read (never its direction). Active conditions that history
+           backs (or that are arithmetic / sizing facts) are cautions; the rest are information only. -->
+      {@const on = result.caution.filter((c) => c.active && CAUTION_STATUSES.includes(c.status))}
+      {@const info = result.caution.filter((c) => c.active && !CAUTION_STATUSES.includes(c.status))}
       <section class="caution panel" class:has={on.length}>
-        <h3>⚠ Caution <span class="cnote">the risk around this read, not its direction · not yet measured</span></h3>
+        <h3>⚠ Caution <span class="cnote">the risk around this read, not its direction</span></h3>
         {#if on.length}
           <ul>
-            {#each on as c}<li><b>{c.label}</b> — {c.detail}</li>{/each}
+            {#each on as c}
+              <li><b>{c.label}</b> <span class="ctag {c.status}">{CAUTION_TAG[c.status] ?? c.status}</span> — {c.detail}
+                {#if c.record}<br /><span class="crec">{c.record}</span>{/if}</li>
+            {/each}
           </ul>
         {:else}
           <p class="none">No caution condition active on this read.</p>
+        {/if}
+        {#if info.length}
+          <p class="cinfo">Also active, information only:
+            {#each info as c, k}{k ? ' · ' : ' '}<span title={c.record ?? ''}>{c.label.toLowerCase()} ({CAUTION_TAG[c.status] ?? c.status})</span>{/each}
+          </p>
         {/if}
         <p class="cfoot">
           {#if result.caution.some((c) => c.active === false)}Not present: {result.caution.filter((c) => c.active === false).map((c) => c.label.toLowerCase()).join(' · ')}.{/if}
@@ -654,6 +664,10 @@
   .caution li b { color: #e3b341; font-weight: 600; }
   .caution .none { margin: 0; font-size: 14px; color: #8b949e; }
   .caution .cfoot { margin: 8px 0 0; font-size: 12px; color: #6e7681; }
+  .caution .ctag { font-size: 11px; border: 1px solid #30363d; border-radius: 8px; padding: 0 6px; color: #8b949e; }
+  .caution .ctag.helps { color: #e3b341; border-color: #9e6a03; }
+  .caution .crec { font-size: 12px; color: #8b949e; }
+  .caution .cinfo { margin: 8px 0 0; font-size: 13px; color: #8b949e; }
   .panel h2 { margin: 0 0 8px; font-size: 16px; }
   pre { white-space: pre-wrap; margin: 0; color: #c9d1d9; }
 

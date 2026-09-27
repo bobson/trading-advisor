@@ -134,6 +134,7 @@ def analysis(
                         base_rate=BASE_RATES.get(f"{symbol}|{timeframe}"),
                         reliability=RELIABILITY.get("table"),
                         verdict_records=_verdict_rows(), pattern_records=_encyclopedia_top_rows(),
+                        caution_stats=_caution_stats(),
                         as_of_bar=as_of_bar, explanation_style=explanation_style)
     except NotImplementedError as exc:  # e.g. forex before Phase 26
         raise HTTPException(status_code=501, detail=str(exc))
@@ -452,6 +453,16 @@ def scan_patterns(timeframes: str = Query("1d", description="comma list, e.g. 1d
     result["scanned_at"] = int(now)
     _SCAN_CACHE[key] = (now, result)
     return result
+
+
+def _caution_stats() -> dict:
+    """ROADMAP R3: measured status per caution condition ({} until scripts/measure_caution.py runs)."""
+    from src.risk.caution_stats import load
+    conn = _trades_conn()
+    try:
+        return load(conn)
+    finally:
+        conn.close()
 
 
 def _verdict_rows() -> list[dict]:

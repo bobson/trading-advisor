@@ -706,16 +706,21 @@ def facts_to_prompt(facts: dict) -> str:
         add("  - derivatives positioning: not available for this read (not fetched, or not a crypto perp)")
     add("")
 
-    # --- CAUTION (ROADMAP R1) -------------------------------------------------------------
+    # --- CAUTION (ROADMAP R1; statuses from R3) -------------------------------------------
     caution = facts.get("caution")
     if caution:
-        add("CAUTION CONDITIONS (the RISK around this read, never its direction; not votes; UNMEASURED "
-            "until ROADMAP R3 — say 'unmeasured' if you mention one):")
-        on = [x for x in caution if x["active"]]
+        from src.risk.caution import STATUS_TAG, is_caution
+        add("CAUTION CONDITIONS (the RISK around this read, never its direction; not votes; each carries how "
+            "far history backs it — quote that tag if you mention one):")
+        on = [x for x in caution if is_caution(x)]
         for x in on:
-            add(f"  - ACTIVE {x['label']}: {x['detail']}")
+            rec = f" — {x['record']}" if x.get("record") else ""
+            add(f"  - ACTIVE [{STATUS_TAG[x['status']]}] {x['label']}: {x['detail']}{rec}")
         if not on:
             add("  - none active")
+        info = [x for x in caution if x["active"] and not is_caution(x)]
+        for x in info:
+            add(f"  - information only [{STATUS_TAG[x['status']]}] {x['label']}: {x['detail']}")
         off = [x["label"].lower() for x in caution if x["active"] is False]
         if off:
             add("  - not present: " + "; ".join(off))
