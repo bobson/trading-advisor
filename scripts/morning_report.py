@@ -42,8 +42,17 @@ def main() -> int:
             out = run_morning(cfg, conn, trigger=args.trigger)
         finally:
             conn.close()
+        # D1: resolve the journal's due calls too (its own module and rule — never mixed with the reads)
+        from src.journal.resolve import live_candles, resolve_due
+        from src.journal.store import connect as jconnect
+        jc = jconnect(args.db)
+        try:
+            n_journal = resolve_due(jc, live_candles(cfg))
+        finally:
+            jc.close()
     print(f"Morning run {out['run_date']}: {out['status']} — {out['new_reads']} new reads, "
           f"{out['resolved']} resolved, engine {out['engine']['commit']}{' (dirty)' if out['engine']['dirty'] else ''}")
+    print(f"  journal: {n_journal} call(s) resolved")
     for g in out["gaps"]:
         print(f"  gap recorded: {g}")
     for s in out["skipped"]:

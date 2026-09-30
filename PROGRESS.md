@@ -6,8 +6,8 @@ A state file for the "learning instrument" build. Source of truth for what's nex
 **ROADMAP progress:** A1 ✓ (merged, `645231c`), A2 ✓ (merged, `800e12a`; docs `1003735`), A3 ✓ (merged), A4 ✓ (merged), A5 ✓ (merged), A6 ✓ (merged), A7 ✓ (merged), B1 ✓ (merged — labelling mode
 built; the ≥30 labelled charts are the user's ongoing work), B2 tooling ✓ (merged — `eval_detectors.py`;
 its measurement + tuning run as soon as ≥30 charts are labelled — the user has decided NOT to label, so
-it stays unmeasured). B3 ✓ (merged), B4 ✓ (merged), B5 ✓ (merged), A8 ✓ (merged — forward record live since 2026-09-25 on wizard.bosfoot.com), R1 ✓ (merged), R2 ✓ (merged), R3 ✓ (merged — no condition changed the coin flip; ~80% of reads have a stop inside noise and no room after costs), R4 ✓ (merged — noise floor ~1 ATR, stable; Phase R complete), C1 slim ✓ (merged). **Next: D1** (prediction journal + calibration).
-Order from here (user-confirmed 2026-09-26): D1 → D6; D2–D5 on demand. Drawing tools: deferred.
+it stays unmeasured). B3 ✓ (merged), B4 ✓ (merged), B5 ✓ (merged), A8 ✓ (merged — forward record live since 2026-09-25 on wizard.bosfoot.com), R1 ✓ (merged), R2 ✓ (merged), R3 ✓ (merged — no condition changed the coin flip; ~80% of reads have a stop inside noise and no room after costs), R4 ✓ (merged — noise floor ~1 ATR, stable; Phase R complete), C1 slim ✓ (merged), D1 ✓ (merged). **Next: D6** (blind training mode).
+Order from here (user-confirmed 2026-09-26): D6; D2–D5 on demand. Drawing tools: deferred.
 
 ## Current state
 
@@ -63,6 +63,40 @@ apply if `config.yaml` omits them.
 ---
 
 ## Log (newest first)
+
+### ROADMAP D1 — Prediction journal + calibration
+- **Done:** 2026-09-30 · on `main` · **merged.**
+- `src/journal/{store,resolve,calibration}.py`, the `journal_entries` table, and `POST/GET/DELETE
+  /journal` + `GET /journal/price`. The UI: a "📝 My call" form on the Analysis page and the Morning
+  report, and a new **Journal** page (`#/journal`).
+- **Logging:** the server fixes the bar (the latest CLOSED candle, fresh data) and its price; the form
+  shows exactly which candle and price before you log. The engine's read at that bar is frozen with
+  the call (bias, tier, current patterns, Feature-6 regime, facts hash, commit). What was ON SCREEN
+  (verdict, explanation) is stored, so calls split into **blind vs anchored**. An option hides the
+  engine's read (verdict, record, cautions, categories, explanation, chart marker) until you log or
+  reveal; on the Morning report it works per market, on the latest morning only.
+- **Journal rule v1 (fixed, versioned):** the window is the closed bars after the logging bar up to
+  the horizon (weeks / days / bars; 2 weeks default). **Invalidated** if the invalidation is touched
+  anywhere in it; otherwise **correct** if the last close is on the called side, **incorrect** if not
+  (an equal close = incorrect). A call resolves only once the data covers its window (a forex
+  Saturday end waits for Monday), idempotently. Resolution happens on the Journal page and in the
+  08:00 job, fetching only markets with a due call.
+- **Calibration:** Brier (beside 0.25 = always saying 50%), a 10-point confidence curve (a dot and a
+  rate only with 20+ calls in a band, counts otherwise), overconfidence (mean confidence − share
+  right), and breakdowns by blind/anchored, timeframe, page, engine regime and pattern. No streaks,
+  no praise.
+- **Spec vs code (rule 2):** up/down calls only (no neutral: it needs a range, not one price);
+  confidence 50–100 meaning "P(judged correct under the rule)"; live candles only (practice on past
+  bars is D6); **no hedging** (one live call per market/timeframe/candle across pages — found in
+  browser testing, where analysis-up + morning-down on the same candle were both accepted); deletion
+  only within 5 minutes and never after resolution; an invalidation > 50% from the price is refused
+  as a typo (found in testing: an invalidation of 0 had been accepted).
+- The API reads an optional `TRADES_DB` env (like `MORNING_DB`) so a scratch server never writes test
+  calls into the real journal. Verified: 19 tests, 558 pass. Browser-checked on a scratch DB (hide →
+  log → reveal, morning per-market log, the Journal page with 140 synthetic judged calls so the curve
+  has dots) at 1100/1300 and 400 px.
+- **User's check:** log your first real calls with the engine's read hidden. It pays off over months,
+  not days.
 
 ### ROADMAP C1 (slim) — The integrity guard
 - **Done:** 2026-09-30 · on `main` · **merged.**

@@ -345,3 +345,37 @@ export interface MorningReport {
 }
 export const getMorning = (date?: string) => get<MorningReport>(`/morning${date ? `?date=${date}` : ''}`)
 export const runMorning = () => send<{ started: boolean }>('POST', '/morning/run')
+
+// --- ROADMAP D1: the prediction journal (YOUR calls) ---
+export interface JournalEntry {
+  id: number; created_at: number; source: string; symbol: string; timeframe: string
+  bar_time: number; price: number; direction: 'up' | 'down'; confidence: number; invalidation: number
+  horizon_value: number; horizon_unit: string; end_time: number; note: string | null
+  verdict_visible: boolean; explanation_visible: boolean
+  engine: { bias: string; tier: string; aligned: boolean; patterns: string[]; regime: string } | null
+  outcome: 'correct' | 'incorrect' | 'invalidated' | null; resolved_at: number | null; end_close: number | null
+}
+export interface JournalGroup {
+  n: number; hits: number; invalidated: number; accuracy: number | null; brier: number | null
+  mean_confidence?: number; overconfidence: number | null
+}
+export interface JournalStats {
+  overall: JournalGroup; baseline_brier: number; pending: number; min_n: number
+  curve: { bin: string; n: number; hits: number; mean_confidence: number | null; rate: number | null }[]
+  by_timeframe: Record<string, JournalGroup>; by_source: Record<string, JournalGroup>
+  by_regime: Record<string, JournalGroup>; by_pattern: Record<string, JournalGroup>; by_view: Record<string, JournalGroup>
+}
+export interface JournalPage {
+  entries: JournalEntry[]; stats: JournalStats; delete_window_s: number; now: number
+  rule: { version: number; text: string }
+}
+export interface JournalIn {
+  symbol: string; timeframe: string; direction: 'up' | 'down'; confidence: number; invalidation: number
+  horizon_value: number; horizon_unit: string; note: string; source: 'analysis' | 'morning'
+  verdict_visible: boolean; explanation_visible: boolean
+}
+export const getJournal = () => get<JournalPage>('/journal')
+export const getJournalPrice = (symbol: string, timeframe: string) =>
+  get<{ bar_time: number; price: number }>(`/journal/price?symbol=${encodeURIComponent(symbol)}&timeframe=${timeframe}`)
+export const postJournal = (body: JournalIn) => send<JournalEntry>('POST', '/journal', body)
+export const deleteJournal = (id: number) => send<{ deleted: number }>('DELETE', `/journal/${id}`)

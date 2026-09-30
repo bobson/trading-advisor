@@ -242,7 +242,7 @@ def risk_noise_floor(
 
 
 # --- Paper-trading simulator (SQLite `trades`; live spot fills; NO Claude call) ----------------
-_TRADES_DB = None   # None -> default data/wizard.db; tests point this at a tmp path
+_TRADES_DB = os.getenv("TRADES_DB")   # None -> default data/wizard.db; tests / scratch servers point this elsewhere
 
 
 def _trades_conn():
@@ -540,3 +540,101 @@ def morning_run() -> dict:
                       "--trigger", "api"], cwd=root, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
                      start_new_session=True)
     return {"started": True}
+
+
+# --- ROADMAP D1: the prediction journal (YOUR calls, logged before the engine is revealed) ---------
+class JournalIn(BaseModel):
+    symbol: str
+    timeframe: str
+    direction: str
+    confidence: int
+    invalidation: float
+    horizon_value: int = 2
+    horizon_unit: str = "weeks"
+    note: str = ""
+    source: str = "analysis"
+    verdict_visible: bool
+    explanation_visible: bool
+
+
+def _journal_conn():
+    from src.journal.store import connect as jconnect
+    return jconnect(_TRADES_DB or "data/wizard.db")
+
+
+@app.post("/journal", dependencies=_GUARDS)
+def journal_log(body: JournalIn) -> dict:
+    """Log a call at the latest CLOSED bar (fresh candles; the server picks the bar and price)."""
+    from datetime import datetime, timezone
+
+    from src.data.registry import get_candles
+    from src.forward.record import closed_only
+    from src.journal.store import JournalError, log_call, tf_seconds
+    if body.source == "blind":
+        raise HTTPException(status_code=400, detail="blind calls come from training mode (D6)")
+    try:
+        df = get_candles(body.symbol, body.timeframe, cfg,
+                         stale_after_minutes=max(1, tf_seconds(body.timeframe) // 60))
+    except Exception as exc:
+        raise HTTPException(status_code=502, detail=f"no candles: {str(exc)[:160]}")
+    df = closed_only(df, body.timeframe, datetime.now(timezone.utc))
+    conn = _journal_conn()
+    try:
+        return log_call(conn, df=df, cfg=_request_cfg(body.symbol, body.timeframe), **body.model_dump())
+    except JournalError as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
+    finally:
+        conn.close()
+
+
+@app.get("/journal/price", dependencies=_GUARDS)
+def journal_price(symbol: str = Query(...), timeframe: str = Query("1h")) -> dict:
+    """The candle a call logged NOW would be made at (latest closed bar, fresh candles) and its close —
+    so the form shows the exact price the invalidation is checked against."""
+    from datetime import datetime, timezone
+
+    from src.data.registry import get_candles
+    from src.forward.record import closed_only
+    from src.journal.store import tf_seconds
+    try:
+        df = get_candles(symbol, timeframe, cfg, stale_after_minutes=max(1, tf_seconds(timeframe) // 60))
+    except Exception as exc:
+        raise HTTPException(status_code=502, detail=f"no candles: {str(exc)[:160]}")
+    df = closed_only(df, timeframe, datetime.now(timezone.utc))
+    if df.empty:
+        raise HTTPException(status_code=502, detail="no closed candles")
+    return {"bar_time": int(df.index[-1].timestamp()), "price": float(df["close"].iloc[-1])}
+
+
+@app.get("/journal", dependencies=_GUARDS)
+def journal() -> dict:
+    """Your calls + calibration. Due calls are resolved first (only markets with a due call are fetched)."""
+    from src.journal.calibration import calibration
+    from src.journal.resolve import RULE_TEXT, RULE_VERSION, live_candles, resolve_due
+    from src.journal.store import DELETE_WINDOW_S, list_entries
+    conn = _journal_conn()
+    try:
+        resolve_due(conn, live_candles(cfg))
+        entries = list_entries(conn)
+        return {"entries": entries, "stats": calibration(entries), "delete_window_s": DELETE_WINDOW_S,
+                "rule": {"version": RULE_VERSION, "text": RULE_TEXT[RULE_VERSION]}, "now": int(time.time())}
+    finally:
+        conn.close()
+
+
+@app.delete("/journal/{entry_id}", dependencies=_GUARDS)
+def journal_delete(entry_id: int) -> dict:
+    from src.journal.store import JournalError, delete
+    conn = _journal_conn()
+    try:
+        delete(conn, entry_id)
+        return {"deleted": entry_id}
+    except JournalError as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
+    finally:
+        conn.close()
+
+
+def _request_cfg(symbol: str, timeframe: str):
+    from src.service.analyze import _request_config
+    return _request_config(cfg, symbol, timeframe)

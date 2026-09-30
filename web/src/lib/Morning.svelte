@@ -4,6 +4,7 @@
   // review (what resolved this morning) first, then today's reads, then the synthesis — the review is
   // shown beside the read, never fed into it. Counts always; a rate only with 20+ cases.
   import { CAUTION_TAG, getMorning, runMorning, type ForwardRead, type MorningReport } from './api'
+  import JournalForm from './JournalForm.svelte'
 
   let { onOpen }: { onOpen?: (symbol: string, timeframe: string) => void } = $props()
 
@@ -12,6 +13,19 @@
   let loading = $state(false)
   let error = $state<string | null>(null)
   let started = $state(false)
+
+  // D1: log my own read before the engine's is revealed (latest morning only; per symbol)
+  const HIDE_KEY = 'tw.hideMorning'
+  let hideReads = $state((() => { try { return localStorage.getItem(HIDE_KEY) === '1' } catch { return false } })())
+  $effect(() => { try { localStorage.setItem(HIDE_KEY, hideReads ? '1' : '0') } catch { /* private mode */ } })
+  let revealed = $state<Record<string, boolean>>({})
+  let logFor = $state<string | null>(null)
+  let logTf = $state('1d')
+  const latestDate = $derived(report?.runs.find((r) => r.status !== 'gap')?.run_date ?? null)
+  const isLatest = $derived(!!report && report.run_date === latestDate)
+  const hidden = (sym: string) => hideReads && isLatest && !revealed[`${report?.run_date}|${sym}`]
+  function reveal(sym: string) { revealed = { ...revealed, [`${report?.run_date}|${sym}`]: true } }
+  function openLog(sym: string) { logFor = sym; logTf = report?.watchlist.timeframes.at(-1) ?? '1d' }
 
   async function load() {
     loading = true; error = null
@@ -119,16 +133,25 @@
 
     <!-- 2. TODAY'S READS -->
     <h3>2 · Reads frozen on {report.run_date}</h3>
+    {#if isLatest}
+      <p class="small"><label><input type="checkbox" bind:checked={hideReads} /> hide the engine's reads until I've
+        logged my own call for that market</label> <span class="muted">— your calls go to the Journal, a separate record
+        from the engine's (different bars, different rule).</span></p>
+    {/if}
     <div class="tablewrap"><table class="grid">
       <thead><tr><th></th>{#each report.watchlist.timeframes as tf}<th>{tf}</th>{/each}</tr></thead>
       <tbody>
         {#each gridSymbols as sym}
           <tr>
-            <th>{sym}</th>
+            <th>{sym}
+              {#if isLatest}<br /><button class="mini" onclick={() => openLog(sym)}>📝 my call</button>
+                {#if hidden(sym)}<button class="mini" onclick={() => reveal(sym)}>reveal</button>{/if}{/if}</th>
             {#each report.watchlist.timeframes as tf}
               {@const r = cell(sym, tf)}
               <td>
-                {#if r}
+                {#if r && hidden(sym)}
+                  <span class="muted small">hidden</span>
+                {:else if r}
                   <button class="cellbtn" onclick={() => onOpen?.(sym, tf)} title={`${readText(r)} · closed bar ${barDate(r.bar_time)} · engine ${r.engine_commit}`}>
                     <span class="tier {r.tier}">{TIER[r.tier] ?? r.tier}</span>
                     {#if r.read_kind === 'directional'}<span class="dir {r.direction}">{arrow(r.direction)} {r.direction}</span>{/if}
@@ -145,13 +168,25 @@
         {/each}
       </tbody>
     </table></div>
+    {#if logFor && isLatest}
+      <div class="logbox">
+        <b>My call on {logFor}</b>
+        <label class="small">timeframe <select bind:value={logTf}>{#each report.watchlist.timeframes as tf}<option>{tf}</option>{/each}</select></label>
+        <button class="mini" onclick={() => (logFor = null)}>close</button>
+        {#key `${logFor}|${logTf}`}
+          <JournalForm symbol={logFor} timeframe={logTf} source="morning" lastClose={cell(logFor, logTf)?.price ?? null}
+            verdictVisible={!hidden(logFor)} explanationVisible={!hidden(logFor) && report.syntheses.some((x) => x.symbol === logFor)}
+            onLogged={() => logFor && reveal(logFor)} />
+        {/key}
+      </div>
+    {/if}
     <p class="muted small">Closed candles only. Forex, gold and oil get no new read when their market was closed.
       Engine {report.grid[0]?.engine_commit ?? report.run?.engine_commit ?? '—'}{report.grid[0]?.engine_dirty ? ' (uncommitted changes)' : ''}.</p>
 
     <!-- 3. SYNTHESIS -->
     <h3>3 · Cross-timeframe synthesis</h3>
     {#if report.syntheses.length}
-      {#each report.syntheses as s}<div class="synth"><b>{s.symbol}</b><p>{s.text}</p></div>{/each}
+      {#each report.syntheses as s}<div class="synth"><b>{s.symbol}</b>{#if hidden(s.symbol)}<p class="muted small">hidden until you log your call or reveal</p>{:else}<p>{s.text}</p>{/if}</div>{/each}
     {:else}
       <p class="muted small">None for this morning (off by default: <code>morning_report.synthesis</code> in config.yaml).</p>
     {/if}
@@ -230,6 +265,9 @@
   .dir.bullish { color: #3fb950; }
   .dir.bearish { color: #f85149; }
   .warn { color: #d29922; }
+  button.mini { font-size: 11px; padding: 1px 6px; margin: 3px 3px 0 0; }
+  .logbox { border: 1px solid #30363d; border-radius: 8px; padding: 10px 12px; margin: 10px 0; }
+  .logbox label { margin: 0 8px; }
   .chip { border: 1px solid #30363d; border-radius: 10px; padding: 1px 8px; font-size: 12px; white-space: nowrap; }
   .chip.good { color: #3fb950; border-color: #238636; }
   .chip.bad { color: #f85149; border-color: #da3633; }

@@ -6,6 +6,8 @@
   import Encyclopedia from './lib/Encyclopedia.svelte'
   import Scanner from './lib/Scanner.svelte'
   import Morning from './lib/Morning.svelte'
+  import Journal from './lib/Journal.svelte'
+  import JournalForm from './lib/JournalForm.svelte'
   import {
     getPairs, getTimeframes, getAnalysis, getTrades, getPosition, postTrade, deleteTrade,
     getTradesBaseline, qualityText, recordText, CAUTION_STATUSES, CAUTION_TAG,
@@ -14,8 +16,9 @@
   } from './lib/api'
 
   // #/encyclopedia[/<type>] opens the encyclopedia directly (linkable pages).
-  let view = $state<'analysis' | 'risk' | 'encyclopedia' | 'scanner' | 'morning'>(
+  let view = $state<'analysis' | 'risk' | 'encyclopedia' | 'scanner' | 'morning' | 'journal'>(
     typeof location === 'undefined' ? 'analysis'
+    : location.hash.startsWith('#/journal') ? 'journal'
     : location.hash.startsWith('#/morning') ? 'morning'
     : location.hash.startsWith('#/encyclopedia') ? 'encyclopedia'
     : location.hash.startsWith('#/scanner') ? 'scanner' : 'analysis')
@@ -70,6 +73,16 @@
   const labelBar = $derived(result?.bar_index ?? scrubMax)
   const labelBarTime = $derived(result?.chart.candles.at(-1)?.time ?? null)
   function toggleLabelMode() { labelMode = !labelMode; pending = null }
+
+  // ---- D1: hide the engine's read until I've logged my own call (per chart; the choice persists) ----
+  const HIDE_KEY = 'tw.hideEngine'
+  let hideEngine = $state((() => { try { return localStorage.getItem(HIDE_KEY) === '1' } catch { return false } })())
+  $effect(() => { try { localStorage.setItem(HIDE_KEY, hideEngine ? '1' : '0') } catch { /* private mode */ } })
+  let revealedKey = $state<string | null>(null)
+  const chartKey = $derived(result ? `${result.market.symbol}|${result.market.timeframe}|${result.chart.candles.at(-1)?.time}` : '')
+  const engineHidden = $derived(!!result && hideEngine && revealedKey !== chartKey && asOfBar == null && !labelMode)
+  const chartToggles = $derived(engineHidden ? { ...toggles, marker: false } : toggles)
+
   // Encyclopedia example -> the analysis view, scrubbed to the breakout candle (future hidden).
   async function openExample(s: string, tf: string, bar: number) {
     symbol = s; timeframe = tf; asOfBar = bar; labelMode = false
@@ -286,6 +299,7 @@
     <button class:active={view === 'analysis'} onclick={() => (view = 'analysis')}>Analysis</button>
     <button class:active={view === 'risk'} onclick={() => (view = 'risk')}>Risk calculator</button>
     <button class:active={view === 'morning'} onclick={() => { view = 'morning'; location.hash = '#/morning' }}>Morning report</button>
+    <button class:active={view === 'journal'} onclick={() => { view = 'journal'; location.hash = '#/journal' }}>Journal</button>
     <button class:active={view === 'scanner'} onclick={() => { view = 'scanner'; location.hash = '#/scanner' }}>Scanner</button>
     <button class:active={view === 'encyclopedia'} onclick={() => { view = 'encyclopedia'; location.hash = '#/encyclopedia' }}>Encyclopedia</button>
   </nav>
@@ -313,6 +327,22 @@
 
   {#if result}
     {#if !labelMode}
+    <!-- D1: my call first. The form is live-chart only (practice on past bars is D6's blind mode). -->
+    <section class="journal panel">
+      <h3>📝 My call <span class="cnote">log your read before the engine's — the Journal measures you, not it</span>
+        <label class="hidebox"><input type="checkbox" bind:checked={hideEngine} /> hide the engine's read until I log</label></h3>
+      {#key chartKey}
+        <JournalForm {symbol} {timeframe} lastClose={result.market.last_close}
+          verdictVisible={!engineHidden} explanationVisible={!engineHidden && !!result.explanation}
+          disabledReason={asOfBar != null ? 'Calls are logged on the live chart only — practice on past bars comes with blind training mode.' : null}
+          onLogged={() => (revealedKey = chartKey)} />
+      {/key}
+    </section>
+
+    {#if engineHidden}
+      <div class="hidden-read">The engine's read (verdict, record, cautions, categories, explanation) is hidden until you
+        log your call. <button onclick={() => (revealedKey = chartKey)}>Reveal without logging</button></div>
+    {:else}
     <!-- Neutral styling on purpose: green/red + a percentage read as odds to a beginner. -->
     <div class="verdict">
       <span>Bias: <b>{conf?.bias}</b></span>
@@ -376,6 +406,8 @@
           {#if result.caution.some((c) => c.active === null)}<br />Can't judge: {result.caution.filter((c) => c.active === null).map((c) => `${c.label.toLowerCase()} (${c.detail.replace(/^(unavailable|not applicable): /, '')})`).join(' · ')}.{/if}
         </p>
       </section>
+    {/if}
+
     {/if}
 
     <!-- Paper-trading simulator: log a simulated Buy/Sell, see the position + PnL. Fills are live
@@ -518,13 +550,14 @@
       {/each}
     {/if}
 
-    <PriceChart data={result.chart} {toggles} {trades} {labelMode} {draft} {pending}
+    <PriceChart data={result.chart} toggles={chartToggles} {trades} {labelMode} {draft} {pending}
                 onChartClick={(t, p) => labelPanel?.handleClick(t, p)} />
 
     {#if labelMode}
       <LabelPanel bind:this={labelPanel} {symbol} {timeframe} bar={labelBar} barTime={labelBarTime}
                   candles={result.chart.candles} bind:draft bind:pending onJump={jumpToLabel} />
     {:else}
+    {#if !engineHidden}
     <div class="panels">
       <section class="panel">
         <h3>Confluence by category</h3>
@@ -589,7 +622,8 @@
       </section>
     </div>
 
-    {#if result.explanation}
+    {/if}
+    {#if result.explanation && !engineHidden}
       <section class="panel"><h2>Explanation</h2>
         {#if result.verification}
           {@const v = result.verification}
@@ -615,6 +649,8 @@
   {/if}
   {:else if view === 'morning'}
     <Morning onOpen={openLive} />
+  {:else if view === 'journal'}
+    <Journal onOpen={openLive} />
   {:else if view === 'scanner'}
     <Scanner onOpen={openLive} />
   {:else if view === 'encyclopedia'}
@@ -686,6 +722,12 @@
   .caution .ctag { font-size: 11px; border: 1px solid #30363d; border-radius: 8px; padding: 0 6px; color: #8b949e; }
   .caution .ctag.helps { color: #e3b341; border-color: #9e6a03; }
   .caution .crec { font-size: 12px; color: #8b949e; }
+  .journal h3 { margin: 0 0 6px; font-size: 13px; color: #8b949e; text-transform: uppercase; letter-spacing: .04em; }
+  .journal .cnote { text-transform: none; letter-spacing: 0; color: #8b949e; font-weight: 400; font-size: 12px; margin-left: 6px; }
+  .journal .hidebox { float: right; text-transform: none; letter-spacing: 0; font-weight: 400; font-size: 12px; color: #c9d1d9; }
+  .hidden-read { border: 1px dashed #30363d; border-radius: 8px; padding: 10px 12px; margin-top: 14px; color: #8b949e; font-size: 14px; }
+  .hidden-read button { margin-left: 8px; }
+  @media (max-width: 640px) { .journal .hidebox { float: none; display: block; margin-top: 4px; } }
   .vcheck { margin: 0 0 8px; font-size: 12px; }
   .vcheck.ok { color: #3fb950; }
   .vcheck.bad { color: #d29922; border: 1px solid #9e6a03; border-radius: 6px; padding: 6px 8px; font-size: 13px; }
