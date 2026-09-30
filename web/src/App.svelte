@@ -367,6 +367,10 @@
             {#each info as c, k}{k ? ' · ' : ' '}<span title={c.record ?? ''}>{c.label.toLowerCase()} ({CAUTION_TAG[c.status] ?? c.status})</span>{/each}
           </p>
         {/if}
+        {#if result.exits}
+          <p class="cexit">Exits on {result.market.timeframe}, from history: {result.exits.text}{#if result.exits.noise_floor_price != null && result.exits.typical_run_price != null}{' '}— at today's ATR that's about <b>{result.exits.noise_floor_price.toPrecision(4)}</b> against and
+            <b>{result.exits.typical_run_price.toPrecision(4)}</b> in favour{/if}.</p>
+        {/if}
         <p class="cfoot">
           {#if result.caution.some((c) => c.active === false)}Not present: {result.caution.filter((c) => c.active === false).map((c) => c.label.toLowerCase()).join(' · ')}.{/if}
           {#if result.caution.some((c) => c.active === null)}<br />Can't judge: {result.caution.filter((c) => c.active === null).map((c) => `${c.label.toLowerCase()} (${c.detail.replace(/^(unavailable|not applicable): /, '')})`).join(' · ')}.{/if}
@@ -667,6 +671,7 @@
   .caution .ctag { font-size: 11px; border: 1px solid #30363d; border-radius: 8px; padding: 0 6px; color: #8b949e; }
   .caution .ctag.helps { color: #e3b341; border-color: #9e6a03; }
   .caution .crec { font-size: 12px; color: #8b949e; }
+  .caution .cexit { margin: 8px 0 0; font-size: 13px; color: #c9d1d9; }
   .caution .cinfo { margin: 8px 0 0; font-size: 13px; color: #8b949e; }
   .panel h2 { margin: 0 0 8px; font-size: 16px; }
   pre { white-space: pre-wrap; margin: 0; color: #c9d1d9; }

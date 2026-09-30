@@ -83,6 +83,8 @@ export const CAUTION_TAG: Record<string, string> = {
 export interface Analysis {
   market: { symbol: string; timeframe: string; last_close: number }
   caution?: CautionEntry[]
+  exits?: { noise_floor_atr: number | null; typical_run_atr: number | null; noise_floor_price: number | null
+            typical_run_price: number | null; n: number; winners: number; text: string } | null
   confluence: Confluence
   situation?: Situation
   base_rate: BaseRate | null
@@ -149,6 +151,15 @@ export interface CoinFlip {
 export const getCoinFlip = (symbol: string, timeframe: string, entry: number, stop: number, payoff: number) =>
   get<CoinFlip>(`/risk/coin_flip?symbol=${encodeURIComponent(symbol)}&timeframe=${timeframe}` +
     `&entry=${entry}&stop=${stop}&payoff_ratio=${payoff}`)
+
+// ROADMAP R4: is a stop inside the noise floor of this market/timeframe?
+export interface NoiseFloor {
+  atr: number; last_close: number; stop_atr: number; timeframe: string; measured: boolean
+  inside?: boolean; noise_floor_atr?: number; typical_run_atr?: number | null
+  winners_beyond_stop_in_10?: number | null; n?: number; winners?: number; stable?: boolean | null
+}
+export const getNoiseFloor = (symbol: string, timeframe: string, entry: number, stop: number) =>
+  get<NoiseFloor>(`/risk/noise_floor?symbol=${encodeURIComponent(symbol)}&timeframe=${timeframe}&entry=${entry}&stop=${stop}`)
 
 // --- Paper-trading simulator ---
 export interface Trade {

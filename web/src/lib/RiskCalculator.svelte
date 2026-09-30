@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { getRisk, getMeasured, getCoinFlip, type RiskResult } from './api'
+  import { getRisk, getMeasured, getCoinFlip, getNoiseFloor, type NoiseFloor, type RiskResult } from './api'
 
   let { symbol = 'BTC/USDT', timeframe = '1h' }: { symbol?: string; timeframe?: string } = $props()
 
@@ -69,6 +69,17 @@
     } catch (e: any) { measuredNote = e.message }
   }
 
+  // R4: is the stop inside this market's noise floor (history of the timeframe's directional reads)?
+  let noise = $state<NoiseFloor | null>(null)
+  let noiseTimer: any = null
+  async function checkNoise() {
+    if (!(entry > 0 && stop > 0 && entry !== stop)) { noise = null; return }
+    try { noise = await getNoiseFloor(symbol, timeframe, entry, stop) } catch { noise = null }
+  }
+  $effect(() => { symbol; timeframe; entry; stop; clearTimeout(noiseTimer); noiseTimer = setTimeout(checkNoise, 300) })
+  const realEntry = $derived(noise ? Math.abs(entry - noise.last_close) / noise.last_close <= 0.2 : false)
+  const fmtP = (x: number) => (Math.abs(x) >= 100 ? x.toLocaleString(undefined, { maximumFractionDigits: 2 }) : Number(x.toPrecision(5)).toString())
+
   const pct = (x: number) => `${(x * 100).toFixed(1)}%`
   const ruinClass = (p: number) => (p >= 0.5 ? 'bad' : p >= 0.2 ? 'warn' : 'ok')
   const heat = (p: number) => `background:rgba(${Math.round(248 * p + 38 * (1 - p))},${Math.round(81 * p + 134 * (1 - p))},${Math.round(73 * p + 54 * (1 - p))},0.85)`
@@ -96,6 +107,33 @@
   </div>
   {#if coinNote && winSource === 'coin'}<p class="note src-note">{coinNote}</p>{/if}
   {#if measuredNote && winSource === 'backtest'}<p class="note src-note">{measuredNote}</p>{/if}
+
+  {#if noise}
+    {#if !realEntry}
+      <p class="note src-note">To check the stop against {symbol}'s normal noise, use a real entry price (it trades
+        around {fmtP(noise.last_close)}).</p>
+    {:else if !noise.measured}
+      <p class="note src-note">Your stop is {noise.stop_atr} ATR away on {timeframe}. The noise floor for this
+        timeframe hasn't been measured yet.</p>
+    {:else}
+      {@const wider = (noise.noise_floor_atr ?? 0) * noise.atr}
+      <div class="noise" class:inside={noise.inside}>
+        <b>{noise.inside ? '⚠ Stop inside normal noise' : 'Stop outside the noise floor'}</b> — your stop is
+        {noise.stop_atr} ATR away ({timeframe}). Half of the {noise.winners} past reads on {timeframe} that ended in
+        profit first went {noise.noise_floor_atr} ATR against{noise.stable === false ? ' (unstable between periods)' : ''}.
+        {#if noise.winners_beyond_stop_in_10 != null}<b>{noise.winners_beyond_stop_in_10 === 0 ? 'Fewer than 1 in 10'
+          : noise.winners_beyond_stop_in_10 === 9 ? 'More than 9 in 10' : `About ${noise.winners_beyond_stop_in_10} in 10`}</b>
+          of them went further against than your stop.{/if}
+        {#if noise.inside && result?.position}
+          <br />A stop at the noise floor would sit at <b>{fmtP(entry > stop ? entry - wider : entry + wider)}</b>; risking
+          the same ${result.position.risk_amount.toLocaleString()}, the position shrinks to
+          <b>{(result.position.units * Math.abs(entry - stop) / wider).toLocaleString(undefined, { maximumFractionDigits: 4 })}</b>
+          units (from {result.position.units.toLocaleString()}).
+        {/if}
+        <span class="muted">History, not a recommended stop: a wider stop is hit less often but costs more when it is.</span>
+      </div>
+    {/if}
+  {/if}
 
   {#if error}<p class="error">{error}</p>{/if}
 
@@ -176,4 +214,8 @@
   table.ruin th { color: #8b949e; padding: 5px 8px; font-weight: 600; text-align: center; }
   table.ruin td { text-align: center; padding: 6px 8px; color: #0e1117; font-weight: 700; }
   table.ruin tbody th { text-align: right; }
+  .noise { border: 1px solid #30363d; border-radius: 8px; padding: 10px 12px; margin: 10px 0; font-size: 14px; line-height: 1.5; }
+  .noise.inside { border-color: #9e6a03; }
+  .noise.inside b:first-child { color: #d29922; }
+  .noise .muted { display: block; font-size: 12px; color: #8b949e; margin-top: 4px; }
 </style>

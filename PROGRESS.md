@@ -6,8 +6,8 @@ A state file for the "learning instrument" build. Source of truth for what's nex
 **ROADMAP progress:** A1 ✓ (merged, `645231c`), A2 ✓ (merged, `800e12a`; docs `1003735`), A3 ✓ (merged), A4 ✓ (merged), A5 ✓ (merged), A6 ✓ (merged), A7 ✓ (merged), B1 ✓ (merged — labelling mode
 built; the ≥30 labelled charts are the user's ongoing work), B2 tooling ✓ (merged — `eval_detectors.py`;
 its measurement + tuning run as soon as ≥30 charts are labelled — the user has decided NOT to label, so
-it stays unmeasured). B3 ✓ (merged), B4 ✓ (merged), B5 ✓ (merged), A8 ✓ (merged — forward record live since 2026-09-25 on wizard.bosfoot.com), R1 ✓ (merged), R2 ✓ (merged), R3 ✓ (merged — no condition changed the coin flip; ~80% of reads have a stop inside noise and no room after costs). **Next: R4** (exits: MAE/MFE noise floor).
-Order from here (user-confirmed 2026-09-26): R4 → C1 (slim) → D1 → D6; D2–D5 on demand. Drawing tools: deferred.
+it stays unmeasured). B3 ✓ (merged), B4 ✓ (merged), B5 ✓ (merged), A8 ✓ (merged — forward record live since 2026-09-25 on wizard.bosfoot.com), R1 ✓ (merged), R2 ✓ (merged), R3 ✓ (merged — no condition changed the coin flip; ~80% of reads have a stop inside noise and no room after costs), R4 ✓ (merged — noise floor ~1 ATR, stable; Phase R complete). **Next: C1 (slim)** (the integrity guard).
+Order from here (user-confirmed 2026-09-26): C1 (slim) → C1 (slim) → D1 → D6; D2–D5 on demand. Drawing tools: deferred.
 
 ## Current state
 
@@ -63,6 +63,49 @@ apply if `config.yaml` omits them.
 ---
 
 ## Log (newest first)
+
+### ROADMAP R4 — Exits: how far against, how far for (Phase R complete)
+- **Done:** 2026-09-28 · on `main` · **merged.**
+- `src/risk/excursions.py` + `scripts/measure_exits.py`: the same walk and 70/30 split as R3.
+  `caution_stats.collect` now also records MFE, where the read ended, the regime and the tier.
+  **Definitions fixed before the run** (module docstring):
+  - **noise floor** = median MAE of the reads that ended in profit;
+  - **typical run** = median MFE of all reads;
+  - **stop touch** at 0.5–3 ATR (all reads / eventual winners);
+  - **stable** = held-back within 25% of the older part;
+  - the 8 Feature-8 exits simulated on the held-back reads, net of costs, with the average bars held.
+- **Results** (held-back 30%, 7 markets, step 4):
+
+  | TF | reads (winners) | noise floor | typical run | winners whose MAE reached 1 ATR / 2 ATR | stable |
+  |---|---|---|---|---|---|
+  | 1h | 1025 (515) | 0.97 ATR (older 1.13) | 2.17 ATR (older 2.10) | 49% / 19% | yes |
+  | 4h | 1156 (574) | 1.34 ATR (older 1.39) | 2.87 ATR (older 2.85) | 62% / 29% | yes |
+  | 1d | 1042 (549) | 0.93 ATR (older 0.91) | 1.94 ATR (older 1.77) | 47% / 14% | yes |
+
+  **The robust finding:** about half of the trades that ended in profit first went ~1 ATR against
+  (1.3 on 4h). A stop at 1 ATR would have closed about half of the eventual winners; at 2 ATR, 1 in
+  5–7. It is stable across both periods on every timeframe. With R3 (8 in 10 engine reads have an
+  invalidation < 1 ATR), **most of the engine's own stops sit inside the noise floor.**
+- **Exits on the held-back reads (net, per trade):** no rule is consistently better. On 1h every
+  rule is mildly positive, on 4h every rule is negative, on 1d they're mixed, so the sign follows each
+  period's market drift, not the exit. `fixed_target` (target, no stop by design) wins about 75% of
+  the time yet loses money: rare, very large losers (held ~80 bars). Reported as history, never as a
+  recommended exit.
+- **Where it shows:**
+  - the Caution panel: "Exits on 1h, from history: half of the 515 past reads that ended in profit
+    first went 0.97 ATR against… about 369.6 against and 826.9 in favour at today's ATR";
+  - `facts["exits"]` + an EXITS line in the facts text (live path only; the snapshot is unchanged);
+  - the **risk calculator**: `/risk/noise_floor` warns "⚠ Stop inside normal noise… About 7 in 10 of
+    them went further against than your stop", shows where a noise-floor stop would sit and how much
+    the position shrinks for the same dollar risk; it asks for a real entry price if the entry isn't
+    within 20% of the market.
+- Verified: 9 new tests (the decile estimate never overstates: "fewer than 1 in 10" / "more than
+  9 in 10"), 527 tests pass. Browser-checked the panel and the calculator on BTC 1h at 1400 and
+  400 px. **Droplet:** copy `data/exit_cases.json` + `data/exit_returns.json` up and run
+  `--from-cases` (DEPLOY.md).
+- **Phase R summary:** no caution condition predicts which trades lose (R3), but two things hold up.
+  The engine's stops are mostly inside normal noise (R3), and the noise floor is ~1 ATR, stable over
+  time (R4). The app now says both, with counts, wherever a trader decides.
 
 ### ROADMAP R3 — Caution conditions measured on history (the honest test)
 - **Done:** 2026-09-27 · on `main` · **merged.**

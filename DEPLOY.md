@@ -185,3 +185,16 @@ cd /srv/trading-wizard && .venv/bin/python scripts/measure_caution.py --from-cas
 ```
 
 The API reads the table on every request, so no restart is needed.
+
+## Exit statistics (ROADMAP R4)
+
+The noise floor and typical run (Caution panel, risk calculator) come from the `exit_stats` table,
+built by `scripts/measure_exits.py` (about 80 minutes). Same rule as above: copy the two result files
+up, never the database.
+
+```bash
+# on your computer, after running scripts/measure_exits.py locally
+scp data/exit_cases.json data/exit_returns.json bobson@206.81.21.49:/srv/trading-wizard/data/
+# on the droplet (not around 08:00 Skopje)
+cd /srv/trading-wizard && .venv/bin/python scripts/measure_exits.py --from-cases data/exit_cases.json --exits data/exit_returns.json
+```

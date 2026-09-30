@@ -727,6 +727,11 @@ def facts_to_prompt(facts: dict) -> str:
         na = [f"{x['label'].lower()} ({x['detail']})" for x in caution if x["active"] is None]
         if na:
             add("  - can't be judged here: " + "; ".join(na))
+        ex = facts.get("exits")
+        if ex:
+            price = (f" (= {ex['noise_floor_price']:g} / {ex['typical_run_price']:g} in price at today's ATR)"
+                     if ex.get("noise_floor_price") and ex.get("typical_run_price") else "")
+            add(f"  - EXITS on this timeframe, from history (not a forecast): {ex['text']}{price}")
         add("")
 
     # --- CONFLUENCE VERDICT ---------------------------------------------------------------

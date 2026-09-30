@@ -94,6 +94,10 @@ def collect(df: pd.DataFrame, cfg: Config, symbol: str, timeframe: str, *, step:
         return []
     cut = scanned[int(len(scanned) * TUNE_SHARE)]
     asset = asset_class_for(symbol)
+    closes = df["close"].to_numpy()
+    from src.indicators.features import add_features
+    from src.market.regime import classify_regime
+    regimes = classify_regime(add_features(df, cfg), cfg)          # causal (rolling), read at bar i only
     out = []
     for i, _sub, feat, swings in _ev.walk(df, cfg, horizon=horizon, step=step):
         facts = build_facts(feat, swings, cfg)
@@ -106,7 +110,11 @@ def collect(df: pd.DataFrame, cfg: Config, symbol: str, timeframe: str, *, step:
         h, lo = highs[i + 1: i + 1 + horizon], lows[i + 1: i + 1 + horizon]
         sr = facts.get("support_resistance") or {}
         lv = levels_for(direction, close, atr, sr.get("nearest_support"), sr.get("nearest_resistance"))
-        adverse = (close - lo.min()) if direction == "bullish" else (h.max() - close)
+        bull = direction == "bullish"
+        adverse = (close - lo.min()) if bull else (h.max() - close)
+        favour = (h.max() - close) if bull else (close - lo.min())
+        end = (closes[i + horizon] - close) * (1 if bull else -1)
+        reg = regimes.iloc[i]
         out.append({
             "symbol": symbol, "timeframe": timeframe, "asset": asset, "i": i, "part": part,
             "direction": direction, "flags": {c["code"]: c["active"] for c in facts.get("caution") or []},
@@ -114,6 +122,11 @@ def collect(df: pd.DataFrame, cfg: Config, symbol: str, timeframe: str, *, step:
             "rule_v1": _resolve_directional(direction, lv["next_level"], lv["invalidation"], list(zip(h, lo))),
             "mae_atr": round(max(0.0, float(adverse)) / atr, 3),
             "range_atr": round(float(h.max() - lo.min()) / atr, 3),
+            # R4: how far it ran in favour at best, and where it ended, in ATR; regime + tier at the read
+            "mfe_atr": round(max(0.0, float(favour)) / atr, 3),
+            "end_atr": round(float(end) / atr, 3),
+            "regime": str(reg) if reg is not None and not pd.isna(reg) else "unknown",
+            "tier": facts["situation"]["tier"], "atr": float(atr), "close": close,
         })
     return out
 

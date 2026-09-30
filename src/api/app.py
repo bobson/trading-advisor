@@ -134,7 +134,7 @@ def analysis(
                         base_rate=BASE_RATES.get(f"{symbol}|{timeframe}"),
                         reliability=RELIABILITY.get("table"),
                         verdict_records=_verdict_rows(), pattern_records=_encyclopedia_top_rows(),
-                        caution_stats=_caution_stats(),
+                        caution_stats=_caution_stats(), exit_stats=_exit_stats(),
                         as_of_bar=as_of_bar, explanation_style=explanation_style)
     except NotImplementedError as exc:  # e.g. forex before Phase 26
         raise HTTPException(status_code=501, detail=str(exc))
@@ -218,6 +218,27 @@ def risk_coin_flip(
                                        payoff_ratio=payoff_ratio, atr_pct=atr_pct)
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc))
+
+
+@app.get("/risk/noise_floor", dependencies=_GUARDS)
+def risk_noise_floor(
+    symbol: str = Query(...), timeframe: str = Query("1h"),
+    entry: float = Query(..., gt=0.0), stop: float = Query(..., gt=0.0),
+) -> dict:
+    """ROADMAP R4 — is this stop inside the noise floor? The stop distance in ATR (this instrument's
+    current ATR, cache-first candles) against what history says about the timeframe. No Claude call."""
+    from src.data.registry import get_candles
+    from src.indicators.features import COL_ATR, add_features
+    from src.risk.excursions import stop_warning
+
+    feat = add_features(get_candles(symbol, timeframe, cfg), cfg)
+    atr = feat[COL_ATR].iloc[-1]
+    if atr != atr or not atr:
+        raise HTTPException(status_code=400, detail="no ATR for this market yet")
+    stop_atr = abs(entry - stop) / float(atr)
+    warn = stop_warning(stop_atr, _exit_stats().get(timeframe))
+    return {"atr": round(float(atr), 6), "last_close": float(feat["close"].iloc[-1]),
+            "stop_atr": round(stop_atr, 2), "timeframe": timeframe, "measured": warn is not None, **(warn or {})}
 
 
 # --- Paper-trading simulator (SQLite `trades`; live spot fills; NO Claude call) ----------------
@@ -453,6 +474,16 @@ def scan_patterns(timeframes: str = Query("1d", description="comma list, e.g. 1d
     result["scanned_at"] = int(now)
     _SCAN_CACHE[key] = (now, result)
     return result
+
+
+def _exit_stats() -> dict:
+    """ROADMAP R4: noise floor / typical run per timeframe ({} until scripts/measure_exits.py runs)."""
+    from src.risk.excursions import load
+    conn = _trades_conn()
+    try:
+        return load(conn)
+    finally:
+        conn.close()
 
 
 def _caution_stats() -> dict:
