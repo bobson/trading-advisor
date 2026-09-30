@@ -590,7 +590,22 @@
     </div>
 
     {#if result.explanation}
-      <section class="panel"><h2>Explanation</h2><pre>{result.explanation}</pre></section>
+      <section class="panel"><h2>Explanation</h2>
+        {#if result.verification}
+          {@const v = result.verification}
+          {#if v.fallback}
+            <p class="vcheck bad">⚠ {v.notice}</p>
+          {:else}
+            <p class="vcheck ok">✓ Checked against the computed facts{v.retried
+              ? ` — rewritten once to fix: ${v.first_attempt_hard.map((h) => h.check.replace(/_/g, ' ')).join(', ')}` : ''}</p>
+          {/if}
+          {#if v.soft.length}
+            <details class="vsoft"><summary>⚠ {v.soft.length} note{v.soft.length > 1 ? 's' : ''} from the check</summary>
+              <ul>{#each v.soft as n}<li>{n.check.replace(/_/g, ' ')}: {n.detail}</li>{/each}</ul>
+            </details>
+          {/if}
+        {/if}
+        <pre>{result.explanation}</pre></section>
     {:else}
       <p class="hint">Tick “explain” and Analyze again for Claude’s plain-language write-up.</p>
     {/if}
@@ -671,6 +686,11 @@
   .caution .ctag { font-size: 11px; border: 1px solid #30363d; border-radius: 8px; padding: 0 6px; color: #8b949e; }
   .caution .ctag.helps { color: #e3b341; border-color: #9e6a03; }
   .caution .crec { font-size: 12px; color: #8b949e; }
+  .vcheck { margin: 0 0 8px; font-size: 12px; }
+  .vcheck.ok { color: #3fb950; }
+  .vcheck.bad { color: #d29922; border: 1px solid #9e6a03; border-radius: 6px; padding: 6px 8px; font-size: 13px; }
+  .vsoft { margin: 0 0 8px; font-size: 12px; color: #d29922; }
+  .vsoft ul { margin: 4px 0 0; padding-left: 18px; color: #8b949e; }
   .caution .cexit { margin: 8px 0 0; font-size: 13px; color: #c9d1d9; }
   .caution .cinfo { margin: 8px 0 0; font-size: 13px; color: #8b949e; }
   .panel h2 { margin: 0 0 8px; font-size: 16px; }

@@ -83,6 +83,12 @@ export const CAUTION_TAG: Record<string, string> = {
 export interface Analysis {
   market: { symbol: string; timeframe: string; last_close: number }
   caution?: CautionEntry[]
+  // ROADMAP C1: the explanation checked against the facts (null when there's no explanation)
+  verification?: {
+    ok: boolean; issues: string[]; retried: boolean; fallback: boolean; notice: string | null
+    hard: { check: string; detail: string }[]; soft: { check: string; detail: string }[]
+    first_attempt_hard: { check: string; detail: string }[]
+  } | null
   exits?: { noise_floor_atr: number | null; typical_run_atr: number | null; noise_floor_price: number | null
             typical_run_price: number | null; n: number; winners: number; text: string } | null
   confluence: Confluence

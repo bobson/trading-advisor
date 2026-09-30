@@ -25,7 +25,6 @@ import pandas as pd
 
 from src.advisor.explain import explain
 from src.advisor.facts import build_facts, facts_to_prompt
-from src.advisor.verify import verify_explanation
 from src.backtest.base_rate import base_rate_entry
 from src.config import Config
 from src.data.registry import get_candles
@@ -87,6 +86,34 @@ def _request_config(cfg: Config, symbol: str, timeframe: str) -> Config:
     """A copy of `cfg` whose market reflects THIS request (symbol/timeframe per call)."""
     market = cfg.market.model_copy(update={"symbol": symbol, "timeframe": timeframe})
     return cfg.model_copy(update={"market": market})
+
+
+def _guard(explanation: str, facts: dict, facts_text: str, req: Config, client) -> tuple[str, dict]:
+    """ROADMAP C1: check the explanation against the facts. A hard violation gets ONE rewrite with the
+    violation list; if that still fails, the deterministic facts-only summary is shown with a notice.
+    Soft issues travel as a badge. `ok`/`issues` keep the Phase-20 payload shape."""
+    from src.advisor.explain import revise
+    from src.advisor.integrity import check_explanation, facts_only_summary
+    style = req.advisor.explanation_style
+    first = check_explanation(explanation, facts, style=style)
+    result, retried, fallback, notice = first, False, False, None
+    if first.hard:
+        retried = True
+        try:
+            explanation = revise(facts_text, explanation, [f"{v['check']}: {v['detail']}" for v in first.hard],
+                                 req, client=client, situation=facts.get("situation"))
+            result = check_explanation(explanation, facts, style=style)
+        except RuntimeError:
+            result = first
+        if result.hard:
+            fallback = True
+            notice = ("Claude's explanation didn't pass the integrity check against the computed facts twice, "
+                      "so only the computed facts are shown.")
+            explanation = facts_only_summary(facts)
+    verification = {"ok": not result.hard, "issues": result.issues(), "hard": result.hard, "soft": result.soft,
+                    "first_attempt_hard": first.hard if retried else [], "retried": retried,
+                    "fallback": fallback, "notice": notice}
+    return explanation, verification
 
 
 def advise(
@@ -190,17 +217,14 @@ def advise(
     fib = fib_retracement(swings)
 
     explanation: Optional[str] = None
+    verification: Optional[dict] = None
     if explain_enabled:
         try:
             explanation = explain(facts_text, req, client=client, situation=facts.get("situation"))
         except RuntimeError:
             explanation = None  # no ANTHROPIC_API_KEY — deterministic facts stand on their own
-
-    # Phase 20: enforce "Layer 2 never contradicts Layer 1" — check the explanation's numbers
-    # against the facts. Advisory (never blocks); only runs when there is an explanation.
-    verification: Optional[dict] = None
-    if explanation is not None:
-        verification = verify_explanation(explanation, facts).to_dict()
+        if explanation is not None:
+            explanation, verification = _guard(explanation, facts, facts_text, req, client)
 
     return AnalysisResult(
         facts=facts,

@@ -1,4 +1,5 @@
-"""Phase 20 — Layer-2 consistency check: enforce "never contradict Layer 1".
+"""Phase 20 — Layer-2 consistency check (SUPERSEDED in the live path by ROADMAP C1, `advisor/integrity.py`,
+which matches prices at the precision they are written instead of ±1%). Kept for its tests/CLI use.
 
 The project's hard rule is that Claude explains the computed facts and never invents numbers.
 This module *checks* that instead of hoping. The model only ever sees `facts_to_prompt(facts)`,

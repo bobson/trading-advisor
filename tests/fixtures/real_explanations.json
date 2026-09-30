@@ -1,0 +1,2894 @@
+[
+ {
+  "symbol": "BTC/USDT",
+  "timeframe": "1h",
+  "style": "brief",
+  "explanation": "No setup: ADX 28.3 (trending) but trend neutral, signals split. Above: 83000.0 (+0.05%). Below: 82767.2 (support zone). A close through either changes the read.\n\nOpposing: MACD bearish (-427.03 vs signal -300.55).",
+  "facts": {
+   "market": {
+    "symbol": "BTC/USDT",
+    "timeframe": "1h",
+    "exchange": "binance",
+    "last_close": 82960.0,
+    "last_time": "2026-09-28 10:00:00+00:00"
+   },
+   "trend": {
+    "label": "sideways",
+    "reasons": [
+     "Swing highs and lows are not consistently rising or falling."
+    ]
+   },
+   "momentum": {
+    "rsi": 33.6,
+    "rsi_zone": "neutral",
+    "macd": -427.03,
+    "macd_signal": -300.55,
+    "macd_state": "bearish",
+    "stochastic_k": 9.7,
+    "stochastic_d": 10.8,
+    "stochastic_zone": "oversold"
+   },
+   "volatility": {
+    "atr": 381.06,
+    "atr_pct": 0.46,
+    "adx": 28.3,
+    "regime": "trending",
+    "bollinger_pct_b": 0.187,
+    "bollinger_position": "inside bands"
+   },
+   "divergence": {
+    "kind": "bullish",
+    "reason": "Price made a lower low (83856.23 -> 83838.00) but RSI made a higher low (46 -> 49) \u2014 downside momentum is fading."
+   },
+   "round_number": {
+    "nearest": 83000.0,
+    "distance_pct": 0.048,
+    "is_near": true,
+    "signed_distance_atr": 0.1,
+    "signed_distance_pct": 0.05
+   },
+   "market_adaptation": {
+    "asset_class": "crypto",
+    "volume_type": "real",
+    "is_24_7": true,
+    "active_session": null,
+    "weekend_gap": null,
+    "significant_move_pct": 0.689
+   },
+   "volume": {
+    "last": 804.82,
+    "average": 690.49,
+    "ratio": 1.17,
+    "confirmed": false,
+    "obv_rising": false,
+    "type": "real"
+   },
+   "candlestick": null,
+   "support_resistance": {
+    "nearest_support": {
+     "price": 82862.46,
+     "lower": 82767.2,
+     "upper": 82957.73,
+     "touches": 2,
+     "bars_since_touch": 97,
+     "strength": 0.326,
+     "stale": false,
+     "inside": false,
+     "distance_atr": -0.01,
+     "distance_pct": -0.0
+    },
+    "nearest_resistance": {
+     "price": 83797.36,
+     "lower": 83702.09,
+     "upper": 83892.62,
+     "touches": 4,
+     "bars_since_touch": 38,
+     "strength": 1.96,
+     "stale": false,
+     "inside": false,
+     "distance_atr": 1.95,
+     "distance_pct": 0.89
+    }
+   },
+   "chart_patterns": [
+    {
+     "type": "rising wedge",
+     "kind": "reversal",
+     "direction": "bearish",
+     "state": "confirmed",
+     "bars": [
+      4251,
+      4269,
+      4274,
+      4281,
+      4298,
+      4309
+     ],
+     "points": [
+      {
+       "bar": 4251,
+       "price": 83183.0
+      },
+      {
+       "bar": 4269,
+       "price": 84336.96
+      },
+      {
+       "bar": 4274,
+       "price": 83856.23
+      },
+      {
+       "bar": 4281,
+       "price": 83838.0
+      },
+      {
+       "bar": 4298,
+       "price": 85159.03
+      },
+      {
+       "bar": 4309,
+       "price": 84999.0
+      }
+     ],
+     "lines": [
+      [
+       {
+        "bar": 4251,
+        "price": 83826.71
+       },
+       {
+        "bar": 4309,
+        "price": 85470.85
+       }
+      ],
+      [
+       {
+        "bar": 4251,
+        "price": 83183.0
+       },
+       {
+        "bar": 4309,
+        "price": 84449.33
+       }
+      ]
+     ],
+     "breakout_level": 84471.17,
+     "invalidation_level": 85499.2,
+     "target": 83805.62,
+     "quality": 0.648,
+     "confirmation": {
+      "price": "supports",
+      "volume": "neutral",
+      "momentum": "supports",
+      "volatility": "neutral",
+      "candlestick": "neutral",
+      "higher_tf": "neutral",
+      "structure": "supports"
+     },
+     "reason": "Both lines rising and converging (32% narrower) \u2014 a rising wedge, conventionally bearish.",
+     "bars_since_completion": 10,
+     "bars_since_state_change": 9,
+     "lifecycle": "completed",
+     "state_bar": 4310,
+     "target_hit_bar": 4310,
+     "distances": {
+      "breakout": {
+       "distance_atr": 3.97,
+       "distance_pct": 1.82
+      },
+      "invalidation": {
+       "distance_atr": 6.66,
+       "distance_pct": 3.06
+      },
+      "target": {
+       "distance_atr": 2.22,
+       "distance_pct": 1.02
+      }
+     }
+    },
+    {
+     "type": "sideways channel",
+     "kind": "continuation",
+     "direction": "bearish",
+     "state": "confirmed",
+     "bars": [
+      4274,
+      4281,
+      4298,
+      4309
+     ],
+     "points": [
+      {
+       "bar": 4274,
+       "price": 83856.23
+      },
+      {
+       "bar": 4281,
+       "price": 83838.0
+      },
+      {
+       "bar": 4298,
+       "price": 85159.03
+      },
+      {
+       "bar": 4309,
+       "price": 84999.0
+      }
+     ],
+     "lines": [
+      [
+       {
+        "bar": 4274,
+        "price": 85079.01
+       },
+       {
+        "bar": 4309,
+        "price": 85079.01
+       }
+      ],
+      [
+       {
+        "bar": 4274,
+        "price": 83847.11
+       },
+       {
+        "bar": 4309,
+        "price": 83847.11
+       }
+      ]
+     ],
+     "breakout_level": 83847.11,
+     "invalidation_level": 85079.01,
+     "target": 82615.21,
+     "quality": 0.805,
+     "confirmation": {
+      "price": "supports",
+      "volume": "neutral",
+      "momentum": "supports",
+      "volatility": "neutral",
+      "candlestick": "neutral",
+      "higher_tf": "neutral",
+      "structure": "supports"
+     },
+     "reason": "Sideways channel \u2014 flat-top resistance and flat-bottom support; a close beyond either edge resolves it.",
+     "bars_since_completion": 10,
+     "bars_since_state_change": 9,
+     "lifecycle": "completed",
+     "state_bar": 4310,
+     "target_hit_bar": 4318,
+     "distances": {
+      "breakout": {
+       "distance_atr": 2.33,
+       "distance_pct": 1.07
+      },
+      "invalidation": {
+       "distance_atr": 5.56,
+       "distance_pct": 2.55
+      },
+      "target": {
+       "distance_atr": -0.9,
+       "distance_pct": -0.42
+      }
+     }
+    }
+   ],
+   "fibonacci": {
+    "direction": "up",
+    "impulse_low": 83838.0,
+    "impulse_high": 84999.0,
+    "key_levels": {
+     "0.382": 84555.5,
+     "0.5": 84418.5,
+     "0.618": 84281.5,
+     "0.786": 84086.45
+    },
+    "key_level_distances": {
+     "0.382": {
+      "distance_atr": 4.19,
+      "distance_pct": 1.92
+     },
+     "0.5": {
+      "distance_atr": 3.83,
+      "distance_pct": 1.76
+     },
+     "0.618": {
+      "distance_atr": 3.47,
+      "distance_pct": 1.59
+     },
+     "0.786": {
+      "distance_atr": 2.96,
+      "distance_pct": 1.36
+     }
+    }
+   },
+   "confluence": {
+    "bias": "bullish",
+    "triggered": false,
+    "confidence": 0.3,
+    "agreeing_categories": 1,
+    "require_categories": 2,
+    "categories": {
+     "momentum": "bearish",
+     "structure": "bullish",
+     "trend": "neutral",
+     "volume": "neutral"
+    },
+    "signals": [
+     {
+      "name": "trend",
+      "direction": "neutral",
+      "category": "trend",
+      "reason": "Swing highs and lows are not consistently rising or falling."
+     },
+     {
+      "name": "rsi",
+      "direction": "neutral",
+      "category": "momentum",
+      "reason": "RSI is 34, in the neutral zone."
+     },
+     {
+      "name": "macd",
+      "direction": "bearish",
+      "category": "momentum",
+      "reason": "MACD line is below its signal line (bearish momentum)."
+     },
+     {
+      "name": "candlestick",
+      "direction": "neutral",
+      "category": "structure",
+      "reason": "No notable candlestick pattern on the last candle."
+     },
+     {
+      "name": "support_resistance",
+      "direction": "bullish",
+      "category": "structure",
+      "reason": "Price is at the edge of the support zone 82767.20\u201382957.73."
+     },
+     {
+      "name": "fibonacci",
+      "direction": "neutral",
+      "category": "structure",
+      "reason": "Price is not near a key Fibonacci level."
+     },
+     {
+      "name": "volume",
+      "direction": "neutral",
+      "category": "volume",
+      "reason": "Volume is 1.2x its average \u2014 below the 1.2x bar, so the move is not confirmed by participation."
+     }
+    ],
+    "mtf_alignment": "neutral",
+    "mtf_trends": {
+     "4h": "sideways",
+     "1d": "sideways"
+    }
+   },
+   "moving_averages": {
+    "slow": {
+     "period": 50,
+     "value": 84165.59,
+     "distance_atr": 3.16,
+     "distance_pct": 1.45
+    },
+    "long": {
+     "period": 200,
+     "value": 84177.76,
+     "distance_atr": 3.2,
+     "distance_pct": 1.47
+    }
+   },
+   "nearest_levels": {
+    "above": {
+     "price": 83000.0,
+     "source": "round number",
+     "distance_atr": 0.1,
+     "distance_pct": 0.05
+    },
+    "below": {
+     "price": 82957.73,
+     "source": "S/R zone 82767.20\u201382957.73 (upper edge)",
+     "distance_atr": -0.01,
+     "distance_pct": -0.0
+    }
+   },
+   "strongest_opposing_fact": {
+    "category": "momentum",
+    "direction": "bearish",
+    "weight": 1.0,
+    "detector": "macd",
+    "reason": "MACD line is below its signal line (bearish momentum).",
+    "opposing_categories": [
+     "momentum"
+    ]
+   },
+   "mtf_signals": {
+    "timeframes": [
+     "1h",
+     "4h",
+     "1d"
+    ],
+    "signals": {
+     "trend": {
+      "1h": "neutral",
+      "4h": "neutral",
+      "1d": "neutral"
+     },
+     "rsi": {
+      "1h": "neutral",
+      "4h": "neutral",
+      "1d": "neutral"
+     },
+     "macd": {
+      "1h": "bearish",
+      "4h": "bearish",
+      "1d": "bullish"
+     },
+     "candlestick": {
+      "1h": "neutral",
+      "4h": "neutral",
+      "1d": "bearish"
+     },
+     "support_resistance": {
+      "1h": "bullish",
+      "4h": "bullish",
+      "1d": "bullish"
+     },
+     "fibonacci": {
+      "1h": "neutral",
+      "4h": "neutral",
+      "1d": "bullish"
+     },
+     "volume": {
+      "1h": "neutral",
+      "4h": "bearish",
+      "1d": "neutral"
+     }
+    }
+   },
+   "detector_reliability": {
+    "status": "unmeasured \u2014 detector precision is filled in by ROADMAP B2",
+    "detectors": {
+     "trend": {
+      "precision": null,
+      "n": 0,
+      "status": "unmeasured"
+     },
+     "rsi": {
+      "precision": null,
+      "n": 0,
+      "status": "unmeasured"
+     },
+     "macd": {
+      "precision": null,
+      "n": 0,
+      "status": "unmeasured"
+     },
+     "candlestick": {
+      "precision": null,
+      "n": 0,
+      "status": "unmeasured"
+     },
+     "support_resistance": {
+      "precision": null,
+      "n": 0,
+      "status": "unmeasured"
+     },
+     "fibonacci": {
+      "precision": null,
+      "n": 0,
+      "status": "unmeasured"
+     },
+     "volume": {
+      "precision": null,
+      "n": 0,
+      "status": "unmeasured"
+     }
+    },
+    "chart_patterns": {
+     "rising wedge": {
+      "precision": null,
+      "n": 0,
+      "status": "unmeasured"
+     },
+     "sideways channel": {
+      "precision": null,
+      "n": 0,
+      "status": "unmeasured"
+     }
+    }
+   },
+   "absences": [
+    "no failed chart pattern",
+    "no candlestick pattern on the last closed bar"
+   ],
+   "situation": {
+    "tier": "no_setup",
+    "reasons": [
+     "no_pattern_no_confluence"
+    ],
+    "word_budget": 30,
+    "template": "One or two sentences: what's absent, what would change it. Stop."
+   },
+   "caution": [
+    {
+     "code": "no_expansion",
+     "label": "Breakout without expansion",
+     "active": false,
+     "detail": "no fresh breakout to judge",
+     "value": null,
+     "status": "unmeasured"
+    },
+    {
+     "code": "stretched",
+     "label": "Stretched from the average",
+     "active": true,
+     "detail": "3.2 ATR below the 50-MA (flag at 3)",
+     "value": -3.16,
+     "status": "unmeasured"
+    },
+    {
+     "code": "volatility_extreme",
+     "label": "Volatility at an extreme",
+     "active": false,
+     "detail": "ATR is higher than 54% of the last 100 bars",
+     "value": {
+      "percentile": 0.55,
+      "kind": null
+     },
+     "status": "unmeasured"
+    },
+    {
+     "code": "stop_in_noise",
+     "label": "Invalidation inside normal noise",
+     "active": null,
+     "detail": "not applicable: no directional read",
+     "value": null,
+     "status": "unmeasured"
+    },
+    {
+     "code": "no_room",
+     "label": "Not enough room after costs",
+     "active": null,
+     "detail": "not applicable: no directional read",
+     "value": null,
+     "status": "unmeasured"
+    },
+    {
+     "code": "htf_against",
+     "label": "Higher timeframe against the read",
+     "active": null,
+     "detail": "not applicable: no directional read",
+     "value": null,
+     "status": "unmeasured"
+    },
+    {
+     "code": "event_risk",
+     "label": "High-impact news soon",
+     "active": null,
+     "detail": "unavailable: no economic calendar (needs FINNHUB_API_KEY)",
+     "value": null,
+     "status": "unmeasured"
+    },
+    {
+     "code": "thin_market",
+     "label": "Thin market",
+     "active": null,
+     "detail": "not applicable: crypto trades around the clock",
+     "value": null,
+     "status": "unmeasured"
+    }
+   ]
+  }
+ },
+ {
+  "symbol": "BTC/USDT",
+  "timeframe": "1h",
+  "style": "teaching",
+  "explanation": "No clear setup: ADX 28.3 (trending) but trend is sideways across all timeframes, and only 1 of 4 voting categories agree (2 needed).\n\n**What would change this:** Above: 83,000 round number (+0.05%). Below: support zone 82,767.20\u201382,957.73 (\u22120.00%, price is essentially at its upper edge now). A decisive close through either is the trigger to watch.\n\n---\n\n**Teaching note \u2014 why \"no setup\" is the honest answer here, and what the chart is actually saying:**\n\n**The ADX paradox.** ADX 28.3 reads as \"trending\" by the threshold, yet every timeframe vote (1h, 4h, 1d) is sideways/neutral on trend. That contradiction is worth understanding: ADX measures the *strength* of directional movement, not its direction \u2014 it can stay elevated after a trend ends, while price chops. Here, both SMAs (50 and 200) sit about 1.45\u20131.47% above price, and price has been grinding below them. The ADX number alone would suggest a trend; everything else says there isn't one worth trading.\n\n**Confluence requires independent agreement \u2014 and it isn't there.** Only structure votes bullish (price sitting at the edge of the 82,767\u201382,957 support zone). Momentum votes bearish (MACD line below its signal line). Trend and volume are neutral. One category out of four isn't confluence \u2014 it's a single opinion with three abstentions.\n\n**The two completed patterns are history, not setups.** A bearish rising wedge and a bearish sideways channel both broke and reached their targets 1\u20139 bars ago. They're worth noting because they tell you *why* price is here \u2014 two bearish patterns completed their moves and deposited price at this support zone \u2014 but completed patterns don't give you a trade. The move is done.\n\n**Stochastic is oversold (9.7/10.8), but that's a location, not a signal.** Oscillators going oversold in a downward grind can stay oversold. The bullish RSI divergence (price made a lower low at 83,838 while RSI made a higher low, 46\u219249) is more interesting \u2014 it says downside *momentum* is fading \u2014 but divergence alone, mid-range, without a confirming candle or structure break, doesn't generate a setup. It's a condition to monitor.\n\n**Price is essentially sitting on support (\u22120.00%)**, which is why structure votes bullish. But a zone with only 2 swing reversals and a recency-weighted strength of 0.326 is a weak zone. The resistance above (83,702\u201383,892, 4 reversals, strength 1.96) is considerably more established. That asymmetry is worth knowing.\n\n**The caution flag:** price is 3.2 ATR below the 50-MA (flagged at the 3 ATR threshold). That describes a stretched condition \u2014 not a direction, just a fact that mean-reversion moves become more common at such distances. Historical backing for this flag is unmeasured.\n\nOpposing: MACD line is below its signal line (bearish momentum) \u2014 the one category voting against the bullish structure read.",
+  "facts": {
+   "market": {
+    "symbol": "BTC/USDT",
+    "timeframe": "1h",
+    "exchange": "binance",
+    "last_close": 82960.0,
+    "last_time": "2026-09-28 10:00:00+00:00"
+   },
+   "trend": {
+    "label": "sideways",
+    "reasons": [
+     "Swing highs and lows are not consistently rising or falling."
+    ]
+   },
+   "momentum": {
+    "rsi": 33.6,
+    "rsi_zone": "neutral",
+    "macd": -427.03,
+    "macd_signal": -300.55,
+    "macd_state": "bearish",
+    "stochastic_k": 9.7,
+    "stochastic_d": 10.8,
+    "stochastic_zone": "oversold"
+   },
+   "volatility": {
+    "atr": 381.06,
+    "atr_pct": 0.46,
+    "adx": 28.3,
+    "regime": "trending",
+    "bollinger_pct_b": 0.187,
+    "bollinger_position": "inside bands"
+   },
+   "divergence": {
+    "kind": "bullish",
+    "reason": "Price made a lower low (83856.23 -> 83838.00) but RSI made a higher low (46 -> 49) \u2014 downside momentum is fading."
+   },
+   "round_number": {
+    "nearest": 83000.0,
+    "distance_pct": 0.048,
+    "is_near": true,
+    "signed_distance_atr": 0.1,
+    "signed_distance_pct": 0.05
+   },
+   "market_adaptation": {
+    "asset_class": "crypto",
+    "volume_type": "real",
+    "is_24_7": true,
+    "active_session": null,
+    "weekend_gap": null,
+    "significant_move_pct": 0.689
+   },
+   "volume": {
+    "last": 804.82,
+    "average": 690.49,
+    "ratio": 1.17,
+    "confirmed": false,
+    "obv_rising": false,
+    "type": "real"
+   },
+   "candlestick": null,
+   "support_resistance": {
+    "nearest_support": {
+     "price": 82862.46,
+     "lower": 82767.2,
+     "upper": 82957.73,
+     "touches": 2,
+     "bars_since_touch": 97,
+     "strength": 0.326,
+     "stale": false,
+     "inside": false,
+     "distance_atr": -0.01,
+     "distance_pct": -0.0
+    },
+    "nearest_resistance": {
+     "price": 83797.36,
+     "lower": 83702.09,
+     "upper": 83892.62,
+     "touches": 4,
+     "bars_since_touch": 38,
+     "strength": 1.96,
+     "stale": false,
+     "inside": false,
+     "distance_atr": 1.95,
+     "distance_pct": 0.89
+    }
+   },
+   "chart_patterns": [
+    {
+     "type": "rising wedge",
+     "kind": "reversal",
+     "direction": "bearish",
+     "state": "confirmed",
+     "bars": [
+      4251,
+      4269,
+      4274,
+      4281,
+      4298,
+      4309
+     ],
+     "points": [
+      {
+       "bar": 4251,
+       "price": 83183.0
+      },
+      {
+       "bar": 4269,
+       "price": 84336.96
+      },
+      {
+       "bar": 4274,
+       "price": 83856.23
+      },
+      {
+       "bar": 4281,
+       "price": 83838.0
+      },
+      {
+       "bar": 4298,
+       "price": 85159.03
+      },
+      {
+       "bar": 4309,
+       "price": 84999.0
+      }
+     ],
+     "lines": [
+      [
+       {
+        "bar": 4251,
+        "price": 83826.71
+       },
+       {
+        "bar": 4309,
+        "price": 85470.85
+       }
+      ],
+      [
+       {
+        "bar": 4251,
+        "price": 83183.0
+       },
+       {
+        "bar": 4309,
+        "price": 84449.33
+       }
+      ]
+     ],
+     "breakout_level": 84471.17,
+     "invalidation_level": 85499.2,
+     "target": 83805.62,
+     "quality": 0.648,
+     "confirmation": {
+      "price": "supports",
+      "volume": "neutral",
+      "momentum": "supports",
+      "volatility": "neutral",
+      "candlestick": "neutral",
+      "higher_tf": "neutral",
+      "structure": "supports"
+     },
+     "reason": "Both lines rising and converging (32% narrower) \u2014 a rising wedge, conventionally bearish.",
+     "bars_since_completion": 10,
+     "bars_since_state_change": 9,
+     "lifecycle": "completed",
+     "state_bar": 4310,
+     "target_hit_bar": 4310,
+     "distances": {
+      "breakout": {
+       "distance_atr": 3.97,
+       "distance_pct": 1.82
+      },
+      "invalidation": {
+       "distance_atr": 6.66,
+       "distance_pct": 3.06
+      },
+      "target": {
+       "distance_atr": 2.22,
+       "distance_pct": 1.02
+      }
+     }
+    },
+    {
+     "type": "sideways channel",
+     "kind": "continuation",
+     "direction": "bearish",
+     "state": "confirmed",
+     "bars": [
+      4274,
+      4281,
+      4298,
+      4309
+     ],
+     "points": [
+      {
+       "bar": 4274,
+       "price": 83856.23
+      },
+      {
+       "bar": 4281,
+       "price": 83838.0
+      },
+      {
+       "bar": 4298,
+       "price": 85159.03
+      },
+      {
+       "bar": 4309,
+       "price": 84999.0
+      }
+     ],
+     "lines": [
+      [
+       {
+        "bar": 4274,
+        "price": 85079.01
+       },
+       {
+        "bar": 4309,
+        "price": 85079.01
+       }
+      ],
+      [
+       {
+        "bar": 4274,
+        "price": 83847.11
+       },
+       {
+        "bar": 4309,
+        "price": 83847.11
+       }
+      ]
+     ],
+     "breakout_level": 83847.11,
+     "invalidation_level": 85079.01,
+     "target": 82615.21,
+     "quality": 0.805,
+     "confirmation": {
+      "price": "supports",
+      "volume": "neutral",
+      "momentum": "supports",
+      "volatility": "neutral",
+      "candlestick": "neutral",
+      "higher_tf": "neutral",
+      "structure": "supports"
+     },
+     "reason": "Sideways channel \u2014 flat-top resistance and flat-bottom support; a close beyond either edge resolves it.",
+     "bars_since_completion": 10,
+     "bars_since_state_change": 9,
+     "lifecycle": "completed",
+     "state_bar": 4310,
+     "target_hit_bar": 4318,
+     "distances": {
+      "breakout": {
+       "distance_atr": 2.33,
+       "distance_pct": 1.07
+      },
+      "invalidation": {
+       "distance_atr": 5.56,
+       "distance_pct": 2.55
+      },
+      "target": {
+       "distance_atr": -0.9,
+       "distance_pct": -0.42
+      }
+     }
+    }
+   ],
+   "fibonacci": {
+    "direction": "up",
+    "impulse_low": 83838.0,
+    "impulse_high": 84999.0,
+    "key_levels": {
+     "0.382": 84555.5,
+     "0.5": 84418.5,
+     "0.618": 84281.5,
+     "0.786": 84086.45
+    },
+    "key_level_distances": {
+     "0.382": {
+      "distance_atr": 4.19,
+      "distance_pct": 1.92
+     },
+     "0.5": {
+      "distance_atr": 3.83,
+      "distance_pct": 1.76
+     },
+     "0.618": {
+      "distance_atr": 3.47,
+      "distance_pct": 1.59
+     },
+     "0.786": {
+      "distance_atr": 2.96,
+      "distance_pct": 1.36
+     }
+    }
+   },
+   "confluence": {
+    "bias": "bullish",
+    "triggered": false,
+    "confidence": 0.3,
+    "agreeing_categories": 1,
+    "require_categories": 2,
+    "categories": {
+     "momentum": "bearish",
+     "structure": "bullish",
+     "trend": "neutral",
+     "volume": "neutral"
+    },
+    "signals": [
+     {
+      "name": "trend",
+      "direction": "neutral",
+      "category": "trend",
+      "reason": "Swing highs and lows are not consistently rising or falling."
+     },
+     {
+      "name": "rsi",
+      "direction": "neutral",
+      "category": "momentum",
+      "reason": "RSI is 34, in the neutral zone."
+     },
+     {
+      "name": "macd",
+      "direction": "bearish",
+      "category": "momentum",
+      "reason": "MACD line is below its signal line (bearish momentum)."
+     },
+     {
+      "name": "candlestick",
+      "direction": "neutral",
+      "category": "structure",
+      "reason": "No notable candlestick pattern on the last candle."
+     },
+     {
+      "name": "support_resistance",
+      "direction": "bullish",
+      "category": "structure",
+      "reason": "Price is at the edge of the support zone 82767.20\u201382957.73."
+     },
+     {
+      "name": "fibonacci",
+      "direction": "neutral",
+      "category": "structure",
+      "reason": "Price is not near a key Fibonacci level."
+     },
+     {
+      "name": "volume",
+      "direction": "neutral",
+      "category": "volume",
+      "reason": "Volume is 1.2x its average \u2014 below the 1.2x bar, so the move is not confirmed by participation."
+     }
+    ],
+    "mtf_alignment": "neutral",
+    "mtf_trends": {
+     "4h": "sideways",
+     "1d": "sideways"
+    }
+   },
+   "moving_averages": {
+    "slow": {
+     "period": 50,
+     "value": 84165.59,
+     "distance_atr": 3.16,
+     "distance_pct": 1.45
+    },
+    "long": {
+     "period": 200,
+     "value": 84177.76,
+     "distance_atr": 3.2,
+     "distance_pct": 1.47
+    }
+   },
+   "nearest_levels": {
+    "above": {
+     "price": 83000.0,
+     "source": "round number",
+     "distance_atr": 0.1,
+     "distance_pct": 0.05
+    },
+    "below": {
+     "price": 82957.73,
+     "source": "S/R zone 82767.20\u201382957.73 (upper edge)",
+     "distance_atr": -0.01,
+     "distance_pct": -0.0
+    }
+   },
+   "strongest_opposing_fact": {
+    "category": "momentum",
+    "direction": "bearish",
+    "weight": 1.0,
+    "detector": "macd",
+    "reason": "MACD line is below its signal line (bearish momentum).",
+    "opposing_categories": [
+     "momentum"
+    ]
+   },
+   "mtf_signals": {
+    "timeframes": [
+     "1h",
+     "4h",
+     "1d"
+    ],
+    "signals": {
+     "trend": {
+      "1h": "neutral",
+      "4h": "neutral",
+      "1d": "neutral"
+     },
+     "rsi": {
+      "1h": "neutral",
+      "4h": "neutral",
+      "1d": "neutral"
+     },
+     "macd": {
+      "1h": "bearish",
+      "4h": "bearish",
+      "1d": "bullish"
+     },
+     "candlestick": {
+      "1h": "neutral",
+      "4h": "neutral",
+      "1d": "bearish"
+     },
+     "support_resistance": {
+      "1h": "bullish",
+      "4h": "bullish",
+      "1d": "bullish"
+     },
+     "fibonacci": {
+      "1h": "neutral",
+      "4h": "neutral",
+      "1d": "bullish"
+     },
+     "volume": {
+      "1h": "neutral",
+      "4h": "bearish",
+      "1d": "neutral"
+     }
+    }
+   },
+   "detector_reliability": {
+    "status": "unmeasured \u2014 detector precision is filled in by ROADMAP B2",
+    "detectors": {
+     "trend": {
+      "precision": null,
+      "n": 0,
+      "status": "unmeasured"
+     },
+     "rsi": {
+      "precision": null,
+      "n": 0,
+      "status": "unmeasured"
+     },
+     "macd": {
+      "precision": null,
+      "n": 0,
+      "status": "unmeasured"
+     },
+     "candlestick": {
+      "precision": null,
+      "n": 0,
+      "status": "unmeasured"
+     },
+     "support_resistance": {
+      "precision": null,
+      "n": 0,
+      "status": "unmeasured"
+     },
+     "fibonacci": {
+      "precision": null,
+      "n": 0,
+      "status": "unmeasured"
+     },
+     "volume": {
+      "precision": null,
+      "n": 0,
+      "status": "unmeasured"
+     }
+    },
+    "chart_patterns": {
+     "rising wedge": {
+      "precision": null,
+      "n": 0,
+      "status": "unmeasured"
+     },
+     "sideways channel": {
+      "precision": null,
+      "n": 0,
+      "status": "unmeasured"
+     }
+    }
+   },
+   "absences": [
+    "no failed chart pattern",
+    "no candlestick pattern on the last closed bar"
+   ],
+   "situation": {
+    "tier": "no_setup",
+    "reasons": [
+     "no_pattern_no_confluence"
+    ],
+    "word_budget": 30,
+    "template": "One or two sentences: what's absent, what would change it. Stop."
+   },
+   "caution": [
+    {
+     "code": "no_expansion",
+     "label": "Breakout without expansion",
+     "active": false,
+     "detail": "no fresh breakout to judge",
+     "value": null,
+     "status": "unmeasured"
+    },
+    {
+     "code": "stretched",
+     "label": "Stretched from the average",
+     "active": true,
+     "detail": "3.2 ATR below the 50-MA (flag at 3)",
+     "value": -3.16,
+     "status": "unmeasured"
+    },
+    {
+     "code": "volatility_extreme",
+     "label": "Volatility at an extreme",
+     "active": false,
+     "detail": "ATR is higher than 54% of the last 100 bars",
+     "value": {
+      "percentile": 0.55,
+      "kind": null
+     },
+     "status": "unmeasured"
+    },
+    {
+     "code": "stop_in_noise",
+     "label": "Invalidation inside normal noise",
+     "active": null,
+     "detail": "not applicable: no directional read",
+     "value": null,
+     "status": "unmeasured"
+    },
+    {
+     "code": "no_room",
+     "label": "Not enough room after costs",
+     "active": null,
+     "detail": "not applicable: no directional read",
+     "value": null,
+     "status": "unmeasured"
+    },
+    {
+     "code": "htf_against",
+     "label": "Higher timeframe against the read",
+     "active": null,
+     "detail": "not applicable: no directional read",
+     "value": null,
+     "status": "unmeasured"
+    },
+    {
+     "code": "event_risk",
+     "label": "High-impact news soon",
+     "active": null,
+     "detail": "unavailable: no economic calendar (needs FINNHUB_API_KEY)",
+     "value": null,
+     "status": "unmeasured"
+    },
+    {
+     "code": "thin_market",
+     "label": "Thin market",
+     "active": null,
+     "detail": "not applicable: crypto trades around the clock",
+     "value": null,
+     "status": "unmeasured"
+    }
+   ]
+  }
+ },
+ {
+  "symbol": "SOL/USDT",
+  "timeframe": "4h",
+  "style": "brief",
+  "explanation": "Bearish lean at resistance: price is pressing the lower edge of the 116.52\u2013117.60 zone (stale, [unmeasured]), while MACD is bearish and the Fibonacci 50.0% retracement at 116.14 sits just below. No confirmed pattern; forming rising wedge is context only.\nInvalidation: 4h close above 117.60 (+1.08%). Below: 116.14 Fibonacci (\u22120.21%). Track record: unavailable.",
+  "facts": {
+   "market": {
+    "symbol": "SOL/USDT",
+    "timeframe": "4h",
+    "exchange": "binance",
+    "last_close": 116.38,
+    "last_time": "2026-09-25 04:00:00+00:00"
+   },
+   "trend": {
+    "label": "sideways",
+    "reasons": [
+     "Swing highs and lows are not consistently rising or falling."
+    ]
+   },
+   "momentum": {
+    "rsi": 55.2,
+    "rsi_zone": "neutral",
+    "macd": 1.04,
+    "macd_signal": 1.33,
+    "macd_state": "bearish",
+    "stochastic_k": 58.7,
+    "stochastic_d": 60.6,
+    "stochastic_zone": "neutral"
+   },
+   "volatility": {
+    "atr": 2.14,
+    "atr_pct": 1.84,
+    "adx": 23.4,
+    "regime": "ranging",
+    "bollinger_pct_b": 0.483,
+    "bollinger_position": "inside bands"
+   },
+   "divergence": null,
+   "round_number": {
+    "nearest": 120.0,
+    "distance_pct": 3.111,
+    "is_near": false,
+    "signed_distance_atr": 1.69,
+    "signed_distance_pct": 3.11
+   },
+   "market_adaptation": {
+    "asset_class": "crypto",
+    "volume_type": "real",
+    "is_24_7": true,
+    "active_session": null,
+    "weekend_gap": null,
+    "significant_move_pct": 2.76
+   },
+   "volume": {
+    "last": 317293.9,
+    "average": 497437.85,
+    "ratio": 0.64,
+    "confirmed": false,
+    "obv_rising": true,
+    "type": "real"
+   },
+   "candlestick": null,
+   "support_resistance": {
+    "nearest_support": {
+     "price": 112.22,
+     "lower": 111.69,
+     "upper": 112.76,
+     "touches": 4,
+     "bars_since_touch": 5,
+     "strength": 0.944,
+     "stale": false,
+     "inside": false,
+     "distance_atr": -1.69,
+     "distance_pct": -3.11
+    },
+    "nearest_resistance": {
+     "price": 117.06,
+     "lower": 116.52,
+     "upper": 117.6,
+     "touches": 3,
+     "bars_since_touch": 1455,
+     "strength": 0.0,
+     "stale": true,
+     "inside": false,
+     "distance_atr": 0.07,
+     "distance_pct": 0.12
+    }
+   },
+   "chart_patterns": [
+    {
+     "type": "rising wedge",
+     "kind": "reversal",
+     "direction": "bearish",
+     "state": "forming",
+     "bars": [
+      4268,
+      4280,
+      4288,
+      4299,
+      4307,
+      4314
+     ],
+     "points": [
+      {
+       "bar": 4268,
+       "price": 96.09
+      },
+      {
+       "bar": 4280,
+       "price": 114.32
+      },
+      {
+       "bar": 4288,
+       "price": 107.4
+      },
+      {
+       "bar": 4299,
+       "price": 119.99
+      },
+      {
+       "bar": 4307,
+       "price": 119.77
+      },
+      {
+       "bar": 4314,
+       "price": 112.52
+      }
+     ],
+     "lines": [
+      [
+       {
+        "bar": 4268,
+        "price": 110.74
+       },
+       {
+        "bar": 4314,
+        "price": 124.47
+       }
+      ],
+      [
+       {
+        "bar": 4268,
+        "price": 96.09
+       },
+       {
+        "bar": 4314,
+        "price": 112.52
+       }
+      ]
+     ],
+     "breakout_level": 114.31,
+     "invalidation_level": 125.96,
+     "target": 97.87105,
+     "quality": 0.832,
+     "confirmation": {
+      "price": "neutral",
+      "volume": "contradicts",
+      "momentum": "supports",
+      "volatility": "neutral",
+      "candlestick": "neutral",
+      "higher_tf": "neutral",
+      "structure": "supports"
+     },
+     "reason": "Both lines rising and converging (42% narrower) \u2014 a rising wedge, conventionally bearish.",
+     "bars_since_completion": 5,
+     "bars_since_state_change": null,
+     "lifecycle": "forming",
+     "state_bar": null,
+     "target_hit_bar": null,
+     "distances": {
+      "breakout": {
+       "distance_atr": -0.97,
+       "distance_pct": -1.78
+      },
+      "invalidation": {
+       "distance_atr": 4.48,
+       "distance_pct": 8.23
+      },
+      "target": {
+       "distance_atr": -8.65,
+       "distance_pct": -15.9
+      }
+     }
+    }
+   ],
+   "fibonacci": {
+    "direction": "down",
+    "impulse_low": 112.52,
+    "impulse_high": 119.77,
+    "key_levels": {
+     "0.382": 115.29,
+     "0.5": 116.14,
+     "0.618": 117.0,
+     "0.786": 118.22
+    },
+    "key_level_distances": {
+     "0.382": {
+      "distance_atr": -0.51,
+      "distance_pct": -0.94
+     },
+     "0.5": {
+      "distance_atr": -0.11,
+      "distance_pct": -0.21
+     },
+     "0.618": {
+      "distance_atr": 0.29,
+      "distance_pct": 0.53
+     },
+     "0.786": {
+      "distance_atr": 0.86,
+      "distance_pct": 1.58
+     }
+    }
+   },
+   "confluence": {
+    "bias": "bearish",
+    "triggered": true,
+    "confidence": 0.55,
+    "agreeing_categories": 2,
+    "require_categories": 2,
+    "categories": {
+     "momentum": "bearish",
+     "structure": "bearish",
+     "trend": "neutral",
+     "volume": "neutral"
+    },
+    "signals": [
+     {
+      "name": "trend",
+      "direction": "neutral",
+      "category": "trend",
+      "reason": "Swing highs and lows are not consistently rising or falling."
+     },
+     {
+      "name": "rsi",
+      "direction": "neutral",
+      "category": "momentum",
+      "reason": "RSI is 55, in the neutral zone."
+     },
+     {
+      "name": "macd",
+      "direction": "bearish",
+      "category": "momentum",
+      "reason": "MACD line is below its signal line (bearish momentum)."
+     },
+     {
+      "name": "candlestick",
+      "direction": "neutral",
+      "category": "structure",
+      "reason": "No notable candlestick pattern on the last candle."
+     },
+     {
+      "name": "support_resistance",
+      "direction": "bearish",
+      "category": "structure",
+      "reason": "Price is at the edge of the resistance zone 116.52\u2013117.60 (stale \u2014 no reversal there for a long time)."
+     },
+     {
+      "name": "fibonacci",
+      "direction": "bearish",
+      "category": "structure",
+      "reason": "Price is stalling at the 50.0% Fibonacci retracement (resistance) near 116.14."
+     },
+     {
+      "name": "volume",
+      "direction": "neutral",
+      "category": "volume",
+      "reason": "Volume is 0.6x its average \u2014 below the 1.2x bar, so the move is not confirmed by participation."
+     }
+    ],
+    "mtf_alignment": "neutral",
+    "mtf_trends": {
+     "1d": "sideways"
+    }
+   },
+   "moving_averages": {
+    "slow": {
+     "period": 50,
+     "value": 112.21,
+     "distance_atr": -1.95,
+     "distance_pct": -3.58
+    },
+    "long": {
+     "period": 200,
+     "value": 104.21,
+     "distance_atr": -5.69,
+     "distance_pct": -10.46
+    }
+   },
+   "nearest_levels": {
+    "above": {
+     "price": 116.52,
+     "source": "S/R zone 116.52\u2013117.60 (lower edge)",
+     "distance_atr": 0.07,
+     "distance_pct": 0.12
+    },
+    "below": {
+     "price": 116.14,
+     "source": "Fibonacci 50.0%",
+     "distance_atr": -0.11,
+     "distance_pct": -0.21
+    }
+   },
+   "strongest_opposing_fact": null,
+   "mtf_signals": {
+    "timeframes": [
+     "4h",
+     "1d",
+     "1w"
+    ],
+    "signals": {
+     "trend": {
+      "4h": "neutral",
+      "1d": "neutral",
+      "1w": "neutral"
+     },
+     "rsi": {
+      "4h": "neutral",
+      "1d": "neutral",
+      "1w": "neutral"
+     },
+     "macd": {
+      "4h": "bearish",
+      "1d": "bullish",
+      "1w": "bullish"
+     },
+     "candlestick": {
+      "4h": "neutral",
+      "1d": "bearish",
+      "1w": "neutral"
+     },
+     "support_resistance": {
+      "4h": "bearish",
+      "1d": "bearish",
+      "1w": "neutral"
+     },
+     "fibonacci": {
+      "4h": "bearish",
+      "1d": "neutral",
+      "1w": "neutral"
+     },
+     "volume": {
+      "4h": "neutral",
+      "1d": "neutral",
+      "1w": "neutral"
+     }
+    }
+   },
+   "detector_reliability": {
+    "status": "unmeasured \u2014 detector precision is filled in by ROADMAP B2",
+    "detectors": {
+     "trend": {
+      "precision": null,
+      "n": 0,
+      "status": "unmeasured"
+     },
+     "rsi": {
+      "precision": null,
+      "n": 0,
+      "status": "unmeasured"
+     },
+     "macd": {
+      "precision": null,
+      "n": 0,
+      "status": "unmeasured"
+     },
+     "candlestick": {
+      "precision": null,
+      "n": 0,
+      "status": "unmeasured"
+     },
+     "support_resistance": {
+      "precision": null,
+      "n": 0,
+      "status": "unmeasured"
+     },
+     "fibonacci": {
+      "precision": null,
+      "n": 0,
+      "status": "unmeasured"
+     },
+     "volume": {
+      "precision": null,
+      "n": 0,
+      "status": "unmeasured"
+     }
+    },
+    "chart_patterns": {
+     "rising wedge": {
+      "precision": null,
+      "n": 0,
+      "status": "unmeasured"
+     }
+    }
+   },
+   "absences": [
+    "no RSI divergence detected",
+    "no confirmed chart pattern",
+    "no failed chart pattern",
+    "no candlestick pattern on the last closed bar",
+    "no category votes against the read"
+   ],
+   "situation": {
+    "tier": "notable",
+    "reasons": [
+     "categories_aligned",
+     "at_level"
+    ],
+    "word_budget": 70,
+    "template": "Three lines: Read. Why (2\u20133 named facts). Invalidation."
+   },
+   "caution": [
+    {
+     "code": "no_expansion",
+     "label": "Breakout without expansion",
+     "active": false,
+     "detail": "no fresh breakout to judge",
+     "value": null,
+     "status": "unmeasured"
+    },
+    {
+     "code": "stretched",
+     "label": "Stretched from the average",
+     "active": false,
+     "detail": "1.9 ATR above the 50-MA (flag at 3)",
+     "value": 1.95,
+     "status": "unmeasured"
+    },
+    {
+     "code": "volatility_extreme",
+     "label": "Volatility at an extreme",
+     "active": false,
+     "detail": "ATR is higher than 75% of the last 100 bars",
+     "value": {
+      "percentile": 0.76,
+      "kind": null
+     },
+     "status": "unmeasured"
+    },
+    {
+     "code": "stop_in_noise",
+     "label": "Invalidation inside normal noise",
+     "active": true,
+     "detail": "invalidation 117.6 is 0.57 ATR away (noise under 1 ATR; level from zone)",
+     "value": {
+      "distance_atr": 0.57,
+      "invalidation": 117.6
+     },
+     "status": "unmeasured"
+    },
+    {
+     "code": "no_room",
+     "label": "Not enough room after costs",
+     "active": false,
+     "detail": "to the next level 112.76: 1.64 ATR after ~0.05 ATR of costs, vs 0.57 ATR to invalidation",
+     "value": {
+      "reward_atr": 1.64,
+      "risk_atr": 0.57,
+      "cost_atr": 0.05
+     },
+     "status": "unmeasured"
+    },
+    {
+     "code": "htf_against",
+     "label": "Higher timeframe against the read",
+     "active": false,
+     "detail": "higher-timeframe trends are neutral: 1d neutral, 1w neutral",
+     "value": null,
+     "status": "unmeasured"
+    },
+    {
+     "code": "event_risk",
+     "label": "High-impact news soon",
+     "active": null,
+     "detail": "unavailable: no economic calendar (needs FINNHUB_API_KEY)",
+     "value": null,
+     "status": "unmeasured"
+    },
+    {
+     "code": "thin_market",
+     "label": "Thin market",
+     "active": null,
+     "detail": "not applicable: crypto trades around the clock",
+     "value": null,
+     "status": "unmeasured"
+    }
+   ]
+  }
+ },
+ {
+  "symbol": "SOL/USDT",
+  "timeframe": "4h",
+  "style": "teaching",
+  "explanation": "Read. Bearish confluence at resistance: price is pressing the underside of the S/R zone 116.52\u2013117.60, stalling at the Fibonacci 50.0% retracement (116.14), with MACD bearish (line 1.04 below signal 1.33). Two of four voting categories agree (momentum + structure = bearish); the verdict record is unavailable for this pair and timeframe.\n\nWhy. Structure votes bearish on two independent grounds \u2014 Fibonacci and S/R \u2014 rather than one signal counted twice: the 50.0% retracement (116.14, \u22120.21%) is a Fibonacci level from the 112.52\u2013119.77 down-leg; the zone 116.52\u2013117.60 is a historical swing-reversal band. MACD voting bearish adds a second category. ADX 23.4 (ranging) confirms no directional trend is in force, so the read is a range-resistance rejection, not a trend continuation.\n\nTwo cautions to name explicitly. First, the S/R zone is stale \u2014 last reversal was 1,455 bars ago, recency-weighted strength 0.0 \u2014 so its weight as a resistance is low. The Fibonacci level is doing more work here. Second, the forming rising wedge (reversal, not yet broken) has a breakout level at 114.31 (\u22121.78%); it is context only \u2014 not a setup, as Layer 1 has not confirmed it \u2014 and its detector reliability is unmeasured.\n\nVolume (0.64\u00d7 average) is below the 1.2\u00d7 confirmation bar, meaning no expansion supports the read. A bearish rejection from this level without volume participation is a weaker signal than one with it.\n\nInvalidation. A 4h close above 117.60 (the upper edge of the resistance zone, +1.12%) resolves the picture above. Below: the Fibonacci 38.2% at 115.29 (\u22120.94%) and then the support zone 111.69\u2013112.76 (\u22123.11%) are the structural floors.\n\nOne caution: the invalidation edge of the resistance zone (117.60) is only 0.57 ATR away \u2014 inside typical noise for this instrument. A close just above it may be noise rather than a real breakout; Layer 1 flags this as an active caution (unmeasured).\n\nOpposing: no category votes against the bearish read.",
+  "facts": {
+   "market": {
+    "symbol": "SOL/USDT",
+    "timeframe": "4h",
+    "exchange": "binance",
+    "last_close": 116.38,
+    "last_time": "2026-09-25 04:00:00+00:00"
+   },
+   "trend": {
+    "label": "sideways",
+    "reasons": [
+     "Swing highs and lows are not consistently rising or falling."
+    ]
+   },
+   "momentum": {
+    "rsi": 55.2,
+    "rsi_zone": "neutral",
+    "macd": 1.04,
+    "macd_signal": 1.33,
+    "macd_state": "bearish",
+    "stochastic_k": 58.7,
+    "stochastic_d": 60.6,
+    "stochastic_zone": "neutral"
+   },
+   "volatility": {
+    "atr": 2.14,
+    "atr_pct": 1.84,
+    "adx": 23.4,
+    "regime": "ranging",
+    "bollinger_pct_b": 0.483,
+    "bollinger_position": "inside bands"
+   },
+   "divergence": null,
+   "round_number": {
+    "nearest": 120.0,
+    "distance_pct": 3.111,
+    "is_near": false,
+    "signed_distance_atr": 1.69,
+    "signed_distance_pct": 3.11
+   },
+   "market_adaptation": {
+    "asset_class": "crypto",
+    "volume_type": "real",
+    "is_24_7": true,
+    "active_session": null,
+    "weekend_gap": null,
+    "significant_move_pct": 2.76
+   },
+   "volume": {
+    "last": 317293.9,
+    "average": 497437.85,
+    "ratio": 0.64,
+    "confirmed": false,
+    "obv_rising": true,
+    "type": "real"
+   },
+   "candlestick": null,
+   "support_resistance": {
+    "nearest_support": {
+     "price": 112.22,
+     "lower": 111.69,
+     "upper": 112.76,
+     "touches": 4,
+     "bars_since_touch": 5,
+     "strength": 0.944,
+     "stale": false,
+     "inside": false,
+     "distance_atr": -1.69,
+     "distance_pct": -3.11
+    },
+    "nearest_resistance": {
+     "price": 117.06,
+     "lower": 116.52,
+     "upper": 117.6,
+     "touches": 3,
+     "bars_since_touch": 1455,
+     "strength": 0.0,
+     "stale": true,
+     "inside": false,
+     "distance_atr": 0.07,
+     "distance_pct": 0.12
+    }
+   },
+   "chart_patterns": [
+    {
+     "type": "rising wedge",
+     "kind": "reversal",
+     "direction": "bearish",
+     "state": "forming",
+     "bars": [
+      4268,
+      4280,
+      4288,
+      4299,
+      4307,
+      4314
+     ],
+     "points": [
+      {
+       "bar": 4268,
+       "price": 96.09
+      },
+      {
+       "bar": 4280,
+       "price": 114.32
+      },
+      {
+       "bar": 4288,
+       "price": 107.4
+      },
+      {
+       "bar": 4299,
+       "price": 119.99
+      },
+      {
+       "bar": 4307,
+       "price": 119.77
+      },
+      {
+       "bar": 4314,
+       "price": 112.52
+      }
+     ],
+     "lines": [
+      [
+       {
+        "bar": 4268,
+        "price": 110.74
+       },
+       {
+        "bar": 4314,
+        "price": 124.47
+       }
+      ],
+      [
+       {
+        "bar": 4268,
+        "price": 96.09
+       },
+       {
+        "bar": 4314,
+        "price": 112.52
+       }
+      ]
+     ],
+     "breakout_level": 114.31,
+     "invalidation_level": 125.96,
+     "target": 97.87105,
+     "quality": 0.832,
+     "confirmation": {
+      "price": "neutral",
+      "volume": "contradicts",
+      "momentum": "supports",
+      "volatility": "neutral",
+      "candlestick": "neutral",
+      "higher_tf": "neutral",
+      "structure": "supports"
+     },
+     "reason": "Both lines rising and converging (42% narrower) \u2014 a rising wedge, conventionally bearish.",
+     "bars_since_completion": 5,
+     "bars_since_state_change": null,
+     "lifecycle": "forming",
+     "state_bar": null,
+     "target_hit_bar": null,
+     "distances": {
+      "breakout": {
+       "distance_atr": -0.97,
+       "distance_pct": -1.78
+      },
+      "invalidation": {
+       "distance_atr": 4.48,
+       "distance_pct": 8.23
+      },
+      "target": {
+       "distance_atr": -8.65,
+       "distance_pct": -15.9
+      }
+     }
+    }
+   ],
+   "fibonacci": {
+    "direction": "down",
+    "impulse_low": 112.52,
+    "impulse_high": 119.77,
+    "key_levels": {
+     "0.382": 115.29,
+     "0.5": 116.14,
+     "0.618": 117.0,
+     "0.786": 118.22
+    },
+    "key_level_distances": {
+     "0.382": {
+      "distance_atr": -0.51,
+      "distance_pct": -0.94
+     },
+     "0.5": {
+      "distance_atr": -0.11,
+      "distance_pct": -0.21
+     },
+     "0.618": {
+      "distance_atr": 0.29,
+      "distance_pct": 0.53
+     },
+     "0.786": {
+      "distance_atr": 0.86,
+      "distance_pct": 1.58
+     }
+    }
+   },
+   "confluence": {
+    "bias": "bearish",
+    "triggered": true,
+    "confidence": 0.55,
+    "agreeing_categories": 2,
+    "require_categories": 2,
+    "categories": {
+     "momentum": "bearish",
+     "structure": "bearish",
+     "trend": "neutral",
+     "volume": "neutral"
+    },
+    "signals": [
+     {
+      "name": "trend",
+      "direction": "neutral",
+      "category": "trend",
+      "reason": "Swing highs and lows are not consistently rising or falling."
+     },
+     {
+      "name": "rsi",
+      "direction": "neutral",
+      "category": "momentum",
+      "reason": "RSI is 55, in the neutral zone."
+     },
+     {
+      "name": "macd",
+      "direction": "bearish",
+      "category": "momentum",
+      "reason": "MACD line is below its signal line (bearish momentum)."
+     },
+     {
+      "name": "candlestick",
+      "direction": "neutral",
+      "category": "structure",
+      "reason": "No notable candlestick pattern on the last candle."
+     },
+     {
+      "name": "support_resistance",
+      "direction": "bearish",
+      "category": "structure",
+      "reason": "Price is at the edge of the resistance zone 116.52\u2013117.60 (stale \u2014 no reversal there for a long time)."
+     },
+     {
+      "name": "fibonacci",
+      "direction": "bearish",
+      "category": "structure",
+      "reason": "Price is stalling at the 50.0% Fibonacci retracement (resistance) near 116.14."
+     },
+     {
+      "name": "volume",
+      "direction": "neutral",
+      "category": "volume",
+      "reason": "Volume is 0.6x its average \u2014 below the 1.2x bar, so the move is not confirmed by participation."
+     }
+    ],
+    "mtf_alignment": "neutral",
+    "mtf_trends": {
+     "1d": "sideways"
+    }
+   },
+   "moving_averages": {
+    "slow": {
+     "period": 50,
+     "value": 112.21,
+     "distance_atr": -1.95,
+     "distance_pct": -3.58
+    },
+    "long": {
+     "period": 200,
+     "value": 104.21,
+     "distance_atr": -5.69,
+     "distance_pct": -10.46
+    }
+   },
+   "nearest_levels": {
+    "above": {
+     "price": 116.52,
+     "source": "S/R zone 116.52\u2013117.60 (lower edge)",
+     "distance_atr": 0.07,
+     "distance_pct": 0.12
+    },
+    "below": {
+     "price": 116.14,
+     "source": "Fibonacci 50.0%",
+     "distance_atr": -0.11,
+     "distance_pct": -0.21
+    }
+   },
+   "strongest_opposing_fact": null,
+   "mtf_signals": {
+    "timeframes": [
+     "4h",
+     "1d",
+     "1w"
+    ],
+    "signals": {
+     "trend": {
+      "4h": "neutral",
+      "1d": "neutral",
+      "1w": "neutral"
+     },
+     "rsi": {
+      "4h": "neutral",
+      "1d": "neutral",
+      "1w": "neutral"
+     },
+     "macd": {
+      "4h": "bearish",
+      "1d": "bullish",
+      "1w": "bullish"
+     },
+     "candlestick": {
+      "4h": "neutral",
+      "1d": "bearish",
+      "1w": "neutral"
+     },
+     "support_resistance": {
+      "4h": "bearish",
+      "1d": "bearish",
+      "1w": "neutral"
+     },
+     "fibonacci": {
+      "4h": "bearish",
+      "1d": "neutral",
+      "1w": "neutral"
+     },
+     "volume": {
+      "4h": "neutral",
+      "1d": "neutral",
+      "1w": "neutral"
+     }
+    }
+   },
+   "detector_reliability": {
+    "status": "unmeasured \u2014 detector precision is filled in by ROADMAP B2",
+    "detectors": {
+     "trend": {
+      "precision": null,
+      "n": 0,
+      "status": "unmeasured"
+     },
+     "rsi": {
+      "precision": null,
+      "n": 0,
+      "status": "unmeasured"
+     },
+     "macd": {
+      "precision": null,
+      "n": 0,
+      "status": "unmeasured"
+     },
+     "candlestick": {
+      "precision": null,
+      "n": 0,
+      "status": "unmeasured"
+     },
+     "support_resistance": {
+      "precision": null,
+      "n": 0,
+      "status": "unmeasured"
+     },
+     "fibonacci": {
+      "precision": null,
+      "n": 0,
+      "status": "unmeasured"
+     },
+     "volume": {
+      "precision": null,
+      "n": 0,
+      "status": "unmeasured"
+     }
+    },
+    "chart_patterns": {
+     "rising wedge": {
+      "precision": null,
+      "n": 0,
+      "status": "unmeasured"
+     }
+    }
+   },
+   "absences": [
+    "no RSI divergence detected",
+    "no confirmed chart pattern",
+    "no failed chart pattern",
+    "no candlestick pattern on the last closed bar",
+    "no category votes against the read"
+   ],
+   "situation": {
+    "tier": "notable",
+    "reasons": [
+     "categories_aligned",
+     "at_level"
+    ],
+    "word_budget": 70,
+    "template": "Three lines: Read. Why (2\u20133 named facts). Invalidation."
+   },
+   "caution": [
+    {
+     "code": "no_expansion",
+     "label": "Breakout without expansion",
+     "active": false,
+     "detail": "no fresh breakout to judge",
+     "value": null,
+     "status": "unmeasured"
+    },
+    {
+     "code": "stretched",
+     "label": "Stretched from the average",
+     "active": false,
+     "detail": "1.9 ATR above the 50-MA (flag at 3)",
+     "value": 1.95,
+     "status": "unmeasured"
+    },
+    {
+     "code": "volatility_extreme",
+     "label": "Volatility at an extreme",
+     "active": false,
+     "detail": "ATR is higher than 75% of the last 100 bars",
+     "value": {
+      "percentile": 0.76,
+      "kind": null
+     },
+     "status": "unmeasured"
+    },
+    {
+     "code": "stop_in_noise",
+     "label": "Invalidation inside normal noise",
+     "active": true,
+     "detail": "invalidation 117.6 is 0.57 ATR away (noise under 1 ATR; level from zone)",
+     "value": {
+      "distance_atr": 0.57,
+      "invalidation": 117.6
+     },
+     "status": "unmeasured"
+    },
+    {
+     "code": "no_room",
+     "label": "Not enough room after costs",
+     "active": false,
+     "detail": "to the next level 112.76: 1.64 ATR after ~0.05 ATR of costs, vs 0.57 ATR to invalidation",
+     "value": {
+      "reward_atr": 1.64,
+      "risk_atr": 0.57,
+      "cost_atr": 0.05
+     },
+     "status": "unmeasured"
+    },
+    {
+     "code": "htf_against",
+     "label": "Higher timeframe against the read",
+     "active": false,
+     "detail": "higher-timeframe trends are neutral: 1d neutral, 1w neutral",
+     "value": null,
+     "status": "unmeasured"
+    },
+    {
+     "code": "event_risk",
+     "label": "High-impact news soon",
+     "active": null,
+     "detail": "unavailable: no economic calendar (needs FINNHUB_API_KEY)",
+     "value": null,
+     "status": "unmeasured"
+    },
+    {
+     "code": "thin_market",
+     "label": "Thin market",
+     "active": null,
+     "detail": "not applicable: crypto trades around the clock",
+     "value": null,
+     "status": "unmeasured"
+    }
+   ]
+  }
+ },
+ {
+  "symbol": "EUR/USD",
+  "timeframe": "1h",
+  "style": "brief",
+  "explanation": "No setup: ADX 37.4 (trending) but only 1 of 4 categories agree, no pattern. Above: 1.14011 (+0.94 ATR). Below: 1.13908 (\u22120.11 ATR). A close through either changes the read.",
+  "facts": {
+   "market": {
+    "symbol": "EUR/USD",
+    "timeframe": "1h",
+    "exchange": "binance",
+    "last_close": 1.13919,
+    "last_time": "2026-09-27 18:00:00+00:00"
+   },
+   "trend": {
+    "label": "sideways",
+    "reasons": [
+     "Swing highs and lows are not consistently rising or falling."
+    ]
+   },
+   "momentum": {
+    "rsi": 45.5,
+    "rsi_zone": "neutral",
+    "macd": 0.00018,
+    "macd_signal": 0.0002,
+    "macd_state": "bearish",
+    "stochastic_k": 37.3,
+    "stochastic_d": 48.6,
+    "stochastic_zone": "neutral"
+   },
+   "volatility": {
+    "atr": 0.00098,
+    "atr_pct": 0.09,
+    "adx": 37.4,
+    "regime": "trending",
+    "bollinger_pct_b": 0.348,
+    "bollinger_position": "inside bands"
+   },
+   "divergence": null,
+   "round_number": {
+    "nearest": 1.1,
+    "distance_pct": 3.44,
+    "is_near": false,
+    "signed_distance_atr": -39.99,
+    "signed_distance_pct": -3.44
+   },
+   "market_adaptation": {
+    "asset_class": "forex",
+    "volume_type": "tick",
+    "is_24_7": false,
+    "active_session": "New York",
+    "weekend_gap": false,
+    "significant_move_pct": 0.129
+   },
+   "volume": null,
+   "candlestick": null,
+   "support_resistance": {
+    "nearest_support": {
+     "price": 1.13819,
+     "lower": 1.13777,
+     "upper": 1.13864,
+     "touches": 16,
+     "bars_since_touch": 51,
+     "strength": 0.555,
+     "stale": false,
+     "inside": false,
+     "distance_atr": -0.56,
+     "distance_pct": -0.05
+    },
+    "nearest_resistance": {
+     "price": 1.13962,
+     "lower": 1.13899,
+     "upper": 1.14013,
+     "touches": 12,
+     "bars_since_touch": 20,
+     "strength": 2.322,
+     "stale": false,
+     "inside": true,
+     "distance_atr": 0.0,
+     "distance_pct": 0.0
+    }
+   },
+   "chart_patterns": [],
+   "fibonacci": {
+    "direction": "up",
+    "impulse_low": 1.13864,
+    "impulse_high": 1.13935,
+    "key_levels": {
+     "0.382": 1.13908,
+     "0.5": 1.13899,
+     "0.618": 1.13891,
+     "0.786": 1.13879
+    },
+    "key_level_distances": {
+     "0.382": {
+      "distance_atr": -0.11,
+      "distance_pct": -0.01
+     },
+     "0.5": {
+      "distance_atr": -0.2,
+      "distance_pct": -0.02
+     },
+     "0.618": {
+      "distance_atr": -0.29,
+      "distance_pct": -0.02
+     },
+     "0.786": {
+      "distance_atr": -0.41,
+      "distance_pct": -0.04
+     }
+    }
+   },
+   "confluence": {
+    "bias": "bearish",
+    "triggered": false,
+    "confidence": 0.275,
+    "agreeing_categories": 1,
+    "require_categories": 2,
+    "categories": {
+     "momentum": "bearish",
+     "structure": "neutral",
+     "trend": "neutral",
+     "volume": "neutral"
+    },
+    "signals": [
+     {
+      "name": "trend",
+      "direction": "neutral",
+      "category": "trend",
+      "reason": "Swing highs and lows are not consistently rising or falling."
+     },
+     {
+      "name": "rsi",
+      "direction": "neutral",
+      "category": "momentum",
+      "reason": "RSI is 45, in the neutral zone."
+     },
+     {
+      "name": "macd",
+      "direction": "bearish",
+      "category": "momentum",
+      "reason": "MACD line is below its signal line (bearish momentum)."
+     },
+     {
+      "name": "candlestick",
+      "direction": "neutral",
+      "category": "structure",
+      "reason": "No notable candlestick pattern on the last candle."
+     },
+     {
+      "name": "support_resistance",
+      "direction": "bearish",
+      "category": "structure",
+      "reason": "Price is inside the resistance zone 1.13899\u20131.14013."
+     },
+     {
+      "name": "fibonacci",
+      "direction": "bullish",
+      "category": "structure",
+      "reason": "Price is holding the 38.2% Fibonacci retracement (support) near 1.13908."
+     },
+     {
+      "name": "volume",
+      "direction": "neutral",
+      "category": "volume",
+      "reason": "Not enough history yet to gauge average volume."
+     }
+    ],
+    "mtf_alignment": "aligned",
+    "mtf_trends": {
+     "4h": "downtrend",
+     "1d": "sideways"
+    }
+   },
+   "moving_averages": {
+    "slow": {
+     "period": 50,
+     "value": 1.13932,
+     "distance_atr": 0.13,
+     "distance_pct": 0.01
+    },
+    "long": {
+     "period": 200,
+     "value": 1.14269,
+     "distance_atr": 3.57,
+     "distance_pct": 0.31
+    }
+   },
+   "nearest_levels": {
+    "above": {
+     "price": 1.14011,
+     "source": "S/R zone 1.14011\u20131.14110 (lower edge)",
+     "distance_atr": 0.94,
+     "distance_pct": 0.08
+    },
+    "below": {
+     "price": 1.13908,
+     "source": "Fibonacci 38.2%",
+     "distance_atr": -0.11,
+     "distance_pct": -0.01
+    }
+   },
+   "strongest_opposing_fact": null,
+   "mtf_signals": {
+    "timeframes": [
+     "1h",
+     "4h",
+     "1d"
+    ],
+    "signals": {
+     "trend": {
+      "1h": "neutral",
+      "4h": "bearish",
+      "1d": "neutral"
+     },
+     "rsi": {
+      "1h": "neutral",
+      "4h": "neutral",
+      "1d": "bullish"
+     },
+     "macd": {
+      "1h": "bearish",
+      "4h": "bullish",
+      "1d": "bearish"
+     },
+     "candlestick": {
+      "1h": "neutral",
+      "4h": "neutral",
+      "1d": "neutral"
+     },
+     "support_resistance": {
+      "1h": "bearish",
+      "4h": "bearish",
+      "1d": "neutral"
+     },
+     "fibonacci": {
+      "1h": "bullish",
+      "4h": "bearish",
+      "1d": "neutral"
+     },
+     "volume": {
+      "1h": "neutral",
+      "4h": "neutral",
+      "1d": "neutral"
+     }
+    }
+   },
+   "detector_reliability": {
+    "status": "unmeasured \u2014 detector precision is filled in by ROADMAP B2",
+    "detectors": {
+     "trend": {
+      "precision": null,
+      "n": 0,
+      "status": "unmeasured"
+     },
+     "rsi": {
+      "precision": null,
+      "n": 0,
+      "status": "unmeasured"
+     },
+     "macd": {
+      "precision": null,
+      "n": 0,
+      "status": "unmeasured"
+     },
+     "candlestick": {
+      "precision": null,
+      "n": 0,
+      "status": "unmeasured"
+     },
+     "support_resistance": {
+      "precision": null,
+      "n": 0,
+      "status": "unmeasured"
+     },
+     "fibonacci": {
+      "precision": null,
+      "n": 0,
+      "status": "unmeasured"
+     },
+     "volume": {
+      "precision": null,
+      "n": 0,
+      "status": "unmeasured"
+     }
+    },
+    "chart_patterns": {}
+   },
+   "absences": [
+    "no RSI divergence detected",
+    "no confirmed chart pattern",
+    "no failed chart pattern",
+    "no chart pattern detected at all (not even forming)",
+    "no candlestick pattern on the last closed bar",
+    "no volume data",
+    "no category votes against the read"
+   ],
+   "situation": {
+    "tier": "no_setup",
+    "reasons": [
+     "no_pattern_no_confluence",
+     "single_weak_signal"
+    ],
+    "word_budget": 30,
+    "template": "One or two sentences: what's absent, what would change it. Stop."
+   },
+   "caution": [
+    {
+     "code": "no_expansion",
+     "label": "Breakout without expansion",
+     "active": false,
+     "detail": "no fresh breakout to judge",
+     "value": null,
+     "status": "unmeasured"
+    },
+    {
+     "code": "stretched",
+     "label": "Stretched from the average",
+     "active": false,
+     "detail": "0.1 ATR below the 50-MA (flag at 3)",
+     "value": -0.13,
+     "status": "unmeasured"
+    },
+    {
+     "code": "volatility_extreme",
+     "label": "Volatility at an extreme",
+     "active": false,
+     "detail": "ATR is higher than 55% of the last 100 bars",
+     "value": {
+      "percentile": 0.56,
+      "kind": null
+     },
+     "status": "unmeasured"
+    },
+    {
+     "code": "stop_in_noise",
+     "label": "Invalidation inside normal noise",
+     "active": null,
+     "detail": "not applicable: no directional read",
+     "value": null,
+     "status": "unmeasured"
+    },
+    {
+     "code": "no_room",
+     "label": "Not enough room after costs",
+     "active": null,
+     "detail": "not applicable: no directional read",
+     "value": null,
+     "status": "unmeasured"
+    },
+    {
+     "code": "htf_against",
+     "label": "Higher timeframe against the read",
+     "active": null,
+     "detail": "not applicable: no directional read",
+     "value": null,
+     "status": "unmeasured"
+    },
+    {
+     "code": "event_risk",
+     "label": "High-impact news soon",
+     "active": null,
+     "detail": "unavailable: no economic calendar (needs FINNHUB_API_KEY)",
+     "value": null,
+     "status": "unmeasured"
+    },
+    {
+     "code": "thin_market",
+     "label": "Thin market",
+     "active": false,
+     "detail": "session: New York",
+     "value": null,
+     "status": "unmeasured"
+    }
+   ]
+  }
+ },
+ {
+  "symbol": "EUR/USD",
+  "timeframe": "1h",
+  "style": "teaching",
+  "explanation": "No clear setup: 1h sideways, ADX 37.4 (trending) but only 1 of 4 categories agree, no pattern. Above: 1.14011 (+0.94 ATR). Below: 1.13908 (\u22120.11 ATR). A close through either changes the read.\n\n---\n\n**Why teaching mode still produces a short answer here**\n\n`no_setup` means Layer 1 found the chart unreadable as a trade \u2014 not enough agreement across independent categories to form a coherent directional case. Teaching mode lifts the word ceiling, but the tier, its format, and the rule against manufacturing significance all still apply. What follows explains *what the facts actually say and why they don't add up to a setup*, which is genuinely useful to learn.\n\n---\n\n**What the facts say, piece by piece**\n\n**Trend & regime \u2014 the first thing to check.**\nThe 1h trend is sideways (swing highs and lows not consistently rising or falling), but ADX is 37.4, which is firmly in \"trending\" territory. That's a contradiction worth understanding: ADX measures the *strength of directional movement*, not its direction. A high ADX during what looks like a sideways swing pattern usually means one of two things \u2014 the instrument just finished a strong directional move and ADX hasn't decayed yet, or the sideways read is masking a low-amplitude grind that still has momentum behind it. Either way, the 1h trend detector votes neutral, not bullish or bearish. The 4h votes bearish; the 1d votes neutral. Mixed signals across timeframes, no clean alignment.\n\nSMA50 is at 1.13932, only +0.01% above price \u2014 essentially on top of it. SMA200 is at 1.14269, +0.31% above. Price is below both, which is the bearish side of MA alignment, but the gap is tiny and the instrument is inside a tight range, so this carries little weight on its own.\n\n**Structure \u2014 where price is matters most.**\nPrice (1.13919) is sitting *inside* a resistance zone of 1.13899\u20131.14013, with a recency-weighted strength of 2.322 (12 swing reversals, last one only 20 bars ago). Being inside a resistance zone means price is in contested territory \u2014 sellers have pushed back from this area recently and repeatedly. That's what the support/resistance detector votes bearish for.\n\nDirectly below price at 1.13908 is the 38.2% Fibonacci retracement of the latest up-leg (1.13864 to 1.13935). The Fibonacci detector votes bullish: price is \"holding\" that retracement level as support. So structure is split \u2014 price is inside a resistance zone *and* sitting on a Fibonacci support. The net structure category vote is neutral because the two signals cancel each other.\n\nThe support zone below (1.13777\u20131.13864, centre 1.13819) has 16 swing reversals but the last was 51 bars ago \u2014 more distant in time, hence lower recency-weighted strength (0.555 vs the resistance zone's 2.322).\n\n**Patterns \u2014 nothing to work with.**\nNo chart pattern detected, not even a forming one. No candlestick pattern on the last closed bar. This matters because patterns are the clearest way to define a breakout level and an invalidation level. Without one, you're left reading raw S/R and indicators \u2014 which is weaker.\n\n**Volatility.**\nATR is 0.00098 (0.09% of price). Bollinger %B is 0.348, inside the bands and not near either edge. No squeeze, no expansion \u2014 volatility is unremarkable. Nothing here adds to or subtracts from a read.\n\n**Volume.**\nNo volume data available. In forex, volume is always tick volume (a proxy for activity, not actual traded size), and here even that isn't available. The volume category votes neutral. This matters because any breakout read would want to see volume expansion as confirmation \u2014 and we can't check it.\n\n**Momentum.**\nRSI is 45.5 (neutral \u2014 mid-range, no pressure either way). MACD line is below its signal line, which is a bearish momentum vote. Stochastic %K 37.3 / %D 48.6, neutral. No RSI divergence detected. So momentum has one weak bearish signal (MACD) and two neutrals. The category collapses to bearish, but it's a single weak signal \u2014 exactly what Layer 1 flagged as the reason for `no_setup`.\n\n**The confluence count.**\nLayer 1 requires at least 2 of 4 independent categories to agree for a setup. Here: momentum=bearish, structure=neutral, trend=neutral, volume=neutral. Only 1 category agrees with the bearish bias. That's the definition of no confluence \u2014 one signal saying something while the rest say nothing.\n\n**What would change this picture.**\nAbove price: the S/R zone upper edge is at 1.14011 (+0.94 ATR / +0.08%). A 1h close above that would clear the resistance zone entirely \u2014 different read. Below price: the Fibonacci 38.2% at 1.13908 is only \u22120.11 ATR / \u22120.01% away \u2014 so close it's essentially current price. A more meaningful lower level is the support zone centre at 1.13819 (\u22120.56 ATR / \u22120.05%). A 1h close below the support zone would change the structure read. Neither side has a pattern breakout to anchor to, so any level watch here is purely S/R-based.",
+  "facts": {
+   "market": {
+    "symbol": "EUR/USD",
+    "timeframe": "1h",
+    "exchange": "binance",
+    "last_close": 1.13919,
+    "last_time": "2026-09-27 18:00:00+00:00"
+   },
+   "trend": {
+    "label": "sideways",
+    "reasons": [
+     "Swing highs and lows are not consistently rising or falling."
+    ]
+   },
+   "momentum": {
+    "rsi": 45.5,
+    "rsi_zone": "neutral",
+    "macd": 0.00018,
+    "macd_signal": 0.0002,
+    "macd_state": "bearish",
+    "stochastic_k": 37.3,
+    "stochastic_d": 48.6,
+    "stochastic_zone": "neutral"
+   },
+   "volatility": {
+    "atr": 0.00098,
+    "atr_pct": 0.09,
+    "adx": 37.4,
+    "regime": "trending",
+    "bollinger_pct_b": 0.348,
+    "bollinger_position": "inside bands"
+   },
+   "divergence": null,
+   "round_number": {
+    "nearest": 1.1,
+    "distance_pct": 3.44,
+    "is_near": false,
+    "signed_distance_atr": -39.99,
+    "signed_distance_pct": -3.44
+   },
+   "market_adaptation": {
+    "asset_class": "forex",
+    "volume_type": "tick",
+    "is_24_7": false,
+    "active_session": "New York",
+    "weekend_gap": false,
+    "significant_move_pct": 0.129
+   },
+   "volume": null,
+   "candlestick": null,
+   "support_resistance": {
+    "nearest_support": {
+     "price": 1.13819,
+     "lower": 1.13777,
+     "upper": 1.13864,
+     "touches": 16,
+     "bars_since_touch": 51,
+     "strength": 0.555,
+     "stale": false,
+     "inside": false,
+     "distance_atr": -0.56,
+     "distance_pct": -0.05
+    },
+    "nearest_resistance": {
+     "price": 1.13962,
+     "lower": 1.13899,
+     "upper": 1.14013,
+     "touches": 12,
+     "bars_since_touch": 20,
+     "strength": 2.322,
+     "stale": false,
+     "inside": true,
+     "distance_atr": 0.0,
+     "distance_pct": 0.0
+    }
+   },
+   "chart_patterns": [],
+   "fibonacci": {
+    "direction": "up",
+    "impulse_low": 1.13864,
+    "impulse_high": 1.13935,
+    "key_levels": {
+     "0.382": 1.13908,
+     "0.5": 1.13899,
+     "0.618": 1.13891,
+     "0.786": 1.13879
+    },
+    "key_level_distances": {
+     "0.382": {
+      "distance_atr": -0.11,
+      "distance_pct": -0.01
+     },
+     "0.5": {
+      "distance_atr": -0.2,
+      "distance_pct": -0.02
+     },
+     "0.618": {
+      "distance_atr": -0.29,
+      "distance_pct": -0.02
+     },
+     "0.786": {
+      "distance_atr": -0.41,
+      "distance_pct": -0.04
+     }
+    }
+   },
+   "confluence": {
+    "bias": "bearish",
+    "triggered": false,
+    "confidence": 0.275,
+    "agreeing_categories": 1,
+    "require_categories": 2,
+    "categories": {
+     "momentum": "bearish",
+     "structure": "neutral",
+     "trend": "neutral",
+     "volume": "neutral"
+    },
+    "signals": [
+     {
+      "name": "trend",
+      "direction": "neutral",
+      "category": "trend",
+      "reason": "Swing highs and lows are not consistently rising or falling."
+     },
+     {
+      "name": "rsi",
+      "direction": "neutral",
+      "category": "momentum",
+      "reason": "RSI is 45, in the neutral zone."
+     },
+     {
+      "name": "macd",
+      "direction": "bearish",
+      "category": "momentum",
+      "reason": "MACD line is below its signal line (bearish momentum)."
+     },
+     {
+      "name": "candlestick",
+      "direction": "neutral",
+      "category": "structure",
+      "reason": "No notable candlestick pattern on the last candle."
+     },
+     {
+      "name": "support_resistance",
+      "direction": "bearish",
+      "category": "structure",
+      "reason": "Price is inside the resistance zone 1.13899\u20131.14013."
+     },
+     {
+      "name": "fibonacci",
+      "direction": "bullish",
+      "category": "structure",
+      "reason": "Price is holding the 38.2% Fibonacci retracement (support) near 1.13908."
+     },
+     {
+      "name": "volume",
+      "direction": "neutral",
+      "category": "volume",
+      "reason": "Not enough history yet to gauge average volume."
+     }
+    ],
+    "mtf_alignment": "aligned",
+    "mtf_trends": {
+     "4h": "downtrend",
+     "1d": "sideways"
+    }
+   },
+   "moving_averages": {
+    "slow": {
+     "period": 50,
+     "value": 1.13932,
+     "distance_atr": 0.13,
+     "distance_pct": 0.01
+    },
+    "long": {
+     "period": 200,
+     "value": 1.14269,
+     "distance_atr": 3.57,
+     "distance_pct": 0.31
+    }
+   },
+   "nearest_levels": {
+    "above": {
+     "price": 1.14011,
+     "source": "S/R zone 1.14011\u20131.14110 (lower edge)",
+     "distance_atr": 0.94,
+     "distance_pct": 0.08
+    },
+    "below": {
+     "price": 1.13908,
+     "source": "Fibonacci 38.2%",
+     "distance_atr": -0.11,
+     "distance_pct": -0.01
+    }
+   },
+   "strongest_opposing_fact": null,
+   "mtf_signals": {
+    "timeframes": [
+     "1h",
+     "4h",
+     "1d"
+    ],
+    "signals": {
+     "trend": {
+      "1h": "neutral",
+      "4h": "bearish",
+      "1d": "neutral"
+     },
+     "rsi": {
+      "1h": "neutral",
+      "4h": "neutral",
+      "1d": "bullish"
+     },
+     "macd": {
+      "1h": "bearish",
+      "4h": "bullish",
+      "1d": "bearish"
+     },
+     "candlestick": {
+      "1h": "neutral",
+      "4h": "neutral",
+      "1d": "neutral"
+     },
+     "support_resistance": {
+      "1h": "bearish",
+      "4h": "bearish",
+      "1d": "neutral"
+     },
+     "fibonacci": {
+      "1h": "bullish",
+      "4h": "bearish",
+      "1d": "neutral"
+     },
+     "volume": {
+      "1h": "neutral",
+      "4h": "neutral",
+      "1d": "neutral"
+     }
+    }
+   },
+   "detector_reliability": {
+    "status": "unmeasured \u2014 detector precision is filled in by ROADMAP B2",
+    "detectors": {
+     "trend": {
+      "precision": null,
+      "n": 0,
+      "status": "unmeasured"
+     },
+     "rsi": {
+      "precision": null,
+      "n": 0,
+      "status": "unmeasured"
+     },
+     "macd": {
+      "precision": null,
+      "n": 0,
+      "status": "unmeasured"
+     },
+     "candlestick": {
+      "precision": null,
+      "n": 0,
+      "status": "unmeasured"
+     },
+     "support_resistance": {
+      "precision": null,
+      "n": 0,
+      "status": "unmeasured"
+     },
+     "fibonacci": {
+      "precision": null,
+      "n": 0,
+      "status": "unmeasured"
+     },
+     "volume": {
+      "precision": null,
+      "n": 0,
+      "status": "unmeasured"
+     }
+    },
+    "chart_patterns": {}
+   },
+   "absences": [
+    "no RSI divergence detected",
+    "no confirmed chart pattern",
+    "no failed chart pattern",
+    "no chart pattern detected at all (not even forming)",
+    "no candlestick pattern on the last closed bar",
+    "no volume data",
+    "no category votes against the read"
+   ],
+   "situation": {
+    "tier": "no_setup",
+    "reasons": [
+     "no_pattern_no_confluence",
+     "single_weak_signal"
+    ],
+    "word_budget": 30,
+    "template": "One or two sentences: what's absent, what would change it. Stop."
+   },
+   "caution": [
+    {
+     "code": "no_expansion",
+     "label": "Breakout without expansion",
+     "active": false,
+     "detail": "no fresh breakout to judge",
+     "value": null,
+     "status": "unmeasured"
+    },
+    {
+     "code": "stretched",
+     "label": "Stretched from the average",
+     "active": false,
+     "detail": "0.1 ATR below the 50-MA (flag at 3)",
+     "value": -0.13,
+     "status": "unmeasured"
+    },
+    {
+     "code": "volatility_extreme",
+     "label": "Volatility at an extreme",
+     "active": false,
+     "detail": "ATR is higher than 55% of the last 100 bars",
+     "value": {
+      "percentile": 0.56,
+      "kind": null
+     },
+     "status": "unmeasured"
+    },
+    {
+     "code": "stop_in_noise",
+     "label": "Invalidation inside normal noise",
+     "active": null,
+     "detail": "not applicable: no directional read",
+     "value": null,
+     "status": "unmeasured"
+    },
+    {
+     "code": "no_room",
+     "label": "Not enough room after costs",
+     "active": null,
+     "detail": "not applicable: no directional read",
+     "value": null,
+     "status": "unmeasured"
+    },
+    {
+     "code": "htf_against",
+     "label": "Higher timeframe against the read",
+     "active": null,
+     "detail": "not applicable: no directional read",
+     "value": null,
+     "status": "unmeasured"
+    },
+    {
+     "code": "event_risk",
+     "label": "High-impact news soon",
+     "active": null,
+     "detail": "unavailable: no economic calendar (needs FINNHUB_API_KEY)",
+     "value": null,
+     "status": "unmeasured"
+    },
+    {
+     "code": "thin_market",
+     "label": "Thin market",
+     "active": false,
+     "detail": "session: New York",
+     "value": null,
+     "status": "unmeasured"
+    }
+   ]
+  }
+ }
+]

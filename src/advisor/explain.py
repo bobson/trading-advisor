@@ -246,3 +246,27 @@ def explain(facts_text: str, cfg: Config, client=None, max_tokens: int | None = 
 
     # Extract text blocks defensively — skip any thinking/tool blocks a model might emit.
     return "".join(b.text for b in response.content if getattr(b, "type", None) == "text").strip()
+
+
+def revise(facts_text: str, draft: str, violations: list[str], cfg: Config, client=None,
+           situation: dict | None = None) -> str:
+    """ROADMAP C1: ONE rewrite of an explanation that failed the integrity check. The model sees the
+    same facts, its own draft, and the exact violations; nothing else changes (same guide, tier and
+    budget)."""
+    if client is None:
+        import anthropic
+
+        client = anthropic.Anthropic(api_key=cfg.require_api_key())
+    mode = _tier_mode(cfg, situation)
+    fix = ("Your explanation failed the app's integrity check against the computed facts:\n"
+           + "\n".join(f"- {v}" for v in violations)
+           + "\n\nRewrite the whole explanation, fixing exactly these problems. Use only numbers, patterns "
+             "and states that appear in the facts; keep the same tier, format and rules.")
+    response = client.messages.create(
+        model=cfg.advisor.model,
+        max_tokens=mode["max_tokens"],
+        system=_system(mode),
+        messages=build_messages(facts_text) + [{"role": "assistant", "content": draft},
+                                               {"role": "user", "content": fix}],
+    )
+    return "".join(b.text for b in response.content if getattr(b, "type", None) == "text").strip()

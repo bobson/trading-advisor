@@ -6,8 +6,8 @@ A state file for the "learning instrument" build. Source of truth for what's nex
 **ROADMAP progress:** A1 ✓ (merged, `645231c`), A2 ✓ (merged, `800e12a`; docs `1003735`), A3 ✓ (merged), A4 ✓ (merged), A5 ✓ (merged), A6 ✓ (merged), A7 ✓ (merged), B1 ✓ (merged — labelling mode
 built; the ≥30 labelled charts are the user's ongoing work), B2 tooling ✓ (merged — `eval_detectors.py`;
 its measurement + tuning run as soon as ≥30 charts are labelled — the user has decided NOT to label, so
-it stays unmeasured). B3 ✓ (merged), B4 ✓ (merged), B5 ✓ (merged), A8 ✓ (merged — forward record live since 2026-09-25 on wizard.bosfoot.com), R1 ✓ (merged), R2 ✓ (merged), R3 ✓ (merged — no condition changed the coin flip; ~80% of reads have a stop inside noise and no room after costs), R4 ✓ (merged — noise floor ~1 ATR, stable; Phase R complete). **Next: C1 (slim)** (the integrity guard).
-Order from here (user-confirmed 2026-09-26): C1 (slim) → C1 (slim) → D1 → D6; D2–D5 on demand. Drawing tools: deferred.
+it stays unmeasured). B3 ✓ (merged), B4 ✓ (merged), B5 ✓ (merged), A8 ✓ (merged — forward record live since 2026-09-25 on wizard.bosfoot.com), R1 ✓ (merged), R2 ✓ (merged), R3 ✓ (merged — no condition changed the coin flip; ~80% of reads have a stop inside noise and no room after costs), R4 ✓ (merged — noise floor ~1 ATR, stable; Phase R complete), C1 slim ✓ (merged). **Next: D1** (prediction journal + calibration).
+Order from here (user-confirmed 2026-09-26): D1 → D6; D2–D5 on demand. Drawing tools: deferred.
 
 ## Current state
 
@@ -63,6 +63,41 @@ apply if `config.yaml` omits them.
 ---
 
 ## Log (newest first)
+
+### ROADMAP C1 (slim) — The integrity guard
+- **Done:** 2026-09-30 · on `main` · **merged.**
+- `src/advisor/integrity.py`: every explanation is checked against the facts it was given, AFTER it
+  is written. `advise._guard` gives a hard failure ONE rewrite (`explain.revise`: facts + the draft +
+  the violation list); if it fails again, the deterministic `facts_only_summary` (tier, category
+  count, record, zones, Opposing, cautions) is shown with a notice. Soft issues are a badge. The
+  payload keeps `ok`/`issues` and adds `hard`/`soft`/`retried`/`fallback`/`notice`/`first_attempt_hard`.
+  - **Hard:** invented price (price-band numbers matched to the facts **at the precision written**,
+    ≥ 3 significant digits, dates stripped, ×/%/ATR/bars skipped); affirming a NOT PRESENT item
+    (divergence, a confirmed or failed pattern); a forming or failed pattern called confirmed (not in
+    conditional or negated sentences); a directional claim phrase opposing the Layer-1 bias (bare
+    "bullish"/"bearish" never count).
+  - **Soft:** directional phrase with no directional read; missing `Opposing:` line; over 1.2× the
+    word budget (brief only, the Opposing line not counted); a pattern name not in the facts; a
+    completed or expired pattern described as current.
+- **Spec vs code (rule 2):** slim by agreement. The prose stays prose: no structured claims
+  {text, fact_id, role, direction}, so role-fit ("a neckline can't be support") and number-meaning
+  pairing are not checked. **Seen live:** Claude wrote "upper edge 1.14110 (+0.94 ATR)" when the
+  facts said the lower edge 1.14011 is at +0.94 ATR. Both numbers exist, so no number check can catch
+  it; only structured claims could. Also not checked: the multi-timeframe synthesis (morning report
+  / CLI).
+- **Real explanations pass:** 6 live Claude explanations (BTC 1h, SOL 4h, EUR/USD 1h × brief and
+  teaching), report-only first. The first pass had one false alarm ("0.7" read as a price on
+  EUR/USD), fixed by the significant-digit and unit rules. All 6 then pass and are saved as
+  `tests/fixtures/real_explanations.json` (a regression test). The tests also caught a real hole:
+  a price at the end of a sentence ("…at 91,234.56.") wasn't parsed.
+- **Guide (rule 5):** §11 now says what the app checks mechanically and keeps only the unenforced
+  self-checks. The rounding rule's "1% tolerance" became "checked at the precision you write it".
+  The live path no longer uses `verify.py`, which is marked superseded.
+- UI: "✓ Checked against the computed facts" (plus "rewritten once to fix: …"), a "⚠ N notes"
+  dropdown, and an amber fallback notice. Browser-checked live (SOL 4h) and the fallback via an
+  intercepted response. 12 new tests, 539 pass.
+- **User's check (PROMPTS.md):** run ten analyses with "explain" across symbols and modes and count
+  first-time pass / retried / fallback; that measures how often Claude drifts from the facts.
 
 ### ROADMAP R4 — Exits: how far against, how far for (Phase R complete)
 - **Done:** 2026-09-28 · on `main` · **merged.**

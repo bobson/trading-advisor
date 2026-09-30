@@ -87,14 +87,15 @@ instructing it better. So **the guide shrinks as Layer 1 grows.**
 | R2 Caution flags frozen into the forward record | ✅ Done (merged, 2026-09-26) |
 | R3 Caution conditions measured on history | ✅ Done (merged, 2026-09-27) — no condition beat the coin flip; see PROGRESS |
 | R4 Exits: noise floor + typical run | ✅ Done (merged, 2026-09-28) — noise floor ≈ 1 ATR, stable; Phase R complete |
-| Tests | 527 green, ruff + svelte-check clean |
+| C1 Integrity guard (slim) | ✅ Done (merged, 2026-09-30) — prose checked after writing; structured claims not built |
+| Tests | 539 green, ruff + svelte-check clean |
 
 **Remaining, in order:**
 
 ~~`A1`~~ ✅ `→` ~~`A2`~~ ✅ `→` ~~`A3`~~ ✅ `→` ~~`A4`~~ ✅ `→` ~~`A5`~~ ✅ `→` ~~`A6`~~ ✅ `→` ~~`A7`~~ ✅ `→` ~~`A8`~~ ✅ *(honesty & precision hardening, then start the forward record)*
 `→ B1 → B2 → B3 → B4 → B5` *(measure the detectors, then the patterns)*
 `→` ~~`R1`~~ ✅ `→` ~~`R2`~~ ✅ `→` ~~`R3`~~ ✅ `→` ~~`R4`~~ ✅ *(risk filters: when not to enter, when to exit; order confirmed 2026-09-26)*
-`→ C1` *(integrity, enforced)*
+`→` ~~`C1`~~ ✅ *(integrity, enforced — slim)*
 `→ D1 → D2 → D3 → D4 → D5 → D6` *(the learning loop)*
 
 ---

@@ -87,7 +87,7 @@ def test_guide_a6_rules_present():
     assert "historically coincided" not in g and "many false breaks" not in g       # §5
     assert "no implied direction" in g
     assert "price exactly as given" in g and "three significant figures" in g       # rounding rule
-    assert "1% tolerance" in g
+    assert "at the precision you write it" in g                                      # C1 replaced the 1% rule
     assert "worth revisiting" not in g.lower()                                       # §2 conditional
     assert "Both sides, same weight" in g
     assert "Exactly **one** observation" in g                                        # §7
