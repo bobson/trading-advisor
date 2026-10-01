@@ -6,8 +6,11 @@
   // ROADMAP B1: `labelMode` hides EVERY detector overlay (levels, fib, patterns, trendlines, swings,
   // candle patterns, verdict marker, regime strip), draws the user's own `draft` labels instead, and
   // forwards clicks on the price pane to `onChartClick(time, price)`.
-  let { data, toggles, trades = [], labelMode = false, draft = null, pending = null, onChartClick }:
+  let { data, toggles, trades = [], labelMode = false, draft = null, pending = null, onChartClick, call = null }:
     { data: ChartData | null; toggles: PanelToggles; trades?: Trade[]; labelMode?: boolean
+      // D6: the user's blind call, drawn on the reveal chart (entry candle, direction, invalidation, end)
+      call?: { time: number; direction: 'up' | 'down'; invalidation: number; endTime: number
+               lines?: { price: number; text: string; color: string }[] } | null
       draft?: GoldLabels | null
       pending?: { kind: string; points: { time: number; price: number }[] } | null
       onChartClick?: (time: number, price: number) => void } = $props()
@@ -155,7 +158,7 @@
 
   // Rebuild whenever the data or the toggles change (simple + robust vs incremental updates).
   // Deep-read the label draft so adding a point re-renders; JSON keeps the dependency simple.
-  $effect(() => { data; toggles; trades; labelMode; JSON.stringify(draft); JSON.stringify(pending); render() })
+  $effect(() => { data; toggles; trades; labelMode; call; JSON.stringify(draft); JSON.stringify(pending); render() })
 
   // Keep the user's zoom/scroll across re-renders of the SAME candles (e.g. each labelling click).
   let savedRange: { key: string; range: any } | null = null
@@ -358,6 +361,19 @@
       if (tr.status === 'closed' && tr.closed_at != null) {
         const xt = snap(tr.closed_at)
         if (xt != null) markers.push(tradeMarker(tr.side === 'buy' ? 'sell' : 'buy', xt, tr.amount_usd))
+      }
+    }
+    // ---- D6: the user's blind call on the reveal chart ----
+    if (call) {
+      const ct = snap(call.time), et = snap(call.endTime)
+      if (ct != null) markers.push({ time: ct, position: call.direction === 'up' ? 'belowBar' : 'aboveBar',
+        color: '#58a6ff', shape: call.direction === 'up' ? 'arrowUp' : 'arrowDown', text: `your call: ${call.direction}` })
+      if (et != null) markers.push({ time: et, position: 'aboveBar', color: '#8b949e', shape: 'circle', text: 'judged here' })
+      labels.push({ price: call.invalidation, text: 'your "wrong at"', color: '#58a6ff' })
+      series.createPriceLine({ price: call.invalidation, color: '#58a6ff', lineWidth: 1, lineStyle: 2, axisLabelVisible: false })
+      for (const l of call.lines ?? []) {                 // e.g. the tested pattern's breakout and target
+        labels.push({ price: l.price, text: l.text, color: l.color })
+        series.createPriceLine({ price: l.price, color: l.color, lineWidth: 1, lineStyle: 1, axisLabelVisible: false })
       }
     }
     // ---- B1: the user's own labels (purple) + the point/zone being drawn (orange) ----

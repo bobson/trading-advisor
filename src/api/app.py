@@ -638,3 +638,108 @@ def journal_delete(entry_id: int) -> dict:
 def _request_cfg(symbol: str, timeframe: str):
     from src.service.analyze import _request_config
     return _request_config(cfg, symbol, timeframe)
+
+
+# --- ROADMAP D6: blind training (random past breakouts, future hidden, judged at once) --------------
+class TrainingAnswer(BaseModel):
+    setup_id: int
+    direction: str
+    confidence: int
+    invalidation: float
+    note: str = ""
+
+
+def _training_conn():
+    from src.journal.store import connect as jconnect
+    from src.research.training import SCHEMA
+    conn = jconnect(_TRADES_DB or "data/wizard.db")      # journal + training tables in one DB
+    conn.executescript(SCHEMA)
+    return conn
+
+
+def _setup_frame(setup: dict):
+    """Cache-first candles for the setup's market and the setup's bar INDEX in them (by time), or None."""
+    from src.data.registry import get_candles
+    df = get_candles(setup["symbol"], setup["timeframe"], cfg)
+    times = [int(t.timestamp()) for t in df.index]
+    try:
+        return df, times.index(setup["bar_time"])
+    except ValueError:
+        return df, None
+
+
+@app.get("/training/options", dependencies=_GUARDS)
+def training_options() -> dict:
+    from src.research.training import options
+    conn = _training_conn()
+    try:
+        return options(conn)
+    finally:
+        conn.close()
+
+
+@app.get("/training/next", dependencies=_GUARDS)
+def training_next(type: str | None = None, regime: str | None = None, timeframe: str | None = None) -> dict:
+    """A random unanswered setup: where the chart should END (as_of_bar) and the price at that candle.
+    The pattern, its direction and outcome are NOT sent until the call is logged."""
+    from src.research.training import pick
+    conn = _training_conn()
+    try:
+        for _ in range(25):                                   # skip setups the cache no longer covers
+            s = pick(conn, type_=type, regime=regime, timeframe=timeframe)
+            if s is None:
+                return {"setup": None}
+            horizon = cfg.morning_report.horizons.get(s["timeframe"], 24)
+            df, i = _setup_frame(s)
+            if i is not None and i + horizon < len(df):
+                return {"setup": {"id": s["id"], "symbol": s["symbol"], "timeframe": s["timeframe"],
+                                  "as_of_bar": i, "bar_time": s["bar_time"], "price": float(df["close"].iloc[i]),
+                                  "horizon_bars": horizon}}
+        return {"setup": None}
+    finally:
+        conn.close()
+
+
+@app.post("/training/answer", dependencies=_GUARDS)
+def training_answer(body: TrainingAnswer) -> dict:
+    """Log the blind call in the journal, judge it at once (the future is known), and reveal."""
+    from src.journal.resolve import judge
+    from src.journal.store import JournalError, log_call
+    from src.research.scanner import pattern_record
+    from src.research.training import get
+    from src.risk.caution import is_caution
+    conn = _training_conn()
+    try:
+        s = get(conn, body.setup_id)
+        if s is None:
+            raise HTTPException(status_code=404, detail="no such setup")
+        df, i = _setup_frame(s)
+        horizon = cfg.morning_report.horizons.get(s["timeframe"], 24)
+        if i is None or i + horizon >= len(df):
+            raise HTTPException(status_code=409, detail="this setup is no longer in the candle history")
+        req = _request_cfg(s["symbol"], s["timeframe"])
+        try:
+            entry = log_call(conn, df=df, cfg=req, symbol=s["symbol"], timeframe=s["timeframe"],
+                             direction=body.direction, confidence=body.confidence, invalidation=body.invalidation,
+                             horizon_value=horizon, horizon_unit="bars", note=body.note, source="blind",
+                             verdict_visible=False, explanation_visible=False, bar_time=s["bar_time"])
+        except JournalError as exc:
+            raise HTTPException(status_code=400, detail=str(exc))
+        outcome, end_close = judge(entry, df)
+        conn.execute("UPDATE journal_entries SET outcome=?, end_close=?, resolved_at=? WHERE id=? AND outcome IS NULL",
+                     (outcome, end_close, int(time.time()), entry["id"]))
+        conn.commit()
+        facts = advise(s["symbol"], s["timeframe"], cfg, df=df.iloc[: i + 1], explain_enabled=False).facts
+        c = facts["confluence"]
+        return {
+            "entry": {**entry, "outcome": outcome, "end_close": end_close},
+            "setup": s, "reveal_bar": i + horizon, "end_time": entry["end_time"],
+            "engine": {"bias": c["bias"], "tier": facts["situation"]["tier"], "agreeing": c["agreeing_categories"],
+                       "total": len(c.get("categories") or {}),
+                       "cautions": [x["label"] for x in facts.get("caution") or [] if is_caution(x)],
+                       "patterns": [{"type": p["type"], "state": p["state"], "lifecycle": p.get("lifecycle")}
+                                    for p in facts.get("chart_patterns") or []]},
+            "record": pattern_record(_encyclopedia_top_rows(), s["type"], s["timeframe"]),
+        }
+    finally:
+        conn.close()

@@ -198,3 +198,15 @@ scp data/exit_cases.json data/exit_returns.json bobson@206.81.21.49:/srv/trading
 # on the droplet (not around 08:00 Skopje)
 cd /srv/trading-wizard && .venv/bin/python scripts/measure_exits.py --from-cases data/exit_cases.json --exits data/exit_returns.json
 ```
+
+## Blind-training setups (ROADMAP D6)
+
+The Training page draws from the `training_setups` table, built by `scripts/build_training_setups.py`
+(about 30 minutes). Same rule: copy the file up, never the database.
+
+```bash
+# on your computer, after running scripts/build_training_setups.py locally
+scp data/training_setups.json bobson@206.81.21.49:/srv/trading-wizard/data/
+# on the droplet
+cd /srv/trading-wizard && .venv/bin/python scripts/build_training_setups.py --from-file data/training_setups.json
+```

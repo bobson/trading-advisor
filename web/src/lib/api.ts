@@ -379,3 +379,22 @@ export const getJournalPrice = (symbol: string, timeframe: string) =>
   get<{ bar_time: number; price: number }>(`/journal/price?symbol=${encodeURIComponent(symbol)}&timeframe=${timeframe}`)
 export const postJournal = (body: JournalIn) => send<JournalEntry>('POST', '/journal', body)
 export const deleteJournal = (id: number) => send<{ deleted: number }>('DELETE', `/journal/${id}`)
+
+// --- ROADMAP D6: blind training ---
+export interface TrainingOptions { types: Record<string, number>; regimes: Record<string, number>; timeframes: Record<string, number>; total: number }
+export interface TrainingSetup { id: number; symbol: string; timeframe: string; as_of_bar: number; bar_time: number; price: number; horizon_bars: number }
+export interface TrainingReveal {
+  entry: JournalEntry; reveal_bar: number; end_time: number
+  setup: { type: string; direction: string; regime: string; outcome: string; move_atr: number | null
+           breakout: number | null; invalidation: number | null; target: number | null }
+  engine: { bias: string; tier: string; agreeing: number; total: number; cautions: string[]
+            patterns: { type: string; state: string; lifecycle: string | null }[] }
+  record: PatternRecord | null
+}
+const qs = (o: Record<string, string | undefined>) =>
+  Object.entries(o).filter(([, v]) => v).map(([k, v]) => `${k}=${encodeURIComponent(v as string)}`).join('&')
+export const getTrainingOptions = () => get<TrainingOptions>('/training/options')
+export const getTrainingNext = (f: { type?: string; regime?: string; timeframe?: string }) =>
+  get<{ setup: TrainingSetup | null }>(`/training/next?${qs(f)}`)
+export const postTrainingAnswer = (body: { setup_id: number; direction: 'up' | 'down'; confidence: number; invalidation: number; note: string }) =>
+  send<TrainingReveal>('POST', '/training/answer', body)

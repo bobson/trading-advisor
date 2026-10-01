@@ -6,8 +6,8 @@ A state file for the "learning instrument" build. Source of truth for what's nex
 **ROADMAP progress:** A1 ✓ (merged, `645231c`), A2 ✓ (merged, `800e12a`; docs `1003735`), A3 ✓ (merged), A4 ✓ (merged), A5 ✓ (merged), A6 ✓ (merged), A7 ✓ (merged), B1 ✓ (merged — labelling mode
 built; the ≥30 labelled charts are the user's ongoing work), B2 tooling ✓ (merged — `eval_detectors.py`;
 its measurement + tuning run as soon as ≥30 charts are labelled — the user has decided NOT to label, so
-it stays unmeasured). B3 ✓ (merged), B4 ✓ (merged), B5 ✓ (merged), A8 ✓ (merged — forward record live since 2026-09-25 on wizard.bosfoot.com), R1 ✓ (merged), R2 ✓ (merged), R3 ✓ (merged — no condition changed the coin flip; ~80% of reads have a stop inside noise and no room after costs), R4 ✓ (merged — noise floor ~1 ATR, stable; Phase R complete), C1 slim ✓ (merged), D1 ✓ (merged). **Next: D6** (blind training mode).
-Order from here (user-confirmed 2026-09-26): D6; D2–D5 on demand. Drawing tools: deferred.
+it stays unmeasured). B3 ✓ (merged), B4 ✓ (merged), B5 ✓ (merged), A8 ✓ (merged — forward record live since 2026-09-25 on wizard.bosfoot.com), R1 ✓ (merged), R2 ✓ (merged), R3 ✓ (merged — no condition changed the coin flip; ~80% of reads have a stop inside noise and no room after costs), R4 ✓ (merged — noise floor ~1 ATR, stable; Phase R complete), C1 slim ✓ (merged), D1 ✓ (merged), D6 ✓ (merged). **The confirmed order is complete.** Remaining on demand: D2–D5 (pre-registration, news & macro context, event study, behavioural circuit breaker); small idea: a measured "no prior trend to reverse" fact on reversal patterns.
+Order from here: user's choice. Drawing tools: deferred.
 
 ## Current state
 
@@ -63,6 +63,35 @@ apply if `config.yaml` omits them.
 ---
 
 ## Log (newest first)
+
+### ROADMAP D6 — Blind training mode
+- **Done:** 2026-09-30 · on `main` · **merged.**
+- `src/research/training.py` + `scripts/build_training_setups.py`: the `training_setups` pool, built
+  from THE encyclopedia walk (look-ahead-safe). Every pattern first seen forming that later broke out
+  and whose outcome is known, keyed by the breakout candle's TIME (the cache shifts, indices don't
+  survive). **Built: 1,566 setups** (7 markets × 1h/4h/1d; 12 types, 5 regimes; 179 duplicates
+  skipped). The JSON is at `data/training_setups.json`; `--from-file` imports it on the droplet.
+- API: `GET /training/options` (counts per filter); `GET /training/next` (a random UNANSWERED setup:
+  where the chart ends plus the price; **the type, direction, regime and outcome are NOT sent before
+  the call**); `POST /training/answer` (logs the call to the journal as `source='blind'` at that past
+  candle with horizon = the timeframe's forward horizon (24/42/21 bars), judges it at once under
+  journal rule v1, and reveals the pattern and its outcome, the engine's read AT that candle (bias,
+  tier, cautions) and the encyclopedia record). Blind calls feed the Journal (its "where logged"
+  breakdown separates them).
+- UI: a **Training** page (`#/training`) with filters (pattern / regime / timeframe) and a
+  10-setup session. The blind chart shows candles + MAs + volume/RSI/MACD, with the engine's drawings
+  off. The reveal chart marks "your call", "judged here", your "wrong at" line, and the TESTED
+  pattern's own breakout and target (not the engine's drawings at the window's end, which showed a
+  different, later pattern during testing). It ends with the session's hits, average confidence and
+  Brier vs 0.25.
+- **Known leaks, by design / honour system:** the time axis shows real dates, and the regime strip
+  is visible (it's never up/down; the regime filter reveals it anyway). Pattern records exist only
+  for 1d (the encyclopedia was built for 1d), so 1h/4h reveals say "no history yet" until it's
+  rebuilt for those timeframes.
+- Verified: 4 tests (setups keyed by time; nothing leaks before the call; judged at once; one call
+  per setup; answered setups aren't re-offered; a setup the cache no longer covers is skipped).
+  562 pass. Browser-checked a blind round and the reveal on a scratch DB at 1300 and 400 px.
+- **Droplet:** `scp data/training_setups.json` up, then `build_training_setups.py --from-file` (DEPLOY.md).
 
 ### ROADMAP D1 — Prediction journal + calibration
 - **Done:** 2026-09-30 · on `main` · **merged.**
