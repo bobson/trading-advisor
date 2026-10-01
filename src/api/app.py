@@ -260,15 +260,34 @@ class TradeIn(BaseModel):
     note: str | None = None
 
 
+def _trade_engine_snapshot(symbol: str, timeframe: str) -> dict | None:
+    """ROADMAP D5: the engine's read (regime, categories agreeing…) frozen at a paper-trade open, server
+    side — the rules are checked against it. Never fails the trade."""
+    from datetime import datetime, timezone
+
+    from src.data.registry import get_candles
+    from src.forward.record import closed_only
+    from src.journal.store import engine_snapshot, tf_seconds
+    try:
+        df = get_candles(symbol, timeframe, cfg, stale_after_minutes=max(1, tf_seconds(timeframe) // 60))
+        return engine_snapshot(closed_only(df, timeframe, datetime.now(timezone.utc)), symbol, timeframe,
+                               _request_cfg(symbol, timeframe))
+    except Exception:
+        return None
+
+
 @app.post("/trades", dependencies=_GUARDS)
 def post_trade(body: TradeIn) -> dict:
     """Record a paper Buy/Sell: fetch a LIVE spot fill and open or close the position. One position
     at a time — the same side while open is a 400. No re-analysis, no Claude call."""
     from src.trading import paper
     conn = _trades_conn()
+    snapshot = dict(body.snapshot or {})
+    if paper._open_trade(conn, body.symbol) is None:          # an OPEN: D5 checks rules on the engine's read
+        snapshot["engine"] = _trade_engine_snapshot(body.symbol, body.timeframe or "1h")
     try:
         result = paper.record(conn, body.symbol, body.timeframe, body.side, body.amount_usd, cfg,
-                              last_close=body.last_close, snapshot=body.snapshot, note=body.note)
+                              last_close=body.last_close, snapshot=snapshot, note=body.note)
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc))
     finally:
@@ -741,5 +760,61 @@ def training_answer(body: TrainingAnswer) -> dict:
                                     for p in facts.get("chart_patterns") or []]},
             "record": pattern_record(_encyclopedia_top_rows(), s["type"], s["timeframe"]),
         }
+    finally:
+        conn.close()
+
+
+# --- ROADMAP D2: pre-registered experiments (read-only dashboard; registration happens in the scripts) ----
+@app.get("/experiments", dependencies=_GUARDS)
+def experiments() -> dict:
+    from src.research.prereg import connect as pconnect
+    from src.research.prereg import dashboard
+    conn = pconnect(_TRADES_DB or "data/wizard.db")
+    try:
+        return dashboard(conn)
+    finally:
+        conn.close()
+
+
+# --- ROADMAP D5: declared rules, checked on every decision (recorded, never blocked) -----------------------
+class RulesIn(BaseModel):
+    account_size: float | None = None
+    max_position_pct: float | None = None
+    max_open_positions: int | None = None
+    required_regimes: list[str] | None = None
+    min_categories_aligned: int | None = None
+    allowed_symbols: list[str] | None = None
+    max_per_week: int | None = None
+    cooling_off_hours: float | None = None
+    note: str = ""
+
+
+def _rules_conn():
+    from src.journal.rules import connect as rconnect
+    return rconnect(_TRADES_DB or "data/wizard.db")
+
+
+@app.get("/discipline", dependencies=_GUARDS)
+def discipline() -> dict:
+    """Your rules, every decision checked against the version active at its time, rule-following vs
+    rule-breaking outcomes, after-the-fact observations and the weekly review."""
+    from src.journal.rules import review
+    conn = _rules_conn()
+    try:
+        return review(conn)
+    finally:
+        conn.close()
+
+
+@app.post("/rules", dependencies=_GUARDS)
+def declare_rules(body: RulesIn) -> dict:
+    """Declare a new rule-set version (older versions stay; past decisions keep theirs)."""
+    from src.journal.rules import RulesError, declare
+    conn = _rules_conn()
+    try:
+        data = body.model_dump()
+        return declare(conn, {k: v for k, v in data.items() if k != "note"}, note=data["note"])
+    except RulesError as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
     finally:
         conn.close()

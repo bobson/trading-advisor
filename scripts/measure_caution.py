@@ -44,7 +44,11 @@ def main() -> None:
     ap.add_argument("--db", default="data/wizard.db")
     ap.add_argument("--cases", default="data/caution_cases.json", help="raw cases, for re-aggregation")
     ap.add_argument("--from-cases", default=None, help="skip the walk: aggregate a saved cases file")
+    from src.research import prereg
+    prereg.add_args(ap)
     args = ap.parse_args()
+    # D2: a new measurement must be registered; re-aggregating saved cases (deploying) is not a new run
+    gated = None if args.from_cases else prereg.gate(args, "measure_caution", prereg.run_params(args, ignore=("db", "cases", "from_cases")))
 
     cfg0 = load_config()
     symbols = args.symbols.split(",") if args.symbols else [p.symbol for p in list_pairs()] + ["XAU/USD"]
@@ -84,6 +88,8 @@ def main() -> None:
             print(f"    range after, median ATR: flagged {t['flagged']['range_atr']} (n={t['flagged']['n']}) vs "
                   f"{t['unflagged']['range_atr']} (n={t['unflagged']['n']})")
     print(f"\nWrote caution_stats to {args.db}; raw cases to {args.cases}.")
+    if gated:
+        prereg.finish(*gated, {"helps_count": (sum(1 for s in stats.values() if s["status"] == "helps"), None)})
 
 
 if __name__ == "__main__":

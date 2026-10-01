@@ -8,6 +8,8 @@
   import Morning from './lib/Morning.svelte'
   import Journal from './lib/Journal.svelte'
   import Training from './lib/Training.svelte'
+  import Experiments from './lib/Experiments.svelte'
+  import Discipline from './lib/Discipline.svelte'
   import JournalForm from './lib/JournalForm.svelte'
   import {
     getPairs, getTimeframes, getAnalysis, getTrades, getPosition, postTrade, deleteTrade,
@@ -17,8 +19,10 @@
   } from './lib/api'
 
   // #/encyclopedia[/<type>] opens the encyclopedia directly (linkable pages).
-  let view = $state<'analysis' | 'risk' | 'encyclopedia' | 'scanner' | 'morning' | 'journal' | 'training'>(
+  let view = $state<'analysis' | 'risk' | 'encyclopedia' | 'scanner' | 'morning' | 'journal' | 'training' | 'experiments' | 'discipline'>(
     typeof location === 'undefined' ? 'analysis'
+    : location.hash.startsWith('#/discipline') ? 'discipline'
+    : location.hash.startsWith('#/experiments') ? 'experiments'
     : location.hash.startsWith('#/training') ? 'training'
     : location.hash.startsWith('#/journal') ? 'journal'
     : location.hash.startsWith('#/morning') ? 'morning'
@@ -303,6 +307,8 @@
     <button class:active={view === 'morning'} onclick={() => { view = 'morning'; location.hash = '#/morning' }}>Morning report</button>
     <button class:active={view === 'journal'} onclick={() => { view = 'journal'; location.hash = '#/journal' }}>Journal</button>
     <button class:active={view === 'training'} onclick={() => { view = 'training'; location.hash = '#/training' }}>Training</button>
+    <button class:active={view === 'discipline'} onclick={() => { view = 'discipline'; location.hash = '#/discipline' }}>Discipline</button>
+    <button class:active={view === 'experiments'} onclick={() => { view = 'experiments'; location.hash = '#/experiments' }}>Experiments</button>
     <button class:active={view === 'scanner'} onclick={() => { view = 'scanner'; location.hash = '#/scanner' }}>Scanner</button>
     <button class:active={view === 'encyclopedia'} onclick={() => { view = 'encyclopedia'; location.hash = '#/encyclopedia' }}>Encyclopedia</button>
   </nav>
@@ -656,6 +662,10 @@
     <Journal onOpen={openLive} />
   {:else if view === 'training'}
     <Training />
+  {:else if view === 'experiments'}
+    <Experiments />
+  {:else if view === 'discipline'}
+    <Discipline />
   {:else if view === 'scanner'}
     <Scanner onOpen={openLive} />
   {:else if view === 'encyclopedia'}

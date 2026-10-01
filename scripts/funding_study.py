@@ -17,6 +17,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from src.config import load_config  # noqa: E402
+from src.research import prereg  # noqa: E402
 from src.data.registry import get_candles  # noqa: E402
 from src.derivatives.funding_study import align_funding, fetch_funding_history, study_funding  # noqa: E402
 from src.derivatives.gather import _perp_symbol  # noqa: E402
@@ -29,7 +30,9 @@ def main() -> None:
     p.add_argument("--timeframe", default="1h")
     p.add_argument("--horizon", type=int, default=24)
     p.add_argument("--months", type=int, default=6)
+    prereg.add_args(p)
     args = p.parse_args()
+    conn, exp = prereg.gate(args, "funding_study", prereg.run_params(args))   # D2: registered first
 
     import ccxt
 
@@ -64,6 +67,8 @@ def main() -> None:
         edge = True
     print("  => funding shows a usable contrarian skew — consider promoting to a vote." if edge
           else "  => no clear, sized contrarian edge — keep funding as a FACT, do NOT promote to a vote.")
+    up = lambda s: (None if s["pct_up"] is None else s["pct_up"] / 100, s["n"])  # noqa: E731
+    prereg.finish(conn, exp, {"crowded_long_up_rate": up(hi), "crowded_short_up_rate": up(lo)})
 
 
 if __name__ == "__main__":

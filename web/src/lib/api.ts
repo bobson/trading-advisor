@@ -398,3 +398,41 @@ export const getTrainingNext = (f: { type?: string; regime?: string; timeframe?:
   get<{ setup: TrainingSetup | null }>(`/training/next?${qs(f)}`)
 export const postTrainingAnswer = (body: { setup_id: number; direction: 'up' | 'down'; confidence: number; invalidation: number; note: string }) =>
   send<TrainingReveal>('POST', '/training/answer', body)
+
+// --- ROADMAP D2: pre-registered experiments ---
+export interface Experiment {
+  id: number; created_at: number; question: string; hypothesis: string; script: string; params: Record<string, unknown>
+  metric: string; direction: string; threshold: number; baseline: number | null; predicted_pass: number
+  predicted_value: number | null; supersedes: number | null; superseded: boolean; hash: string
+  ran_at: number | null; value: number | null; n: number | null; passed: number | null; p_value: number | null
+  variations: number | null; corrected_alpha: number | null; passed_corrected: number | null; engine_commit: string | null
+}
+export interface ExperimentsPage {
+  experiments: Experiment[]
+  questions: Record<string, { registered: number; ran: number; passed: number; passed_corrected: number }>
+  summary: { registered: number; ran: number; never_ran: number; passed: number; misses: number; prediction_hits: number; prediction_n: number }
+}
+export const getExperiments = () => get<ExperimentsPage>('/experiments')
+
+// --- ROADMAP D5: declared rules + discipline review ---
+export interface TradingRules {
+  account_size?: number; max_position_pct?: number; max_open_positions?: number; required_regimes?: string[]
+  min_categories_aligned?: number; allowed_symbols?: string[]; max_per_week?: number; cooling_off_hours?: number
+}
+export interface RuleVersion { version: number; created_at: number; rules: TradingRules; note: string }
+export interface DisciplineOutcome { n: number; judged: number; wins: number; win_rate: number | null; pnl_total: number | null }
+export interface DisciplineSide { followed: DisciplineOutcome; broke: DisciplineOutcome; by_rule: Record<string, DisciplineOutcome>; unchecked: number }
+export interface Decision {
+  kind: 'trade' | 'call'; id: number; t: number; symbol: string; size: number | null; outcome: string | null
+  pnl: number | null; regime: string | null; agreeing: number | null; rule_version: number | null
+  violations: { rule: string; detail: string }[]; cant_check: string[]; followed: boolean
+}
+export interface DisciplinePage {
+  rules: RuleVersion | null; versions: RuleVersion[]; decisions: Decision[]
+  compare: { trade: DisciplineSide; call: DisciplineSide }
+  observations: { t: number | null; kind: string; text: string; week?: string }[]
+  weekly: { week: string; trades: number; calls: number; broke: number; rules_broken: string[]; judged: number; wins: number; observations: string[] }[]
+  labels: Record<string, string>; min_n: number
+}
+export const getDiscipline = () => get<DisciplinePage>('/discipline')
+export const postRules = (body: TradingRules & { note: string }) => send<RuleVersion>('POST', '/rules', body)

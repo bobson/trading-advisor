@@ -90,7 +90,7 @@ def engine_snapshot(df: pd.DataFrame, symbol: str, timeframe: str, cfg: Config) 
     reg = classify_regime(add_features(df, cfg), cfg).iloc[-1]
     eng = engine_info(cfg)
     return {"bias": f["confluence"]["bias"], "tier": f["situation"]["tier"],
-            "aligned": bool(f["confluence"]["triggered"]),
+            "aligned": bool(f["confluence"]["triggered"]), "agreeing": int(f["confluence"]["agreeing_categories"]),
             "patterns": sorted({p["type"] for p in f.get("chart_patterns") or []
                                 if p.get("lifecycle") in ("forming", "fresh", "in_play")}),
             "regime": str(reg) if reg is not None and not pd.isna(reg) else "unknown",

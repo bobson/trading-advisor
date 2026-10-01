@@ -21,13 +21,26 @@ from src.data.cache import load_candles  # noqa: E402
 
 
 def main() -> None:
+    import argparse
+
+    from src.research import prereg
     cfg = load_config()
-    symbol = sys.argv[1] if len(sys.argv) > 1 else cfg.market.symbol
-    timeframe = sys.argv[2] if len(sys.argv) > 2 else cfg.market.timeframe
+    p = argparse.ArgumentParser(description="Exit-rule laboratory (Feature 8).")
+    p.add_argument("symbol", nargs="?", default=cfg.market.symbol)
+    p.add_argument("timeframe", nargs="?", default=cfg.market.timeframe)
+    prereg.add_args(p)
+    args = p.parse_args()
+    conn, exp = prereg.gate(args, "exit_lab", prereg.run_params(args))   # D2: registered first
+    symbol, timeframe = args.symbol, args.timeframe
     cfg = cfg.model_copy(update={"market": cfg.market.model_copy(
         update={"symbol": symbol, "timeframe": timeframe})})
     df = load_candles(symbol, timeframe, cfg.market.exchange)
-    print(run_exit_lab(df, cfg).summary())
+    rep = run_exit_lab(df, cfg)
+    print(rep.summary())
+    means = [s.mean_return for s in rep.exits.values() if s.n]
+    prereg.finish(conn, exp, {"spread_across_exits": (rep.spread_across_exits, None),
+                              "spread_across_entries": (rep.spread_across_entries, None),
+                              "best_exit_mean_return": (max(means) if means else None, None)})
 
 
 if __name__ == "__main__":

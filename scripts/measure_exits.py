@@ -38,7 +38,11 @@ def main() -> None:
     ap.add_argument("--cases", default="data/exit_cases.json")
     ap.add_argument("--exits", default="data/exit_returns.json")
     ap.add_argument("--from-cases", default=None, help="skip the walk: summarize saved cases (+ --exits file)")
+    from src.research import prereg
+    prereg.add_args(ap)
     args = ap.parse_args()
+    # D2: a new measurement must be registered; re-summarizing saved cases (deploying) is not a new run
+    gated = None if args.from_cases else prereg.gate(args, "measure_exits", prereg.run_params(args, ignore=("db", "cases", "exits", "from_cases")))
 
     cfg0 = load_config()
     symbols = args.symbols.split(",") if args.symbols else [p.symbol for p in list_pairs()] + ["XAU/USD"]
@@ -79,6 +83,8 @@ def main() -> None:
         for rule, e in (s["exits"] or {}).items():
             print(f"    exit {rule:13} n={e['n']:<5} mean {e['mean_pct']}%/trade  win {e['win_rate']}  held {e['avg_bars']} bars")
     print(f"\nWrote exit_stats to {args.db}; cases to {args.cases}; exit returns to {args.exits}.")
+    if gated:
+        prereg.finish(*gated, {f"noise_floor_{tf}": (s["test"]["noise_floor"], None) for tf, s in summary.items()})
 
 
 if __name__ == "__main__":

@@ -22,6 +22,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from src.backtest.evaluate import evaluate  # noqa: E402
 from src.config import PROJECT_ROOT, load_config  # noqa: E402
 from src.data.registry import get_candles  # noqa: E402
+from src.research import prereg  # noqa: E402
 
 OUTPUTS_DIR = PROJECT_ROOT / "outputs"
 
@@ -36,7 +37,9 @@ def main() -> None:
     p.add_argument("--warmup", type=int, default=None, help="bars to skip before the first setup")
     p.add_argument("--step", type=int, default=1, help="scan every Nth bar (larger = faster, fewer/less-overlapping setups)")
     p.add_argument("--save", action="store_true", help="also write the report to outputs/")
+    prereg.add_args(p)
     args = p.parse_args()
+    conn, exp = prereg.gate(args, "backtest", prereg.run_params(args, ignore=("save",)))   # D2: registered first
 
     # Request-scoped config so report labels + detectors match the chosen market.
     market = cfg.market.model_copy(update={"symbol": args.symbol, "timeframe": args.timeframe})
@@ -52,6 +55,9 @@ def main() -> None:
         step=args.step,
     )
     print(report.summary())
+    o = report.overall
+    prereg.finish(conn, exp, {"win_rate": (o.win_rate, o.n), "avg_return": (o.avg_return, None),
+                              "median_return": (o.median_return, None)})
 
     if args.save:
         OUTPUTS_DIR.mkdir(parents=True, exist_ok=True)

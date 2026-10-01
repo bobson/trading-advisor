@@ -17,6 +17,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from src.config import load_config  # noqa: E402
+from src.research import prereg  # noqa: E402
 from src.data.registry import get_candles  # noqa: E402
 from src.ml.walkforward import walk_forward_eval  # noqa: E402
 
@@ -29,7 +30,9 @@ def main() -> None:
     p.add_argument("--horizon", type=int, default=24)
     p.add_argument("--atr-mult", type=float, default=1.0)
     p.add_argument("--folds", type=int, default=5)
+    prereg.add_args(p)
     args = p.parse_args()
+    conn, exp = prereg.gate(args, "ml_eval", prereg.run_params(args))   # D2: registered first
 
     df = get_candles(args.symbol, args.timeframe, cfg)
     r = walk_forward_eval(df, cfg, horizon=args.horizon, atr_mult=args.atr_mult, n_folds=args.folds)
@@ -48,6 +51,9 @@ def main() -> None:
     print("\n  => model beats the baseline out-of-sample — worth pursuing (validate costs/multi-coin next)."
           if beats else
           "\n  => no meaningful edge over a coin flip (AUC ~0.5). Honest result — the features don't predict this.")
+
+    prereg.finish(conn, exp, {"auc": (r["auc"], None), "model_acc": (r["model_acc"], r["n_oos"]),
+                              "acc_minus_baseline": (r["model_acc"] - r["baseline_acc"], None)})
 
 
 if __name__ == "__main__":

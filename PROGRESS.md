@@ -6,7 +6,7 @@ A state file for the "learning instrument" build. Source of truth for what's nex
 **ROADMAP progress:** A1 ✓ (merged, `645231c`), A2 ✓ (merged, `800e12a`; docs `1003735`), A3 ✓ (merged), A4 ✓ (merged), A5 ✓ (merged), A6 ✓ (merged), A7 ✓ (merged), B1 ✓ (merged — labelling mode
 built; the ≥30 labelled charts are the user's ongoing work), B2 tooling ✓ (merged — `eval_detectors.py`;
 its measurement + tuning run as soon as ≥30 charts are labelled — the user has decided NOT to label, so
-it stays unmeasured). B3 ✓ (merged), B4 ✓ (merged), B5 ✓ (merged), A8 ✓ (merged — forward record live since 2026-09-25 on wizard.bosfoot.com), R1 ✓ (merged), R2 ✓ (merged), R3 ✓ (merged — no condition changed the coin flip; ~80% of reads have a stop inside noise and no room after costs), R4 ✓ (merged — noise floor ~1 ATR, stable; Phase R complete), C1 slim ✓ (merged), D1 ✓ (merged), D6 ✓ (merged). **The confirmed order is complete.** Remaining on demand: D2–D5 (pre-registration, news & macro context, event study, behavioural circuit breaker); small idea: a measured "no prior trend to reverse" fact on reversal patterns.
+it stays unmeasured). B3 ✓ (merged), B4 ✓ (merged), B5 ✓ (merged), A8 ✓ (merged — forward record live since 2026-09-25 on wizard.bosfoot.com), R1 ✓ (merged), R2 ✓ (merged), R3 ✓ (merged — no condition changed the coin flip; ~80% of reads have a stop inside noise and no room after costs), R4 ✓ (merged — noise floor ~1 ATR, stable; Phase R complete), C1 slim ✓ (merged), D1 ✓ (merged), D6 ✓ (merged), D2 ✓ (merged), D5 ✓ (merged). Remaining on demand: D3 (news & macro context), D4 (event study); small idea: a measured "no prior trend to reverse" fact on reversal patterns.
 Order from here: user's choice. Drawing tools: deferred.
 
 ## Current state
@@ -63,6 +63,59 @@ apply if `config.yaml` omits them.
 ---
 
 ## Log (newest first)
+
+### ROADMAP D5 — Behavioural circuit breaker
+- **Done:** 2026-10-01 · on `main` · **merged.**
+- `src/journal/rules.py`: `trading_rules` versions (append-only, enforced by triggers).
+  - **Rules** (each optional): position size ≤ % of the account, max open positions, required regimes,
+    min categories agreeing, allowed markets, max decisions per week, cooling-off hours after a loss.
+  - **Checks:** every **paper-trade open** and every **live journal call** (blind training is practice
+    and isn't checked) is checked against the rule version ACTIVE at its time. Violations are
+    recorded, never blocked. A missing input is "can't check", never a violation.
+  - **Not counted:** decisions made before any rules were declared (judging them by later rules
+    would be hindsight).
+- **The engine's read is frozen at every paper-trade open (server side)**, so the regime and
+  categories rules have real inputs: `snapshot.engine` = bias, tier, agreeing, regime, patterns, facts
+  hash, commit. It never fails a trade. The journal's engine snapshot gained `agreeing`.
+- `GET /discipline` + `POST /rules`; the **Discipline** page (`#/discipline`):
+  - the rules, plus "declare a new version";
+  - followed vs broke per record type (count, judged, wins, a % only with 20+, paper P&L);
+  - outcomes per broken rule;
+  - neutral after-the-fact observations: post-loss decisions (within 6 h), positions > 1.5× your
+    median size, off-regime decisions, weeks > 2× your median count;
+  - an ISO-week review.
+- **Spec vs code (rule 2):** "max risk per trade" became "max position size as a % of the account".
+  Paper trades have no stop, so per-trade risk can't be computed. Rules are checked on both records,
+  compared separately.
+- Verified: 10 tests (every rule; the version active at the time; can't-check; counts; neutral
+  wording; blind excluded). Live on a scratch API, an XRP buy of 3,000 after declaring rules was
+  opened, and three violations were recorded (30% > 10%, regime ranging, market not on the list).
+  The Discipline page was browser-checked at 1100 / 400 px. 586 tests pass.
+
+### ROADMAP D2 — Pre-registration
+- **Done:** 2026-10-01 · on `main` · **merged.**
+- `src/research/prereg.py`: `experiments` + `experiment_results`, **append-only enforced by SQLite
+  triggers** (any UPDATE/DELETE aborts: "register a new one that supersedes it"). Gated scripts:
+  backtest, backtest_suite, ml_eval, funding_study, exit_lab, measure_caution, measure_exits (data
+  builders aren't experiments; `--from-cases` re-aggregation isn't a new run). The flow:
+  1. `--register --question --hypothesis --metric --direction --threshold [--baseline] --predict
+     pass|fail [--predicted-value] [--supersedes N]` stores the run's EXACT parameters (hashed) and
+     exits.
+  2. `--experiment N` runs it, and is refused if the experiment is unregistered, belongs to another
+     script, already has a result, or its params differ from the registration.
+  3. The result is stored and scored.
+- **Multiple comparisons:** variations are grouped by question. A rate metric (with n and a
+  registered baseline) needs a one-sided binomial p < 0.05 / k (Bonferroni, k = variations run so
+  far). Non-rate metrics (AUC, spreads, counts) show k, marked "not correctable".
+- **Dashboard** (`/experiments`, the **Experiments** page): registered / run / never run,
+  passed vs missed (every miss listed, misses marked red), "your predictions: X of N right", a
+  per-question table (passed vs passed after correction), each experiment's hash, params and
+  supersede chain.
+- Verified end to end on a scratch DB: a BTC 1d backtest was registered, a run with a tweaked
+  `--step` refused, the proper run recorded (0.463, n=160, p 0.848: miss, predicted right), a repeat
+  refused, an edit blocked by the trigger; a second variation got alpha 0.025. 14 tests (all 7 scripts
+  refuse to run unregistered via subprocess), browser-checked at 1100 / 400 px. Experiments live in
+  the local `data/wizard.db` (research is run locally, not on the droplet).
 
 ### ROADMAP D6 — Blind training mode
 - **Done:** 2026-09-30 · on `main` · **merged.**
