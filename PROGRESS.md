@@ -6,7 +6,7 @@ A state file for the "learning instrument" build. Source of truth for what's nex
 **ROADMAP progress:** A1 ✓ (merged, `645231c`), A2 ✓ (merged, `800e12a`; docs `1003735`), A3 ✓ (merged), A4 ✓ (merged), A5 ✓ (merged), A6 ✓ (merged), A7 ✓ (merged), B1 ✓ (merged — labelling mode
 built; the ≥30 labelled charts are the user's ongoing work), B2 tooling ✓ (merged — `eval_detectors.py`;
 its measurement + tuning run as soon as ≥30 charts are labelled — the user has decided NOT to label, so
-it stays unmeasured). B3 ✓ (merged), B4 ✓ (merged), B5 ✓ (merged), A8 ✓ (merged — forward record live since 2026-09-25 on wizard.bosfoot.com), R1 ✓ (merged), R2 ✓ (merged), R3 ✓ (merged — no condition changed the coin flip; ~80% of reads have a stop inside noise and no room after costs), R4 ✓ (merged — noise floor ~1 ATR, stable; Phase R complete), C1 slim ✓ (merged), D1 ✓ (merged), D6 ✓ (merged), D2 ✓ (merged), D5 ✓ (merged). Remaining on demand: D3 (news & macro context), D4 (event study); small idea: a measured "no prior trend to reverse" fact on reversal patterns.
+it stays unmeasured). B3 ✓ (merged), B4 ✓ (merged), B5 ✓ (merged), A8 ✓ (merged — forward record live since 2026-09-25 on wizard.bosfoot.com), R1 ✓ (merged), R2 ✓ (merged), R3 ✓ (merged — no condition changed the coin flip; ~80% of reads have a stop inside noise and no room after costs), R4 ✓ (merged — noise floor ~1 ATR, stable; Phase R complete), C1 slim ✓ (merged), D1 ✓ (merged), D6 ✓ (merged), D2 ✓ (merged), D5 ✓ (merged), D3 ✓ (merged). Remaining on demand: D4 (event study); small idea: a measured "no prior trend to reverse" fact on reversal patterns.
 Order from here: user's choice. Drawing tools: deferred.
 
 ## Current state
@@ -63,6 +63,47 @@ apply if `config.yaml` omits them.
 ---
 
 ## Log (newest first)
+
+### ROADMAP D3 — News & macro context
+- **Done:** 2026-10-02 · on `main` · **merged.**
+- **Calendar** (`src/context/macro_calendar.py`): the **Forex Factory weekly JSON**, keyless and
+  UNOFFICIAL. Events carry currency, UTC time (offsets converted), impact, consensus and previous;
+  central-bank and commodity events are tagged by name from the same feed (39 and 2 this week).
+  `disk_cache.py` (one cache shared by every process, TTL ~1 h, a stale copy with its age on failure)
+  keeps it from being hammered.
+- **Headlines** (`headlines.py`): RSS from CoinDesk, Cointelegraph, FXStreet and ForexLive, keyless
+  (headline + link + source + time only, cached ~20 min), filtered per market by keyword. **Page only,
+  never in Claude's facts** (titles carry directional wording).
+- **Drivers** (`drivers.py`): a per-market table (event currencies, headline keywords, conventional
+  drivers labelled as convention).
+  - **Driver hypothesis:** the co-movement of daily returns with the dollar (inverse EUR/USD), gold and
+    BTC over 60 days, joined on common dates (7-day vs 5-day markets). Self-proxies are excluded. It's
+    only stated at |ρ| ≥ 0.5 with ≥ 30 days, worded "a co-movement, not a cause — and not a direction".
+  - **Correlation warning:** the followed markets (= the morning watchlist) at ρ ≥ 0.7, "largely the
+    same bet". Live: BTC/ETH 0.87, BTC/SOL 0.82, ETH/SOL 0.80. All thresholds were fixed before
+    looking.
+- **Wiring:** `gather_context` now carries the relevant upcoming high-impact events (with consensus
+  and previous), `calendar_available`, and the drivers block (the hypothesis plus the warnings that
+  involve the symbol). **"News soon" (`event_risk`) is now live without a Finnhub key**; it was always
+  "unavailable" before. The facts text gained labelled driver and correlation lines; the guide §5
+  gained one line ("a measured co-movement, never a cause or a direction"). There's a new **Macro**
+  page (`#/macro`): drivers, the correlation matrix, a calendar with market / central bank /
+  commodity / all tabs, and headlines. The Analysis page's Market context panel shows the next event,
+  "moves with" and "one bet with". The menu now wraps on phones (it used to run off screen).
+- **Spec vs code (rule 2):** Forex Factory replaces Finnhub (unofficial, cached, fails gracefully);
+  **no actual figures** in the feed; it covers **this week only**, so next week's events aren't
+  visible over the weekend (the page says so); central-bank and commodity calendars come from the
+  same feed by name; headlines are on the page only.
+- Verified: 17 offline tests (injected feeds and candles; a test that the offline path never touches
+  the network). Browser-checked live (EUR/USD and ETH) at 1300 / 400 px. 604 tests pass; the snapshot
+  was regenerated with the user's approval (a one-line diff: the `event_risk` detail no longer says
+  "needs FINNHUB_API_KEY").
+- **Forward record (user decision):** the 08:00 run fetches the cached calendar once and freezes each
+  NEW read's "news soon" flag (`news_soon`: a high-impact event for the market's currencies within
+  `caution.event_hours` of the run), so R2's caution split can test it over the coming months. The
+  facts hash stays candles-only; older reads keep null; a failed feed leaves the flag null ("can't
+  judge"). Verified live into a scratch DB (Saturday → all `false`) plus a test (true / false / none,
+  hash unchanged).
 
 ### ROADMAP D5 — Behavioural circuit breaker
 - **Done:** 2026-10-01 · on `main` · **merged.**

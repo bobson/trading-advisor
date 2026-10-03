@@ -248,9 +248,22 @@ def record_gaps(conn, today: date) -> list[str]:
 
 # --- the morning run ----------------------------------------------------------------------------------
 
+def news_soon(symbol: str, events: list[dict], cfg: Config, now: datetime) -> bool:
+    """ROADMAP D3: a high-impact calendar event for this market's currencies within
+    `caution.event_hours` of the run — the same judgement as the live "news soon" caution."""
+    from src.context.drivers import info
+    cur = set(info(symbol)["currencies"])
+    t0 = now.timestamp()
+    return any(e["currency"] in cur and e["impact"] == "High" and 0 <= e["ts"] - t0 <= cfg.caution.event_hours * 3600
+               for e in events)
+
+
 def run_morning(cfg: Config, conn, *, now: datetime | None = None, trigger: str = "manual",
-                candles_for=None, synth_client=None, engine: dict | None = None) -> dict:
-    """One morning: gaps -> fetch -> REVIEW -> READ -> (synthesis). Safe to call twice a day."""
+                candles_for=None, synth_client=None, engine: dict | None = None,
+                events: list[dict] | None = None) -> dict:
+    """One morning: gaps -> fetch -> REVIEW -> READ -> (synthesis). Safe to call twice a day.
+    `events` = this week's calendar (the script passes the cached feed): each new read then freezes its
+    "news soon" flag; None leaves it as "can't judge" (the offline tests, or the feed unavailable)."""
     mr = cfg.morning_report
     now = now or datetime.now(timezone.utc)
     rd = _run_date(now, mr.timezone).isoformat()
@@ -301,6 +314,10 @@ def run_morning(cfg: Config, conn, *, now: datetime | None = None, trigger: str 
         except Exception as exc:
             skipped.append({"symbol": sym, "timeframe": tf, "reason": f"engine: {str(exc)[:160]}"})
             continue
+        if events is not None:                     # D3: freeze "news soon" (facts_hash stays candles-only)
+            flags = json.loads(row["caution"])
+            flags["event_risk"] = news_soon(sym, events, cfg, now)
+            row["caution"] = json.dumps(flags)
         row.update(run_date=rd, created_at=int(now.timestamp()), engine_commit=engine["commit"],
                    engine_dirty=int(engine["dirty"]), config_hash=engine["config_hash"])
         cols = ", ".join(row)

@@ -214,8 +214,17 @@ class ContextConfig(_Strict):
     # Phase 21: extra background facts for Layer 2 (never touches the detectors).
     fear_greed: bool = True          # crypto Fear & Greed (alternative.me, no key)
     fundamentals: bool = True        # crypto market cap/supply/volume (CoinGecko, no key)
-    economic_calendar: bool = True   # high-impact events (Finnhub, needs FINNHUB_API_KEY)
-    news: bool = True                # recent headlines (Finnhub, needs FINNHUB_API_KEY)
+    economic_calendar: bool = True   # D3: Forex Factory weekly calendar (keyless; Finnhub if a key is set)
+    news: bool = True                # recent headlines (Finnhub, needs FINNHUB_API_KEY) — Claude's input
+    # ROADMAP D3 — macro context. Thresholds fixed before looking; the feeds are disk-cached.
+    calendar_ttl_min: int = 60       # re-fetch the (unofficial) calendar at most hourly
+    headlines_ttl_min: int = 20      # RSS headlines (page only, never fed to Claude)
+    followed: Optional[list[str]] = None   # markets for the correlation matrix (default: the morning watchlist)
+    corr_window_days: int = 60
+    corr_min_n: int = 30             # common days needed before a driver hypothesis is stated
+    corr_warn: float = 0.7           # pairwise correlation flagged as "moving as one bet"
+    driver_min_rho: float = 0.5      # below this |correlation|: "no clear co-movement"
+    event_days: int = 7              # upcoming relevant events listed in the facts
 
 
 class RegimeConfig(_Strict):

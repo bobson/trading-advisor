@@ -38,8 +38,10 @@ def main() -> int:
             return 2
         cfg = load_config()
         conn = connect(args.db)
+        from src.context.macro_calendar import week
+        wk = week(ttl_s=cfg.context.calendar_ttl_min * 60)      # D3: cached; failure -> "can't judge"
         try:
-            out = run_morning(cfg, conn, trigger=args.trigger)
+            out = run_morning(cfg, conn, trigger=args.trigger, events=wk["events"] or None)
         finally:
             conn.close()
         # D1: resolve the journal's due calls too (its own module and rule — never mixed with the reads)

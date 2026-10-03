@@ -10,6 +10,7 @@
   import Training from './lib/Training.svelte'
   import Experiments from './lib/Experiments.svelte'
   import Discipline from './lib/Discipline.svelte'
+  import Macro from './lib/Macro.svelte'
   import JournalForm from './lib/JournalForm.svelte'
   import {
     getPairs, getTimeframes, getAnalysis, getTrades, getPosition, postTrade, deleteTrade,
@@ -19,8 +20,9 @@
   } from './lib/api'
 
   // #/encyclopedia[/<type>] opens the encyclopedia directly (linkable pages).
-  let view = $state<'analysis' | 'risk' | 'encyclopedia' | 'scanner' | 'morning' | 'journal' | 'training' | 'experiments' | 'discipline'>(
+  let view = $state<'analysis' | 'risk' | 'encyclopedia' | 'scanner' | 'morning' | 'journal' | 'training' | 'experiments' | 'discipline' | 'macro'>(
     typeof location === 'undefined' ? 'analysis'
+    : location.hash.startsWith('#/macro') ? 'macro'
     : location.hash.startsWith('#/discipline') ? 'discipline'
     : location.hash.startsWith('#/experiments') ? 'experiments'
     : location.hash.startsWith('#/training') ? 'training'
@@ -307,6 +309,7 @@
     <button class:active={view === 'morning'} onclick={() => { view = 'morning'; location.hash = '#/morning' }}>Morning report</button>
     <button class:active={view === 'journal'} onclick={() => { view = 'journal'; location.hash = '#/journal' }}>Journal</button>
     <button class:active={view === 'training'} onclick={() => { view = 'training'; location.hash = '#/training' }}>Training</button>
+    <button class:active={view === 'macro'} onclick={() => { view = 'macro'; location.hash = '#/macro' }}>Macro</button>
     <button class:active={view === 'discipline'} onclick={() => { view = 'discipline'; location.hash = '#/discipline' }}>Discipline</button>
     <button class:active={view === 'experiments'} onclick={() => { view = 'experiments'; location.hash = '#/experiments' }}>Experiments</button>
     <button class:active={view === 'scanner'} onclick={() => { view = 'scanner'; location.hash = '#/scanner' }}>Scanner</button>
@@ -619,6 +622,15 @@
           <div class="row"><span>24h change</span><b>{result.context.fundamentals.change_24h_pct}%</b></div>
           <div class="row"><span>From ATH</span><b>{result.context.fundamentals.ath_change_pct}%</b></div>
         {/if}
+        {#if result.context?.economic_calendar?.length}
+          <div class="row"><span>Next event</span><b>{result.context.economic_calendar[0].country} {result.context.economic_calendar[0].event}</b></div>
+        {/if}
+        {#if result.context?.drivers?.hypothesis?.strongest}
+          <div class="row"><span>Moves with</span><b>{result.context.drivers.hypothesis.strongest.proxy} ({result.context.drivers.hypothesis.strongest.rho > 0 ? '+' : ''}{result.context.drivers.hypothesis.strongest.rho.toFixed(2)})</b></div>
+        {/if}
+        {#if result.context?.drivers?.correlation_warnings?.length}
+          <div class="row"><span>One bet with</span><b>{result.context.drivers.correlation_warnings.map((w: any) => (w.a === result?.market.symbol ? w.b : w.a)).join(', ')}</b></div>
+        {/if}
         {#if result.derivatives?.funding}
           <div class="row"><span>Funding</span><b>{result.derivatives.funding.state}</b></div>
         {/if}
@@ -666,6 +678,8 @@
     <Experiments />
   {:else if view === 'discipline'}
     <Discipline />
+  {:else if view === 'macro'}
+    <Macro {symbol} {pairs} />
   {:else if view === 'scanner'}
     <Scanner onOpen={openLive} />
   {:else if view === 'encyclopedia'}
@@ -690,7 +704,7 @@
     border-radius: 8px; color: #c9d1d9; line-height: 1.5; }
   .disclosure .evidence ul { margin: 6px 0; padding-left: 20px; }
   .disclosure .evidence .muted { color: #8b949e; }
-  .views { display: flex; gap: 8px; margin-bottom: 18px; }
+  .views { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 18px; }
   .views button { background: #161b22; border: 1px solid #30363d; font-weight: 500; }
   .views button.active { background: #238636; border-color: #238636; }
   .controls { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; margin-bottom: 16px; }

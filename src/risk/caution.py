@@ -204,8 +204,8 @@ def _htf_against(facts: dict, direction: str | None) -> dict:
 
 def _event_risk(facts: dict, cfg: Config) -> dict:
     ctx = facts.get("context")
-    if not ctx or not cfg.finnhub_api_key:
-        return _entry("event_risk", None, "unavailable: no economic calendar (needs FINNHUB_API_KEY)")
+    if not ctx or not (ctx.get("calendar_available") or cfg.finnhub_api_key):
+        return _entry("event_risk", None, "unavailable: no economic calendar for this read")
     now = pd.Timestamp.now(tz="UTC")
     soon = []
     for e in ctx.get("economic_calendar") or []:

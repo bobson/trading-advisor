@@ -436,3 +436,18 @@ export interface DisciplinePage {
 }
 export const getDiscipline = () => get<DisciplinePage>('/discipline')
 export const postRules = (body: TradingRules & { note: string }) => send<RuleVersion>('POST', '/rules', body)
+
+// --- ROADMAP D3: news & macro context ---
+export interface MacroEvent { time: string; ts: number; currency: string; title: string; impact: string
+  forecast: string | null; previous: string | null; actual: string | null; kind: string }
+export interface MacroHeadline { headline: string; link: string; source: string; group: string; ts: number | null }
+export interface MacroPage {
+  symbol: string; now: number; currencies: string[]
+  calendar: { events: MacroEvent[]; fetched_at: number | null; stale: boolean; error: string | null; source: string; note: string }
+  headlines: { for_symbol: MacroHeadline[]; all: MacroHeadline[]; fetched_at: number | null; stale: boolean; error: string | null }
+  drivers: { text: string; conventional: string[]; strongest: { proxy: string; rho: number; n: number } | null
+             items: { proxy: string; rho: number | null; n: number; start: string | null; end: string | null }[] }
+  correlation: { symbols: string[]; pairs: { a: string; b: string; rho: number | null; n: number }[]
+                 warnings: { a: string; b: string; rho: number; n: number; text: string }[]; window: number; threshold: number }
+}
+export const getMacro = (symbol: string) => get<MacroPage>(`/macro?symbol=${encodeURIComponent(symbol)}`)

@@ -73,7 +73,7 @@
     {
       "active": null,
       "code": "event_risk",
-      "detail": "unavailable: no economic calendar (needs FINNHUB_API_KEY)",
+      "detail": "unavailable: no economic calendar for this read",
       "label": "High-impact news soon",
       "status": "unmeasured",
       "value": null

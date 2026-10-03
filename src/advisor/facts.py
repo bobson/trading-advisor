@@ -677,13 +677,24 @@ def facts_to_prompt(facts: dict) -> str:
         if cal:
             add("  - Upcoming high-impact economic events:")
             for e in cal:
-                add(f"      {e['time']} {e['country']}: {e['event']} [{e['impact']}]")
+                cons = (f" (consensus {e['forecast']}, previous {e['previous']})"
+                        if e.get("forecast") or e.get("previous") else "")
+                add(f"      {e['time']} {e['country']}: {e['event']} [{e['impact']}]{cons}")
+            if ctx.get("calendar_note"):
+                add(f"      (calendar: {ctx['calendar_note']})")
+        drv = ctx.get("drivers")
+        if drv:
+            add(f"  - Driver hypothesis (a CO-MOVEMENT measured on daily returns — never a cause, never a "
+                f"direction): {drv['hypothesis']['text']}")
+            add("  - Conventional drivers (convention, not measured): " + "; ".join(drv["hypothesis"]["conventional"]))
+            for w in drv.get("correlation_warnings") or []:
+                add(f"  - Correlation warning: {w['text']}")
         news = ctx.get("news") or []
         if news:
             add("  - Recent headlines:")
             for h in news:
                 add(f"      ({h['when']}) {h['source']}: {h['headline']}")
-        if not fg and not fund and not cal and not news:
+        if not fg and not fund and not cal and not news and not drv:
             add("  - market context: none available")
         add(f"  (pulled {ctx.get('as_of', 'unknown')})")
     else:

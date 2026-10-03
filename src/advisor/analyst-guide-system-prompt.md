@@ -184,6 +184,9 @@ matters for both markets — especially forex. A high-impact event in the next f
 looks. Say so explicitly and early when one is imminent. This is a *warning*, not a direction:
 never guess which way an event will resolve.
 
+**Drivers & correlation.** A driver hypothesis is a measured co-movement, never a cause or a
+direction. A correlation warning is about exposure (two markets being one bet), not direction.
+
 **Forex sessions & gaps.** Note the active session when it explains observed volatility, and
 flag weekend gaps when they distort levels or leave an unfilled gap on the chart.
 

@@ -433,3 +433,27 @@ def test_report_carries_the_caution_split_after_a_review(cfg, candles):
     assert rep["caution_split"]["not_recorded"] == 0 and rep["caution_split"]["rows"]
     assert set(rep["caution_labels"]) >= {"stop_in_noise", "no_room"}
     assert all(r["caution"] is not None for r in rep["grid"])
+
+
+# --- ROADMAP D3: "news soon" frozen with each new read ---------------------------------------------------------
+
+def test_the_calendar_freezes_news_soon_on_new_reads_and_none_leaves_it_unjudged(cfg, candles):
+    import json
+    feed = Feed(candles, 300)
+    now = feed.now()
+    t = int(now.timestamp())
+    events = [{"currency": "USD", "impact": "High", "ts": t + 2 * 3600},                  # BTC: USD news in 2 h
+              {"currency": "EUR", "impact": "High", "ts": t + 30 * 3600}]                 # EUR: too far away
+    conn = connect(":memory:")
+    run_morning(cfg, conn, now=now, candles_for=feed, engine=ENGINE, events=events)
+    flags = {r["symbol"]: json.loads(r["caution"])["event_risk"] for r in conn.execute("SELECT * FROM forward_reads")}
+    assert flags == {"BTC/USDT": True, "EUR/USD": True}           # EUR/USD's currencies are EUR and USD
+    quiet = connect(":memory:")
+    run_morning(cfg, quiet, now=now, candles_for=feed, engine=ENGINE, events=[events[1]])
+    assert {json.loads(r["caution"])["event_risk"] for r in quiet.execute("SELECT * FROM forward_reads")} == {False}
+    none = connect(":memory:")
+    run_morning(cfg, none, now=now, candles_for=feed, engine=ENGINE)
+    assert {json.loads(r["caution"])["event_risk"] for r in none.execute("SELECT * FROM forward_reads")} == {None}
+    # the facts hash doesn't depend on the calendar
+    h = lambda c: {r["symbol"]: r["facts_hash"] for r in c.execute("SELECT * FROM forward_reads")}  # noqa: E731
+    assert h(conn) == h(quiet) == h(none)

@@ -818,3 +818,32 @@ def declare_rules(body: RulesIn) -> dict:
         raise HTTPException(status_code=400, detail=str(exc))
     finally:
         conn.close()
+
+
+# --- ROADMAP D3: news & macro context (calendar, headlines, drivers, correlation) ----------------------------
+@app.get("/macro", dependencies=_GUARDS)
+def macro(symbol: str = Query("BTC/USDT")) -> dict:
+    """This week's calendar (with central-bank / commodity events), headlines (page only), the market's
+    drivers and co-movement hypothesis, and the followed markets' correlation. Feeds are disk-cached."""
+    import time as _t
+
+    from src.context import drivers as D
+    from src.context.gather import _daily_candles
+    from src.context.headlines import for_symbol, latest
+    from src.context.macro_calendar import week
+    c = cfg.context
+    wk = week(ttl_s=c.calendar_ttl_min * 60)
+    hl = latest(ttl_s=c.headlines_ttl_min * 60)
+    followed = list(c.followed or cfg.morning_report.symbols)
+    syms = followed if symbol in followed else followed + [symbol]
+    rets = D.returns_for(sorted(set(syms + [p for p, _ in D.PROXIES.values()])), _daily_candles(cfg))
+    info = D.info(symbol)
+    return {
+        "symbol": symbol, "now": int(_t.time()), "currencies": info["currencies"],
+        "calendar": {**{k: wk[k] for k in ("events", "fetched_at", "stale", "error", "source")},
+                     "note": "This week only (Sunday–Saturday, New York time); the feed has no actual figures."},
+        "headlines": {"for_symbol": for_symbol(hl["headlines"], info["keywords"]), "all": hl["headlines"][:30],
+                      "fetched_at": hl["fetched_at"], "stale": hl["stale"], "error": hl["error"]},
+        "drivers": D.hypothesis(symbol, rets, window=c.corr_window_days, min_n=c.corr_min_n, min_rho=c.driver_min_rho),
+        "correlation": D.correlation(syms, rets, window=c.corr_window_days, warn=c.corr_warn),
+    }
