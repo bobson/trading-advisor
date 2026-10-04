@@ -192,3 +192,19 @@ def test_the_offline_suite_never_fetches(cfg, monkeypatch):
         raise AssertionError("network used")
     monkeypatch.setattr(requests, "get", no_net)
     assert _ctx(cfg, [_ff(1)])["calendar_available"]                     # injected feed + candles: no request
+
+
+# --- D4 prep: the calendar archive -------------------------------------------------------------------------------
+
+def test_the_archive_saves_each_event_once_and_refreshes_it():
+    from src.context.event_archive import archive, connect, stats
+    conn = connect(":memory:")
+    week1 = M.parse([_ff(2), _ff(5, title="FOMC Statement", impact="High"), _ff(8, impact="Low", title="Retail Sales")])
+    assert archive(conn, week1, source="test", now=1000) == {"new": 3, "seen": 3}
+    revised = [dict(week1[0], forecast="0.4%")] + week1[1:]
+    assert archive(conn, revised, source="test", now=2000) == {"new": 0, "seen": 3}        # no duplicates
+    row = dict(conn.execute("SELECT * FROM events WHERE title='CPI m/m'").fetchone())
+    assert (row["forecast"], row["first_seen_at"], row["last_seen_at"]) == ("0.4%", 1000, 2000)
+    s = stats(conn)
+    assert s["events"] == 3 and s["high"] == 2 and s["from"] <= s["to"]
+    assert stats(connect(":memory:"))["events"] == 0

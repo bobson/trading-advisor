@@ -6,7 +6,7 @@ A state file for the "learning instrument" build. Source of truth for what's nex
 **ROADMAP progress:** A1 ✓ (merged, `645231c`), A2 ✓ (merged, `800e12a`; docs `1003735`), A3 ✓ (merged), A4 ✓ (merged), A5 ✓ (merged), A6 ✓ (merged), A7 ✓ (merged), B1 ✓ (merged — labelling mode
 built; the ≥30 labelled charts are the user's ongoing work), B2 tooling ✓ (merged — `eval_detectors.py`;
 its measurement + tuning run as soon as ≥30 charts are labelled — the user has decided NOT to label, so
-it stays unmeasured). B3 ✓ (merged), B4 ✓ (merged), B5 ✓ (merged), A8 ✓ (merged — forward record live since 2026-09-25 on wizard.bosfoot.com), R1 ✓ (merged), R2 ✓ (merged), R3 ✓ (merged — no condition changed the coin flip; ~80% of reads have a stop inside noise and no room after costs), R4 ✓ (merged — noise floor ~1 ATR, stable; Phase R complete), C1 slim ✓ (merged), D1 ✓ (merged), D6 ✓ (merged), D2 ✓ (merged), D5 ✓ (merged), D3 ✓ (merged). Remaining on demand: D4 (event study); small idea: a measured "no prior trend to reverse" fact on reversal patterns.
+it stays unmeasured). B3 ✓ (merged), B4 ✓ (merged), B5 ✓ (merged), A8 ✓ (merged — forward record live since 2026-09-25 on wizard.bosfoot.com), R1 ✓ (merged), R2 ✓ (merged), R3 ✓ (merged — no condition changed the coin flip; ~80% of reads have a stop inside noise and no room after costs), R4 ✓ (merged — noise floor ~1 ATR, stable; Phase R complete), C1 slim ✓ (merged), D1 ✓ (merged), D6 ✓ (merged), D2 ✓ (merged), D5 ✓ (merged), D3 ✓ (merged), calendar archive for D4 started (merged). Remaining on demand: D4 (event study — once months of events are archived); small idea: a measured "no prior trend to reverse" fact on reversal patterns.
 Order from here: user's choice. Drawing tools: deferred.
 
 ## Current state
@@ -63,6 +63,18 @@ apply if `config.yaml` omits them.
 ---
 
 ## Log (newest first)
+
+### D4 prep — archiving the economic calendar (user request "2a")
+- **Done:** 2026-10-04 · on `main` · **merged.**
+- The keyless calendar only shows THIS week, so D4 (event study) has no history unless it's kept.
+  `src/context/event_archive.py`: an `events` table keyed (time, currency, title), with
+  first/last-seen times and the latest consensus/previous. The 08:00 morning job saves the week's
+  events every day (`calendar archive: N new event(s) of M this week` in its log); a repeat run adds
+  nothing. A week the droplet is down entirely is a gap (it can't be backfilled from this feed).
+- The Macro page shows "Archive for a future event study: N events (H high-impact) saved since …".
+- Verified: a test (save once, refresh, no duplicates, stats); a live morning run into a scratch DB
+  saved 79 events (Sunday: the new week), the second run 0 new; the Macro line checked in the
+  browser. 605 tests pass. **D4 becomes worth building once a few months of events have accumulated.**
 
 ### ROADMAP D3 — News & macro context
 - **Done:** 2026-10-02 · on `main` · **merged.**

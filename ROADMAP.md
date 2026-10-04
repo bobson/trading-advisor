@@ -93,7 +93,8 @@ instructing it better. So **the guide shrinks as Layer 1 grows.**
 | D2 Pre-registration | ✅ Done (merged, 2026-10-01) |
 | D5 Behavioural circuit breaker | ✅ Done (merged, 2026-10-01) |
 | D3 News & macro context | ✅ Done (merged, 2026-10-02) — keyless Forex Factory calendar + RSS |
-| Tests | 604 green, ruff + svelte-check clean |
+| D4 prep: calendar archive | ✅ Done (merged, 2026-10-04) — D4 itself waits for history |
+| Tests | 605 green, ruff + svelte-check clean |
 
 **Remaining, in order:**
 

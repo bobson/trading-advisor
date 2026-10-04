@@ -449,5 +449,6 @@ export interface MacroPage {
              items: { proxy: string; rho: number | null; n: number; start: string | null; end: string | null }[] }
   correlation: { symbols: string[]; pairs: { a: string; b: string; rho: number | null; n: number }[]
                  warnings: { a: string; b: string; rho: number; n: number; text: string }[]; window: number; threshold: number }
+  archive?: { events: number; high: number; from: number | null; to: number | null }
 }
 export const getMacro = (symbol: string) => get<MacroPage>(`/macro?symbol=${encodeURIComponent(symbol)}`)

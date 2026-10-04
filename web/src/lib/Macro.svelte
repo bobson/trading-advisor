@@ -68,6 +68,11 @@
       <button class:on={tab === 'all'} onclick={() => (tab = 'all')}>All</button>
       <label class="small"><input type="checkbox" bind:checked={showLow} /> low impact too</label>
     </div>
+    {#if p.archive}
+      <p class="small muted">Archive for a future event study: {p.archive.events
+        ? `${p.archive.events} events (${p.archive.high} high-impact) saved since ${new Date((p.archive.from ?? 0) * 1000).toLocaleDateString()}`
+        : 'nothing saved yet — the 08:00 morning run saves each day’s calendar'}.</p>
+    {/if}
     {#if events(p).length}
       <div class="tablewrap"><table>
         <thead><tr><th>when (your time)</th><th></th><th>event</th><th>impact</th><th>consensus</th><th>previous</th></tr></thead>

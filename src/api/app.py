@@ -846,4 +846,16 @@ def macro(symbol: str = Query("BTC/USDT")) -> dict:
                       "fetched_at": hl["fetched_at"], "stale": hl["stale"], "error": hl["error"]},
         "drivers": D.hypothesis(symbol, rets, window=c.corr_window_days, min_n=c.corr_min_n, min_rho=c.driver_min_rho),
         "correlation": D.correlation(syms, rets, window=c.corr_window_days, warn=c.corr_warn),
+        "archive": _event_archive_stats(),
     }
+
+
+def _event_archive_stats() -> dict:
+    """D4 prep: how much calendar history the morning job has archived so far."""
+    from src.context.event_archive import connect as econnect
+    from src.context.event_archive import stats
+    conn = econnect(_TRADES_DB or "data/wizard.db")
+    try:
+        return stats(conn)
+    finally:
+        conn.close()

@@ -40,6 +40,16 @@ def main() -> int:
         conn = connect(args.db)
         from src.context.macro_calendar import week
         wk = week(ttl_s=cfg.context.calendar_ttl_min * 60)      # D3: cached; failure -> "can't judge"
+        if wk["events"]:                                          # D4 prep: keep the calendar's history
+            from src.context.event_archive import archive
+            from src.context.event_archive import connect as econnect
+            ec = econnect(args.db)
+            try:
+                arch = archive(ec, wk["events"], source=wk["source"])
+            finally:
+                ec.close()
+        else:
+            arch = {"new": 0, "seen": 0}
         try:
             out = run_morning(cfg, conn, trigger=args.trigger, events=wk["events"] or None)
         finally:
@@ -55,6 +65,7 @@ def main() -> int:
     print(f"Morning run {out['run_date']}: {out['status']} — {out['new_reads']} new reads, "
           f"{out['resolved']} resolved, engine {out['engine']['commit']}{' (dirty)' if out['engine']['dirty'] else ''}")
     print(f"  journal: {n_journal} call(s) resolved")
+    print(f"  calendar archive: {arch['new']} new event(s) of {arch['seen']} this week")
     for g in out["gaps"]:
         print(f"  gap recorded: {g}")
     for s in out["skipped"]:
