@@ -14,7 +14,7 @@
   import JournalForm from './lib/JournalForm.svelte'
   import MarketRecord from './lib/MarketRecord.svelte'
   import {
-    getPairs, getTimeframes, getAnalysis, getTrades, getPosition, postTrade, deleteTrade,
+    type ReadMemory, type ReadUsage, getPairs, getTimeframes, getAnalysis, getTrades, getPosition, postTrade, deleteTrade,
     getTradesBaseline, qualityText, recordText, CAUTION_STATUSES, CAUTION_TAG,
     type Pair, type Analysis, type PanelToggles, type Trade, type TradePnl, type Position,
     type TradeBaseline, type GoldLabels,
@@ -48,7 +48,6 @@
   let symbol = $state('BTC/USDT')
   let timeframe = $state('1h')
   let explain = $state(false)
-  let explanationStyle = $state<'brief' | 'teaching'>('brief')
   let auto = $state(false)
   let loading = $state(false)
   let error = $state<string | null>(null)
@@ -144,7 +143,7 @@
   // A request made while another is loading is QUEUED (the latest one wins), not dropped —
   // dropping it left the chart showing an older bar than the scrub slider (B1 finding).
   let rerun: boolean | null = null
-  async function run(useExplain = explain) {
+  async function run(useExplain = explain, fresh = false) {
     if (loading) { rerun = useExplain; return }
     loading = true
     error = null
@@ -152,7 +151,7 @@
       // Skip context/explain while scrubbing (current-state context is anachronistic on a past bar).
       const scrubbing = asOfBar != null
       // Labelling never spends API credit: no explanation while labelMode is on.
-      result = await getAnalysis(symbol, timeframe, scrubbing || labelMode ? false : useExplain, !scrubbing, asOfBar, 5000, explanationStyle)
+      result = await getAnalysis(symbol, timeframe, scrubbing || labelMode ? false : useExplain, !scrubbing, asOfBar, 5000, fresh && !scrubbing)
     } catch (e: any) {
       error = e.message
       result = null
@@ -170,6 +169,39 @@
     const id = setInterval(() => run(false), REFRESH_MS)
     return () => clearInterval(id)
   })
+
+  // Claude writes **bold** labels in a full read: escape everything, then render only those as bold.
+  const richText = (t: string) => t.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+    .replace(/^#{1,6}\s*/gm, '').replace(/\*\*(.+?)\*\*/g, '<b>$1</b>')
+    .replace(/(^|[^*\w])\*([^*\n]+?)\*(?![*\w])/g, '$1<i>$2</i>')
+  // Pass 2: where the explanation came from, in one line.
+  const REASON: Record<string, string> = {
+    none_before: 'the first read of this market and timeframe', fresh: 'you started fresh',
+    engine_changed: 'the engine changed since the last read', gap: 'the last read was too many candles ago',
+    no_thesis: 'the last read had no usable thesis',
+  }
+  const STATUS: Record<string, string> = {
+    followed_through: 'its next level was reached first', invalidated: 'its invalidation was touched first',
+    both_touched: 'both levels were touched in one candle', open: 'neither level touched yet', unscorable: '',
+    stayed_inside: 'price stayed in its range', left_above: 'price left its range above',
+    left_below: 'price left its range below', left_both_ways: 'price left its range both ways',
+  }
+  const tokens = (u: ReadUsage | null) => {
+    if (!u) return ''
+    const cached = u.cache_read_input_tokens ?? 0
+    const inp = (u.input_tokens ?? 0) + cached + (u.cache_creation_input_tokens ?? 0)
+    return ` · ${inp.toLocaleString()} tokens in${cached ? ` (${cached.toLocaleString()} cached, cheaper)` : ''}, ${(u.output_tokens ?? 0).toLocaleString()} out`
+  }
+  function memoryLine(m: ReadMemory): string {
+    if (m.kind === 'none') return ''
+    const when = new Date(m.created_at * 1000).toLocaleString([], { dateStyle: 'short', timeStyle: 'short' })
+    if (m.kind === 'stored') return `From memory — same candle as the read written ${when}; no credit used.`
+    if (m.kind === 'continuation') {
+      const st = m.status ? STATUS[m.status] : ''
+      return `Continues the previous read — ${m.candles_since} new closed candle${m.candles_since === 1 ? '' : 's'}${st ? `; ${st}` : ''}${tokens(m.usage)}.`
+    }
+    return `Full read — ${REASON[m.reason ?? ''] ?? 'a new read'}${tokens(m.usage)}.`
+  }
 
   const conf = $derived(result?.confluence)
   // "categories aligned bullish, 2 categories agreeing — 212 of 430 resolved that way (49%) over 24 bars
@@ -340,13 +372,7 @@
     <select bind:value={timeframe} onchange={() => (asOfBar = null)}>
       {#each timeframes as t}<option value={t}>{t}</option>{/each}
     </select>
-    <label class="explain"><input type="checkbox" bind:checked={explain} /> explain (uses API credit)</label>
-    {#if explain}
-      <select class="mode" bind:value={explanationStyle} title="explanation length">
-        <option value="brief">brief</option>
-        <option value="teaching">teaching</option>
-      </select>
-    {/if}
+    <label class="explain" title="The same candle is always free — the stored read comes back. A new candle costs one Claude call."><input type="checkbox" bind:checked={explain} /> explain (a new candle uses API credit)</label>
     <label class="explain"><input type="checkbox" bind:checked={auto} /> auto-refresh (30s)</label>
     <button onclick={() => run()} disabled={loading}>{loading ? 'Analyzing…' : 'Analyze'}</button>
   </div>
@@ -498,6 +524,7 @@
     {:else}
     {#if result.explanation && !engineHidden}
       <section class="panel"><h2>Explanation</h2>
+        {#if result.memory && result.memory.kind !== 'none'}<p class="memline">{memoryLine(result.memory)}</p>{/if}
         {#if result.verification}
           {@const v = result.verification}
           {#if v.fallback}
@@ -512,9 +539,19 @@
             </details>
           {/if}
         {/if}
-        <pre>{result.explanation}</pre></section>
-    {:else}
-      <p class="hint">Tick “explain” and Analyze again for Claude’s plain-language write-up.</p>
+        <pre class="etext">{@html richText(result.explanation)}</pre>
+        {#if result.memory && result.memory.kind !== 'none'}
+          <div class="memfoot">
+            <button class="mini" onclick={() => run(true, true)} disabled={loading}
+                    title="A new full teaching read of this candle, ignoring the earlier ones (uses API credit)">↺ Start fresh</button>
+            <span class="muted">uses API credit · the next new candle continues from this read</span>
+          </div>
+        {/if}
+      </section>
+    {:else if !engineHidden && asOfBar == null && !labelMode}
+      <p class="hint">{#if result.memory?.kind === 'none' && result.memory.error}Claude couldn't be reached ({result.memory.error}) — nothing was spent.
+        {:else if result.memory?.kind === 'none' && result.memory.next === 'continuation'}A new candle since your last read ({result.memory.candles_since} closed) — tick “explain” and Analyze to continue from it.
+        {:else}Tick “explain” and Analyze for Claude’s full read of this market; later candles continue from it.{/if}</p>
     {/if}
     <!-- Simplification pass 1: the info panels and paper trading, folded away. -->
     <details class="moredetails">
@@ -744,6 +781,10 @@
   button { background: #238636; border-color: #238636; cursor: pointer; font-weight: 600; }
   button:disabled { opacity: 0.6; cursor: default; }
   .explain { color: #8b949e; font-size: 13px; }
+  .etext { font-family: inherit; font-size: 15px; line-height: 1.55; }
+  .memline { color: #8b949e; font-size: 13px; margin: -4px 0 8px; }
+  .memfoot .muted { color: #8b949e; }
+  .memfoot { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-top: 8px; font-size: 12px; }
   .error { color: #f85149; }
   .hint { color: #8b949e; }
   .verdict { display: flex; gap: 18px; align-items: center; flex-wrap: wrap;

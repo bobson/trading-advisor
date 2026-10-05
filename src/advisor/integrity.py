@@ -26,6 +26,11 @@ SOFT (badge only):
   unknown_pattern    a chart-pattern name that isn't in the facts, outside a negated sentence.
   history_as_current a completed / expired pattern described as a current setup.
 Not checked: the multi-timeframe synthesis (morning report and --timeframes CLI).
+
+Continuations (simplification pass 2): the MEMORY block (earlier thesis + the computed comparison) is
+passed as `known_text`, so its numbers count as known; and sentences that talk about the EARLIER read
+("the previous read was bullish", "the double top that had confirmed…") are skipped by the
+direction / absence / state checks, which judge claims about the chart NOW. Prices are checked everywhere.
 """
 
 from __future__ import annotations
@@ -142,10 +147,21 @@ def _generic(name: str) -> str:
 
 # --- the checks ------------------------------------------------------------------------------------------
 
-def _invented_prices(text: str, facts: dict) -> list[dict]:
+_EARLIER = re.compile(r"\b(?:(?:at|in|since|from)\s+)?(?:the\s+|my\s+)?(?:previous|earlier|prior|last|first|original)\s+"
+                      r"(?:full\s+)?(?:read|thesis|call|analysis|explanation)s?\b"
+                      r"|\bhad\s+(?:been|said|called|read|expected|confirmed|formed)\b|\bI\s+(?:said|wrote|called|read|expected)\b"
+                      r"|\bwas\s+(?:bullish|bearish|forming|confirmed|failed|in play)\b", re.IGNORECASE)
+
+
+def _now_only(text: str) -> str:
+    """The sentences about the chart NOW (drops those about the earlier read)."""
+    return "\n".join(s for s in _sentences(text) if not _EARLIER.search(s))
+
+
+def _invented_prices(text: str, facts: dict, known_text: str = "") -> list[dict]:
     last = float(facts["market"]["last_close"])
     lo, hi = last * 0.5, last * 1.5
-    known = [n[0] for n in _numbers(facts_to_prompt(facts))]
+    known = [n[0] for n in _numbers(facts_to_prompt(facts) + "\n" + known_text)]
     out, seen = [], set()
     for value, unit, raw, after in _numbers(text):
         if not (lo <= value <= hi) or raw in seen or _UNIT_AFTER.match(after) or _sig_digits(raw) < 3:
@@ -238,11 +254,16 @@ def _soft_checks(text: str, facts: dict, style: str) -> list[dict]:
     return out
 
 
-def check_explanation(text: str, facts: dict, *, style: str = "brief") -> IntegrityResult:
-    """All checks on one explanation. `style` = the explanation mode (brief / teaching)."""
-    dir_hard, dir_soft = _direction(text, facts)
-    hard = _invented_prices(text, facts) + _absences(text, facts) + _state_upgrades(text, facts) + dir_hard
-    soft = dir_soft + _soft_checks(text, facts, style)
+def check_explanation(text: str, facts: dict, *, style: str = "brief", known_text: str = "",
+                      continuation: bool = False) -> IntegrityResult:
+    """All checks on one explanation. `style` = the explanation mode (brief / teaching). `known_text` =
+    extra text whose numbers count as known (a continuation's MEMORY block); `continuation` skips the
+    sentences about the earlier read in the direction / absence / state checks."""
+    now = _now_only(text) if continuation else text
+    dir_hard, dir_soft = _direction(now, facts)
+    hard = _invented_prices(text, facts, known_text) + _absences(now, facts) + _state_upgrades(now, facts) + dir_hard
+    soft = dir_soft + [v for v in _soft_checks(now, facts, style)
+                       if not (continuation and v["check"] == "missing_opposing")]   # a continuation reports change
     return IntegrityResult(hard=hard, soft=soft)
 
 

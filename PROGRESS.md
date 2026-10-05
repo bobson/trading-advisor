@@ -6,7 +6,7 @@ A state file for the "learning instrument" build. Source of truth for what's nex
 **ROADMAP progress:** A1 ✓ (merged, `645231c`), A2 ✓ (merged, `800e12a`; docs `1003735`), A3 ✓ (merged), A4 ✓ (merged), A5 ✓ (merged), A6 ✓ (merged), A7 ✓ (merged), B1 ✓ (merged — labelling mode
 built; the ≥30 labelled charts are the user's ongoing work), B2 tooling ✓ (merged — `eval_detectors.py`;
 its measurement + tuning run as soon as ≥30 charts are labelled — the user has decided NOT to label, so
-it stays unmeasured). B3 ✓ (merged), B4 ✓ (merged), B5 ✓ (merged), A8 ✓ (merged — forward record live since 2026-09-25 on wizard.bosfoot.com), R1 ✓ (merged), R2 ✓ (merged), R3 ✓ (merged — no condition changed the coin flip; ~80% of reads have a stop inside noise and no room after costs), R4 ✓ (merged — noise floor ~1 ATR, stable; Phase R complete), C1 slim ✓ (merged), D1 ✓ (merged), D6 ✓ (merged), D2 ✓ (merged), D5 ✓ (merged), D3 ✓ (merged), calendar archive for D4 started (merged), simplification pass 1 ✓ (merged — menu, morning report in plain words, shorter Analysis; pass 2 = read memory, next). Remaining on demand: D4 (event study — once months of events are archived); small idea: a measured "no prior trend to reverse" fact on reversal patterns.
+it stays unmeasured). B3 ✓ (merged), B4 ✓ (merged), B5 ✓ (merged), A8 ✓ (merged — forward record live since 2026-09-25 on wizard.bosfoot.com), R1 ✓ (merged), R2 ✓ (merged), R3 ✓ (merged — no condition changed the coin flip; ~80% of reads have a stop inside noise and no room after costs), R4 ✓ (merged — noise floor ~1 ATR, stable; Phase R complete), C1 slim ✓ (merged), D1 ✓ (merged), D6 ✓ (merged), D2 ✓ (merged), D5 ✓ (merged), D3 ✓ (merged), calendar archive for D4 started (merged), simplification pass 1 ✓ (merged — menu, morning report in plain words, shorter Analysis), pass 2 ✓ (merged — read memory: same candle free, continuations, Start fresh). Remaining on demand: D4 (event study — once months of events are archived); small idea: a measured "no prior trend to reverse" fact on reversal patterns.
 Order from here: user's choice. Drawing tools: deferred.
 
 ## Current state
@@ -63,6 +63,33 @@ apply if `config.yaml` omits them.
 ---
 
 ## Log (newest first)
+
+### Simplification pass 2 — the explanation remembers (user request)
+
+Every explained read is stored (`analysis_reads` in the app DB; `src/advisor/memory.py`,
+`src/service/read_memory.py`). The memory is data: full facts, a Layer-1 thesis (bias, tier, the
+forward record's levels via `levels_for`, zones, patterns, momentum zones, trend, cautions) and Claude's
+four-field thesis (read / why / invalidation / watch), returned with the prose in ONE forced tool call.
+- **Same candle → the stored read, free** — even with "explain" unticked. Scrubbing never reads or writes it.
+- **New candles → a continuation:** Layer 1 computes what happened since (first touch of the old next
+  level / invalidation, or did the range hold; bias, tier, trend, momentum zones, patterns, cautions,
+  zones; move in ATR) and Claude gets its first and latest thesis + that comparison + the current facts.
+  Claude explains the status, never decides it.
+- **First full read** (teaching) per market + timeframe; again after **Start fresh**, an engine change,
+  more than `advisor.memory_gap_bars` candles since (1h 24, 4h 42, 1d 21, 30m 48), or a facts-only
+  fallback. The brief/teaching select is gone (config `explanation_style` stays for the CLI/synthesis).
+- Integrity guard: memory numbers count as known; sentences about the earlier READ (previous read /
+  thesis / call…) are skipped by the direction / absence / state checks — "the last candle…", "the last
+  swing low…" are still judged; prices are checked everywhere; no "Opposing" badge on continuations.
+- The first read is sent along only while it is within the gap limit; after that the chain moves on.
+- Full reads render Claude's **bold** / *italic* labels (escaped HTML, nothing else rendered).
+- Spend guards: one call per market+timeframe at a time (lock + re-check), the explanation is no longer
+  in the 60 s cache, an API error stores nothing.
+- Live reads are on CLOSED candles only (`advise(closed_only=True)`): crypto unchanged, forex/gold no
+  longer show the forming candle on Analysis.
+- Live check (scratch DB, Sonnet): first read 8.8k tokens in / 1.1k out; same candle free; continuation
+  3 candles later 9.2k in (5.8k cached) / 291 out; a continuation carrying first + previous read
+  9.4k in (5.8k cached) / 313 out. 23 new tests; snapshot untouched.
 
 ### Simplification pass 1 — a simpler app (user request: "this app is becoming a lot of complicated")
 

@@ -135,6 +135,7 @@ def advise(
     exit_stats: Optional[dict] = None,
     as_of_bar: Optional[int] = None,
     explanation_style: Optional[str] = None,
+    closed_only: bool = False,
 ) -> AnalysisResult:
     """Run the full pipeline for one market/timeframe and return a JSON-able result.
 
@@ -156,6 +157,13 @@ def advise(
         # refresh_stale: re-pull once the cached data is older than ~one bar (live API/UI).
         stale = _timeframe_minutes(m.timeframe) if refresh_stale else None
         df = get_candles(m.symbol, m.timeframe, req, stale_after_minutes=stale)
+    if closed_only:
+        # Pass 2: the live read is of CLOSED candles only (a forming candle would change the facts under
+        # a stored read). Crypto's provider already drops it; Twelve Data includes it.
+        from datetime import datetime, timezone
+
+        from src.forward.record import closed_only as _closed
+        df = _closed(df, m.timeframe, datetime.now(timezone.utc))
 
     total_bars = len(df)
     # Feature 1 — historical scrubbing. `as_of_bar=N` recomputes the WHOLE pipeline on bars

@@ -94,8 +94,9 @@ instructing it better. So **the guide shrinks as Layer 1 grows.**
 | D5 Behavioural circuit breaker | ✅ Done (merged, 2026-10-01) |
 | D3 News & macro context | ✅ Done (merged, 2026-10-02) — keyless Forex Factory calendar + RSS |
 | D4 prep: calendar archive | ✅ Done (merged, 2026-10-04) — D4 itself waits for history |
-| Simplification pass 1 | ✅ Done (merged, 2026-10-05) — 4-item menu + More, plain-word morning report, Morning record box on Analysis; pass 2 (read memory) next |
-| Tests | 609 green, ruff + svelte-check clean |
+| Simplification pass 1 | ✅ Done (merged, 2026-10-05) — 4-item menu + More, plain-word morning report, Morning record box on Analysis |
+| Simplification pass 2 | ✅ Done (merged, 2026-10-05) — read memory: same candle free, continuations from the last read, Start fresh |
+| Tests | 632 green, ruff + svelte-check clean |
 
 **Remaining, in order:**
 

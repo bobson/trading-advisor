@@ -23,6 +23,7 @@ a real prompt-cache prefix (it's well above the cache minimum). The model stays 
 
 from __future__ import annotations
 
+import json
 from pathlib import Path
 
 from src.config import Config
@@ -270,3 +271,99 @@ def revise(facts_text: str, draft: str, violations: list[str], cfg: Config, clie
                                                {"role": "user", "content": fix}],
     )
     return "".join(b.text for b in response.content if getattr(b, "type", None) == "text").strip()
+
+
+# --- Simplification pass 2: reads with memory ---------------------------------------------------------
+# One forced tool call per read returns the prose AND the four-field thesis the next read continues
+# from. A first read is the full teaching read; a continuation gets its earlier thesis + the app's
+# computed comparison (MEMORY block, src/advisor/memory.py) before the current facts.
+
+READ_TOOL = {
+    "name": "emit_read",
+    "description": "Return the explanation shown to the user and the thesis the next read will continue from.",
+    "input_schema": {
+        "type": "object",
+        "properties": {
+            "explanation": {"type": "string", "description": "The full plain-text write-up shown to the user (follows the guide)."},
+            "read": {"type": "string", "description": "One sentence: what the chart shows now."},
+            "why": {"type": "string", "description": "The 2–3 facts that carry the read, with their numbers."},
+            "invalidation": {"type": "string", "description": "The concrete price or condition, from the facts, that would prove the read wrong."},
+            "watch": {"type": "string", "description": "What to watch next: levels, pattern states or events from the facts."},
+        },
+        "required": ["explanation", "read", "why", "invalidation", "watch"],
+    },
+}
+READ_FIELDS = ("explanation", "read", "why", "invalidation", "watch")
+
+_FIRST_NOTE = ("TASK: the FIRST full read of this market and timeframe — later reads continue from it, so make it "
+               "complete: teach what each fact means. Return it via the emit_read tool: `explanation` is the write-up "
+               "shown to the user; `read`, `why`, `invalidation` and `watch` are the short thesis the next read will be "
+               "compared against (use the facts' own numbers).")
+_CONTINUATION_NOTE = ("TASK: a CONTINUATION. The MEMORY block holds your earlier read(s) of this market and what the "
+                      "app computed has happened since. Do not repeat the teaching. In `explanation` (about 120–200 "
+                      "words): what changed since your previous read, using the computed status and changes as given "
+                      "(never re-judge them); whether your previous thesis holds, has weakened or is broken, and why; "
+                      "and what to watch now. Refer to the earlier read in the past tense with plain labels (\"the "
+                      "previous read was bullish\"). `read`, `why`, `invalidation` and `watch` describe the read NOW. "
+                      "Return it via the emit_read tool.")
+_FIRST_MAX_TOKENS, _CONTINUATION_MAX_TOKENS = 4000, 1600
+
+
+def _read_mode(cfg: Config, situation: dict | None, continuation: bool) -> dict:
+    teaching = cfg.model_copy(update={"advisor": cfg.advisor.model_copy(update={"explanation_style": "teaching"})})
+    mode = _tier_mode(teaching, situation)
+    if continuation:
+        return {"max_tokens": _CONTINUATION_MAX_TOKENS,
+                "note": mode["note"].split("\n\nOUTPUT MODE")[0] + "\n\n" + _CONTINUATION_NOTE}
+    return {"max_tokens": _FIRST_MAX_TOKENS, "note": mode["note"] + "\n\n" + _FIRST_NOTE}
+
+
+def read_messages(facts_text: str, memory: str | None = None) -> list[dict]:
+    if not memory:
+        return build_messages(facts_text)
+    return [{"role": "user", "content": f"{memory}\n\nTHE COMPUTED FACTS NOW:\n\n{facts_text}"}]
+
+
+def _usage(response) -> dict:
+    u = getattr(response, "usage", None)
+    keys = ("input_tokens", "output_tokens", "cache_read_input_tokens", "cache_creation_input_tokens")
+    return {k: int(getattr(u, k, 0) or 0) for k in keys} if u is not None else {}
+
+
+def _emit(response) -> dict:
+    if getattr(response, "stop_reason", None) == "max_tokens":
+        raise RuntimeError("the answer was cut off (too long)")
+    for block in response.content:
+        if getattr(block, "type", None) == "tool_use" and getattr(block, "name", None) == "emit_read":
+            data = dict(block.input)
+            missing = [f for f in READ_FIELDS if not isinstance(data.get(f), str) or not data[f].strip()]
+            if missing:
+                raise RuntimeError(f"the read is missing fields: {missing}")
+            return {f: data[f].strip() for f in READ_FIELDS}
+    raise RuntimeError("model did not return an emit_read tool call")
+
+
+def explain_read(facts_text: str, cfg: Config, client=None, *, situation: dict | None = None,
+                 memory: str | None = None, revise: tuple[dict, list[str]] | None = None) -> dict:
+    """A first read (memory None) or a continuation (memory = the MEMORY block). `revise=(draft, violations)`
+    asks for ONE rewrite of a draft that failed the integrity check. Returns the five fields + `usage`.
+    Raises RuntimeError without a key, on a cut-off answer, or on a malformed one."""
+    if client is None:
+        import anthropic
+
+        client = anthropic.Anthropic(api_key=cfg.require_api_key())
+    mode = _read_mode(cfg, situation, continuation=bool(memory))
+    messages = read_messages(facts_text, memory)
+    if revise:
+        draft, violations = revise
+        messages = messages + [
+            {"role": "assistant", "content": json.dumps(draft, ensure_ascii=False)},
+            {"role": "user", "content": "Your read failed the app's integrity check against the computed facts:\n"
+             + "\n".join(f"- {v}" for v in violations)
+             + "\n\nReturn the whole read again via emit_read, fixing exactly these problems. Use only numbers, "
+               "patterns and states that appear in the facts or the memory; keep the same tier, format and rules."}]
+    response = client.messages.create(
+        model=cfg.advisor.model, max_tokens=mode["max_tokens"], system=_system(mode), messages=messages,
+        tools=[READ_TOOL], tool_choice={"type": "tool", "name": "emit_read"},
+    )
+    return {**_emit(response), "usage": _usage(response)}

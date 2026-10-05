@@ -17,6 +17,7 @@ from __future__ import annotations
 
 import logging
 import os
+import threading
 import time
 from dataclasses import asdict
 
@@ -55,7 +56,7 @@ if not cfg.api_key:
         "before exposing it publicly (the explain endpoint spends Claude credits)."
     )
 
-_CACHE: dict[tuple, tuple[float, dict]] = {}
+_CACHE: dict[tuple, tuple] = {}
 _TTL_SECONDS = 60
 
 # --- #8 lockdown: auth + per-client rate limit (in-memory, no extra deps) ---
@@ -103,53 +104,74 @@ def timeframes() -> list[str]:
     return list(cfg.timeframes.selectable)
 
 
+_READ_LOCKS: dict[tuple, threading.Lock] = {}
+_READ_LOCKS_GUARD = threading.Lock()
+
+
+def _read_lock(symbol: str, timeframe: str) -> threading.Lock:
+    """One explained read at a time per market + timeframe, so two clicks on a new candle spend once."""
+    with _READ_LOCKS_GUARD:
+        return _READ_LOCKS.setdefault((symbol, timeframe), threading.Lock())
+
+
 @app.get("/analysis", dependencies=_GUARDS)
 def analysis(
     symbol: str = Query(..., description="e.g. BTC/USDT"),
     timeframe: str = Query("1h"),
-    explain: bool = Query(False, description="call Claude for the explanation (uses API credit)"),
+    explain: bool = Query(False, description="call Claude on a new candle (uses API credit); the same candle is free"),
     context: bool = Query(False, description="also fetch sentiment/positioning (extra network)"),
     limit: int = Query(500, ge=50, le=5000, description="candles returned for the chart"),
     as_of_bar: int | None = Query(
         None, ge=0,
         description="historical scrubbing: recompute as of bar N only (look-ahead-safe)"),
-    explanation_style: str = Query(
-        "brief", description="explanation mode: 'brief' (word-budgeted) or 'teaching' (fuller)"),
+    fresh: bool = Query(False, description="start fresh: a new full read instead of a continuation (uses credit)"),
 ) -> dict:
-    # `as_of_bar` and `explanation_style` MUST be in the cache key — otherwise scrubbing to a new
-    # bar, or switching modes, returns a stale payload. context/derivatives are skipped when
-    # scrubbing (they're current-state and would be anachronistic against a historical bar).
-    key = (symbol, timeframe, explain, context, limit, as_of_bar, explanation_style)
+    # The Layer-1 payload is cached for 60 s (`as_of_bar` in the key — otherwise scrubbing returns a stale
+    # payload); the explanation is NOT cached here — it comes from the read memory (pass 2) on every live
+    # request: the same candle returns the stored read for free, a new one is explained once (`explain`).
+    # context/derivatives are skipped when scrubbing (current-state, anachronistic on a past bar).
+    key = (symbol, timeframe, context, limit, as_of_bar)
     now = time.time()
     cached = _CACHE.get(key)
-    if cached and now - cached[0] < _TTL_SECONDS:
-        return cached[1]
-
     scrubbing = as_of_bar is not None
-    try:
-        ctx = gather_context(symbol, cfg) if (context and not scrubbing) else None
-        deriv = gather_derivatives(symbol, cfg) if (context and not scrubbing) else None
-        result = advise(symbol, timeframe, cfg, context=ctx, derivatives=deriv,
-                        explain_enabled=explain, refresh_stale=not scrubbing,
-                        base_rate=BASE_RATES.get(f"{symbol}|{timeframe}"),
-                        reliability=RELIABILITY.get("table"),
-                        verdict_records=_verdict_rows(), pattern_records=_encyclopedia_top_rows(),
-                        caution_stats=_caution_stats(), exit_stats=_exit_stats(),
-                        as_of_bar=as_of_bar, explanation_style=explanation_style)
-    except NotImplementedError as exc:  # e.g. forex before Phase 26
-        raise HTTPException(status_code=501, detail=str(exc))
-    except Exception as exc:  # data fetch / analysis failure
-        raise HTTPException(status_code=502, detail=f"analysis failed: {exc}")
+    if cached and now - cached[0] < _TTL_SECONDS:
+        base, result = cached[1], cached[2]
+    else:
+        try:
+            ctx = gather_context(symbol, cfg) if (context and not scrubbing) else None
+            deriv = gather_derivatives(symbol, cfg) if (context and not scrubbing) else None
+            result = advise(symbol, timeframe, cfg, context=ctx, derivatives=deriv,
+                            explain_enabled=False, refresh_stale=not scrubbing, closed_only=not scrubbing,
+                            base_rate=BASE_RATES.get(f"{symbol}|{timeframe}"),
+                            reliability=RELIABILITY.get("table"),
+                            verdict_records=_verdict_rows(), pattern_records=_encyclopedia_top_rows(),
+                            caution_stats=_caution_stats(), exit_stats=_exit_stats(),
+                            as_of_bar=as_of_bar)
+        except NotImplementedError as exc:  # e.g. forex before Phase 26
+            raise HTTPException(status_code=501, detail=str(exc))
+        except Exception as exc:  # data fetch / analysis failure
+            raise HTTPException(status_code=502, detail=f"analysis failed: {exc}")
 
-    payload = serialize_analysis(result, limit=limit)
-    payload["as_of_bar"] = as_of_bar        # echo so the scrub UI knows the current position
-    # The bar index this payload was ACTUALLY computed at (as_of_bar is clamped up to a warm-up
-    # floor, and None means the latest bar). Labels are keyed to this, never to the slider value.
-    payload["bar_index"] = len(result.df) - 1
-    # Each detected pattern carries its measured record (encyclopedia, same timeframe, all markets) —
-    # the history beside the find, rendered by the UI, never written by Claude.
-    _attach_records(payload.get("chart", {}).get("overlays", {}).get("patterns", []), timeframe)
-    _CACHE[key] = (now, payload)
+        base = serialize_analysis(result, limit=limit)
+        base["as_of_bar"] = as_of_bar        # echo so the scrub UI knows the current position
+        # The bar index this payload was ACTUALLY computed at (as_of_bar is clamped up to a warm-up
+        # floor, and None means the latest bar). Labels are keyed to this, never to the slider value.
+        base["bar_index"] = len(result.df) - 1
+        # Each detected pattern carries its measured record (encyclopedia, same timeframe, all markets) —
+        # the history beside the find, rendered by the UI, never written by Claude.
+        _attach_records(base.get("chart", {}).get("overlays", {}).get("patterns", []), timeframe)
+        _CACHE[key] = (now, base, result)
+
+    payload = {**base, "explanation": None, "verification": None, "memory": None}
+    if not scrubbing:                        # scrubbing never reads or writes the memory
+        from src.advisor.memory import connect as memory_connect
+        from src.service.read_memory import explained_read
+        with _read_lock(symbol, timeframe):
+            conn = memory_connect(_TRADES_DB)
+            try:
+                payload.update(explained_read(result, conn, cfg, spend=explain, fresh=fresh))
+            finally:
+                conn.close()
     return payload
 
 

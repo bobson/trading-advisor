@@ -95,6 +95,7 @@ export interface Analysis {
   situation?: Situation
   base_rate: BaseRate | null
   explanation: string | null
+  memory?: ReadMemory | null      // pass 2: where the explanation came from (null when scrubbing)
   chart: ChartData
   as_of_bar: number | null
   bar_index?: number          // the bar this payload was actually computed at (B1)
@@ -207,15 +208,23 @@ export const getPairs = () => get<Pair[]>('/pairs')
 export const getTimeframes = () => get<string[]>('/timeframes')
 // limit = candles returned. Default 5000 (the API cap) so the chart holds the FULL history and
 // you can pan all the way back, not just the last 500 bars.
+// Simplification pass 2: the explanation remembers. The same candle comes back free; `explain` lets a new
+// candle spend one Claude call (a continuation of the last read, or a first full read); `fresh` = Start fresh.
 export const getAnalysis = (
   symbol: string, timeframe: string, explain = false, context = true,
-  asOfBar: number | null = null, limit = 5000, explanationStyle = 'brief',
+  asOfBar: number | null = null, limit = 5000, fresh = false,
 ) =>
   get<Analysis>(
     `/analysis?symbol=${encodeURIComponent(symbol)}&timeframe=${timeframe}&explain=${explain}` +
-      `&context=${context}&limit=${limit}&explanation_style=${explanationStyle}` +
+      `&context=${context}&limit=${limit}` + (fresh ? '&fresh=true' : '') +
       (asOfBar != null ? `&as_of_bar=${asOfBar}` : ''),
   )
+export interface ReadUsage { input_tokens?: number; output_tokens?: number; cache_read_input_tokens?: number; cache_creation_input_tokens?: number }
+export type ReadMemory =
+  | { kind: 'first' | 'continuation' | 'stored'; read_kind: 'first' | 'continuation'; reason: string | null
+      read_id: number; bar_time: number; created_at: number; candles_since: number | null; status: string | null
+      from_time: string | null; usage: ReadUsage | null; model: string | null; has_thesis: boolean }
+  | { kind: 'none'; next: 'first' | 'continuation'; reason: string | null; candles_since: number | null; error?: string }
 
 // --- ROADMAP B1: detector gold set (your own labels) ---
 export interface GoldPattern { type: string; points: { time: number; price: number }[] }

@@ -272,6 +272,10 @@ class AdvisorConfig(_Strict):
     # "teaching" gives a fuller educational breakdown, exempt from the budgets but bound by every
     # other guide rule. See src/advisor/explain.py.
     explanation_style: str = "brief"
+    # Simplification pass 2 (read memory): a continuation needs a previous read no more than this many
+    # closed candles old; older (or another timeframe not listed: `memory_gap_default`) -> a fresh full read.
+    memory_gap_bars: dict[str, int] = Field(default_factory=lambda: {"30m": 48, "1h": 24, "4h": 42, "1d": 21})
+    memory_gap_default: int = 24
 
 
 class Config(_Strict):
