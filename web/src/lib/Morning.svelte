@@ -1,9 +1,11 @@
 <script lang="ts">
   // ROADMAP A8 — the morning report: the engine's live, forward record. Every morning at 08:00
-  // Skopje the reads are frozen; each is judged later against a fixed, versioned rule. Order: the
-  // review (what resolved this morning) first, then today's reads, then the synthesis — the review is
-  // shown beside the read, never fed into it. Counts always; a rate only with 20+ cases.
+  // Skopje the reads are frozen; each is judged later against a fixed, versioned rule.
+  // Simplification pass 1: the page answers "was it right, why was it wrong, what do the misses have in
+  // common" in plain words first; today's reads next; tables and rule text under Details. The results
+  // are shown beside the reads, never fed into them. Counts always; a rate only with 20+ cases.
   import { CAUTION_TAG, getMorning, runMorning, type ForwardRead, type MorningReport } from './api'
+  import { coinSentence, mark, outcomeSentence, readSentence, summarySentence, whySentence } from './forwardText'
   import JournalForm from './JournalForm.svelte'
 
   let { onOpen }: { onOpen?: (symbol: string, timeframe: string) => void } = $props()
@@ -63,6 +65,11 @@
     x.engine.n === 0 ? '—' : kind === 'directional'
       ? `${x.engine.counts.followed_through} followed · ${x.engine.counts.invalidated} invalidated · ${x.engine.counts.expired + x.engine.counts.ambiguous} other (${x.engine.n})${rate(x.engine.rate)}`
       : `${x.engine.counts.correct} correct · ${x.engine.counts.missed_move} missed (${x.engine.n})${rate(x.engine.rate)}`
+  // pass 1: judged directional reads one by one; no-setup reads summed in one line
+  const judgedDir = $derived((report?.review ?? []).filter((r) => r.read_kind === 'directional'))
+  const judgedRange = $derived((report?.review ?? []).filter((r) => r.read_kind === 'range'))
+  const whyText = (r: ForwardRead) => whySentence(r, report?.caution_labels ?? {}, report?.caution_status ?? {})
+  const totals = $derived(report?.summary?.directional.engine.counts)
   const BENIGN = ['already read today', 'no new closed candle since the last read']
   const clock = (t: number) => new Date(t * 1000).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
   const attemptText = (a: { trigger: string; status: string; new_reads: number; resolved: number; skipped: { reason: string }[] }) => {
@@ -93,46 +100,71 @@
   {#if error}<p class="error">{error}</p>{/if}
   {#if loading && !report}<p class="muted">Loading…</p>{/if}
 
-  {#if report?.run?.attempt_log?.length}
-    <p class="muted small attempts">Runs this morning:
-      {#each report.run.attempt_log as a, i}{i ? ' · ' : ' '}<span title={a.skipped.map((s) => `${s.symbol} ${s.timeframe}: ${s.reason}`).join('\n')}>{clock(a.started_at)} {attemptText(a)}</span>{/each}
-    </p>
-  {/if}
-
   {#if report && !report.run_date}
     <p class="muted">No morning has run yet. The first run is day one of the forward record.</p>
   {/if}
 
   {#if report?.run_date}
-    <!-- 1. REVIEW -->
-    <h3>1 · Review <span class="muted small">— reads whose time ran out, judged this morning</span></h3>
-    {#if report.review.length}
-      <div class="tablewrap"><table>
-        <thead><tr><th>market</th><th>read on</th><th>the read</th><th>outcome</th><th>coin flip</th></tr></thead>
-        <tbody>
-          {#each report.review as r}
-            <tr>
-              <td><b>{r.symbol}</b> <span class="muted">{r.timeframe}</span></td>
-              <td class="muted">{r.run_date}<br /><span class="small">{TIER[r.tier] ?? r.tier} · {r.horizon} bars</span></td>
-              <td>{readText(r)}
-                {#if r.caution === null}<br /><span class="small muted">cautions: not recorded (before R2)</span>
-                {:else if flagsOn(r).length}<br /><span class="small warn">⚠ {flagsOn(r).join(' · ')}</span>{/if}</td>
-              <td><span class="chip {OUT[r.outcome ?? '']?.[1]}">{OUT[r.outcome ?? '']?.[0] ?? r.outcome}</span></td>
-              <td class="muted small">{r.baseline_direction} → {OUT[r.baseline_outcome ?? '']?.[0] ?? '—'}</td>
-            </tr>
-          {/each}
-        </tbody>
-      </table></div>
-    {:else}
-      <p class="muted small">Nothing resolved this morning. 30m and 1h reads are judged the next morning, 4h after
+    <div class="summary">
+      <b>The record so far</b>
+      <p>{summarySentence(report.summary)}</p>
+    </div>
+
+    <!-- 1. WAS IT RIGHT? -->
+    <h3>Judged this morning</h3>
+    {#if judgedDir.length}
+      {#each judgedDir as r}
+        <div class="judged {mark(r) === '✓' ? 'good' : mark(r) === '✗' ? 'bad' : ''}">
+          <div class="jhead"><span class="mark">{mark(r)}</span> <b>{r.symbol}</b> {r.timeframe}
+            <span class="muted small">· read on {r.run_date}</span>
+            {#if onOpen}<button class="mini" onclick={() => onOpen?.(r.symbol, r.timeframe)}>open chart</button>{/if}</div>
+          <p>{readSentence(r)} → price {outcomeSentence(r)}.</p>
+          {#if whyText(r)}<p class="why">{mark(r) === '✗' ? 'Why it may have gone wrong: ' : ''}{whyText(r)}</p>{/if}
+          <p class="muted small">{coinSentence(r)}</p>
+        </div>
+      {/each}
+    {:else if !judgedRange.length}
+      <p class="muted small">Nothing was judged this morning. 30m and 1h reads are judged the next morning, 4h after
         about a week, 1d after about a month.</p>
+    {/if}
+    {#if judgedRange.length}
+      {@const ok = judgedRange.filter((r) => r.outcome === 'correct').length}
+      <p class="small">No-setup reads judged: <b>{judgedRange.length}</b> — {ok} stayed in their range,
+        {judgedRange.length - ok} missed a move. <span class="muted">These ranges are narrow (about 2 ATR), so price
+        usually leaves them; a missed move here is common, not a failed call.</span></p>
+      <details class="small"><summary>show them</summary>
+        <ul class="rlist">{#each judgedRange as r}<li>{mark(r)} <b>{r.symbol}</b> {r.timeframe} — {readSentence(r)} → {outcomeSentence(r)}.</li>{/each}</ul>
+      </details>
     {/if}
     {#if Object.keys(report.pending).length}
       <p class="muted small">Waiting to be judged: {Object.entries(report.pending).map(([tf, n]) => `${n} × ${tf}`).join(', ')}</p>
     {/if}
 
+    <!-- 2. WHAT DO THE MISSES HAVE IN COMMON? -->
+    <h3>What the misses have in common</h3>
+    {#if report.misses_in_common?.length}
+      <p class="small muted">All judged directional reads so far: {totals?.invalidated ?? 0} invalidated (misses),
+        {totals?.followed_through ?? 0} followed through (hits). A condition matters only if it shows up much more often on
+        misses than on hits.</p>
+      <ul class="common">
+        {#each report.misses_in_common.filter((m) => m.misses_flagged || m.hits_flagged) as m}
+          <li><b>{m.label}</b>: on {m.misses_flagged} of {m.misses} misses, and on {m.hits_flagged} of {m.hits} hits.
+            {#if report.caution_status?.[m.code]}<span class="muted small">History: {CAUTION_TAG[report.caution_status[m.code]] ?? report.caution_status[m.code]}.</span>{/if}</li>
+        {/each}
+      </ul>
+      {@const never = report.misses_in_common.filter((m) => !m.misses_flagged && !m.hits_flagged)}
+      {#if never.length}<p class="muted small">Not flagged on any of them: {never.map((m) => m.label.toLowerCase()).join(', ')}.</p>{/if}
+      {#if report.misses_in_common.some((m) => !m.enough)}
+        <p class="muted small">Too few to conclude — this needs 20+ misses and 20+ hits. Until then it's a list of what to
+          watch, not a finding. A difference that holds up becomes a test to set in advance (Experiments), not a rule
+          changed on the spot.</p>
+      {/if}
+    {:else}
+      <p class="muted small">No judged directional read with recorded cautions yet.</p>
+    {/if}
+
     <!-- 2. TODAY'S READS -->
-    <h3>2 · Reads frozen on {report.run_date}</h3>
+    <h3>Today's reads <span class="muted small">— frozen on {report.run_date}, judged later</span></h3>
     {#if isLatest}
       <p class="small"><label><input type="checkbox" bind:checked={hideReads} /> hide the engine's reads until I've
         logged my own call for that market</label> <span class="muted">— your calls go to the Journal, a separate record
@@ -183,16 +215,24 @@
     <p class="muted small">Closed candles only. Forex, gold and oil get no new read when their market was closed.
       Engine {report.grid[0]?.engine_commit ?? report.run?.engine_commit ?? '—'}{report.grid[0]?.engine_dirty ? ' (uncommitted changes)' : ''}.</p>
 
-    <!-- 3. SYNTHESIS -->
-    <h3>3 · Cross-timeframe synthesis</h3>
+  {/if}
+
+  {#if report}
+  <details class="details">
+    <summary>Details — runs, synthesis, scoreboard, caution tables, the rule</summary>
+    {#if report.run?.attempt_log?.length}
+      <p class="muted small attempts">Runs this morning:
+        {#each report.run.attempt_log as a, i}{i ? ' · ' : ' '}<span title={a.skipped.map((s) => `${s.symbol} ${s.timeframe}: ${s.reason}`).join('\n')}>{clock(a.started_at)} {attemptText(a)}</span>{/each}
+      </p>
+    {/if}
+    {#if report.run_date}
+    <h3>Cross-timeframe synthesis</h3>
     {#if report.syntheses.length}
       {#each report.syntheses as s}<div class="synth"><b>{s.symbol}</b>{#if hidden(s.symbol)}<p class="muted small">hidden until you log your call or reveal</p>{:else}<p>{s.text}</p>{/if}</div>{/each}
     {:else}
       <p class="muted small">None for this morning (off by default: <code>morning_report.synthesis</code> in config.yaml).</p>
     {/if}
-  {/if}
-
-  {#if report}
+    {/if}
     <!-- SCOREBOARD -->
     <h3>Scoreboard <span class="muted small">— every judged read so far, beside a coin flip scored by the same rule</span></h3>
     {#if report.scoreboard.length}
@@ -238,7 +278,8 @@
       <p class="muted small">No judged read with recorded cautions yet{report.caution_split?.not_recorded ? ` (${report.caution_split.not_recorded} judged before cautions were recorded)` : ''}.</p>
     {/if}
     {#if report.gaps.length}<p class="muted small">Missed mornings (gaps, never backfilled): {report.gaps.join(', ')}</p>{/if}
-    <details><summary class="small">How reads are judged — rule v{report.rule.version}</summary><pre>{report.rule.text}</pre></details>
+    <h3>How reads are judged — rule v{report.rule.version}</h3><pre>{report.rule.text}</pre>
+  </details>
   {/if}
 </section>
 
@@ -272,6 +313,22 @@
   .chip.good { color: #3fb950; border-color: #238636; }
   .chip.bad { color: #f85149; border-color: #da3633; }
   .chip.muted { color: #8b949e; }
+  .summary { border: 1px solid #30363d; border-radius: 8px; padding: 10px 12px; margin: 8px 0; }
+  .summary p { margin: 4px 0 0; }
+  .judged { border: 1px solid #30363d; border-left-width: 3px; border-radius: 8px; padding: 8px 12px; margin-bottom: 8px; }
+  .judged.good { border-left-color: #238636; }
+  .judged.bad { border-left-color: #da3633; }
+  .judged p { margin: 4px 0 0; }
+  .judged .mark { font-weight: 700; }
+  .judged.good .mark { color: #3fb950; }
+  .judged.bad .mark { color: #f85149; }
+  .judged .why { color: #d29922; }
+  .jhead .mini { margin-left: 8px; }
+  .common { margin: 6px 0; padding-left: 20px; }
+  .common li { margin-bottom: 4px; }
+  .rlist { margin: 6px 0; padding-left: 20px; }
+  .details { margin-top: 24px; border-top: 1px solid #21262d; padding-top: 10px; }
+  .details > summary { cursor: pointer; color: #8b949e; }
   .synth { border: 1px solid #30363d; border-radius: 8px; padding: 8px 12px; margin-bottom: 8px; }
   .synth p { margin: 4px 0 0; white-space: pre-wrap; }
   details { margin-top: 12px; }

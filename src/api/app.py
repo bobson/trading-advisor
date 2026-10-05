@@ -547,6 +547,36 @@ def morning(date: str | None = None) -> dict:
         conn.close()
 
 
+@app.get("/morning/market", dependencies=_GUARDS)
+def morning_market(symbol: str, timeframe: str) -> dict:
+    """Simplification pass 1 — the morning record for ONE market + timeframe (the box on Analysis):
+    its latest frozen read, its last judged read, its record vs the coin flip, and `now` = the engine's
+    read of the last CLOSED candle, so "changed since the morning" never flickers on a forming candle.
+    Read-only: never starts a run, never calls Claude."""
+    from datetime import datetime, timezone
+
+    from src.data.registry import get_candles
+    from src.forward.record import closed_only, connect as forward_connect, freeze_read
+    from src.forward.report import market_box
+    from src.journal.store import tf_seconds
+    conn = forward_connect(_morning_db())
+    try:
+        box = market_box(conn, symbol, timeframe)
+    finally:
+        conn.close()
+    box["now"] = None
+    if box["latest"] and timeframe in cfg.morning_report.horizons:
+        try:
+            df = closed_only(get_candles(symbol, timeframe, cfg, stale_after_minutes=max(1, tf_seconds(timeframe) // 60)),
+                             timeframe, datetime.now(timezone.utc))
+            row, _ = freeze_read(df, symbol, timeframe, cfg)
+            box["now"] = {k: row[k] for k in ("bar_time", "tier", "bias", "read_kind", "direction", "price")}
+            box["now"]["new_candles"] = int((df.index.map(lambda t: int(t.timestamp())) > box["latest"]["bar_time"]).sum())
+        except Exception:
+            pass
+    return box
+
+
 @app.post("/morning/run", dependencies=_GUARDS)
 def morning_run() -> dict:
     """Manual trigger: starts scripts/morning_report.py in the background (returns at once). The

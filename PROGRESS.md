@@ -6,7 +6,7 @@ A state file for the "learning instrument" build. Source of truth for what's nex
 **ROADMAP progress:** A1 ✓ (merged, `645231c`), A2 ✓ (merged, `800e12a`; docs `1003735`), A3 ✓ (merged), A4 ✓ (merged), A5 ✓ (merged), A6 ✓ (merged), A7 ✓ (merged), B1 ✓ (merged — labelling mode
 built; the ≥30 labelled charts are the user's ongoing work), B2 tooling ✓ (merged — `eval_detectors.py`;
 its measurement + tuning run as soon as ≥30 charts are labelled — the user has decided NOT to label, so
-it stays unmeasured). B3 ✓ (merged), B4 ✓ (merged), B5 ✓ (merged), A8 ✓ (merged — forward record live since 2026-09-25 on wizard.bosfoot.com), R1 ✓ (merged), R2 ✓ (merged), R3 ✓ (merged — no condition changed the coin flip; ~80% of reads have a stop inside noise and no room after costs), R4 ✓ (merged — noise floor ~1 ATR, stable; Phase R complete), C1 slim ✓ (merged), D1 ✓ (merged), D6 ✓ (merged), D2 ✓ (merged), D5 ✓ (merged), D3 ✓ (merged), calendar archive for D4 started (merged). Remaining on demand: D4 (event study — once months of events are archived); small idea: a measured "no prior trend to reverse" fact on reversal patterns.
+it stays unmeasured). B3 ✓ (merged), B4 ✓ (merged), B5 ✓ (merged), A8 ✓ (merged — forward record live since 2026-09-25 on wizard.bosfoot.com), R1 ✓ (merged), R2 ✓ (merged), R3 ✓ (merged — no condition changed the coin flip; ~80% of reads have a stop inside noise and no room after costs), R4 ✓ (merged — noise floor ~1 ATR, stable; Phase R complete), C1 slim ✓ (merged), D1 ✓ (merged), D6 ✓ (merged), D2 ✓ (merged), D5 ✓ (merged), D3 ✓ (merged), calendar archive for D4 started (merged), simplification pass 1 ✓ (merged — menu, morning report in plain words, shorter Analysis; pass 2 = read memory, next). Remaining on demand: D4 (event study — once months of events are archived); small idea: a measured "no prior trend to reverse" fact on reversal patterns.
 Order from here: user's choice. Drawing tools: deferred.
 
 ## Current state
@@ -63,6 +63,30 @@ apply if `config.yaml` omits them.
 ---
 
 ## Log (newest first)
+
+### Simplification pass 1 — a simpler app (user request: "this app is becoming a lot of complicated")
+
+The user uses Analysis, Journal, Training and the Morning report ("to see if the analysis was right or
+wrong, why it was wrong and how to improve"). Nothing was removed — the rest was folded away.
+- **Menu:** Analysis · Journal · Training · Morning report, the rest under **More ▾** (shows the open
+  page's name; every `#/` link still works).
+- **Morning report** answers in plain words first: the record in one line (directional reads that
+  followed through vs a coin flip on the same reads, "too early to tell" under 20); each judged read as a
+  ✓/✗ card ("Up read at X: aiming for Y, wrong below Z → price reached Y first"), with **why it may have
+  gone wrong** from the cautions frozen at the read (only conditions history backs or that are
+  arithmetic count as reasons; "nothing was flagged — simply wrong" otherwise; "not recorded" for
+  pre-R2 reads; flagged cautions on ✓ reads shown too, so a caution never reads as "= miss"); no-setup
+  reads summed in one line (ranges are narrow, missed moves common); **what the misses have in common**
+  (`misses_in_common`: per caution condition, X of the misses vs Y of the hits — misses = invalidated
+  only; cautions only, no after-the-fact slicing; "too few to conclude" under 20 each side). Runs,
+  synthesis, scoreboard, caution tables and the rule text sit under Details.
+- **Analysis:** a ☀️ Morning record box on top for the market on screen (`GET /morning/market` —
+  this morning's frozen read, whether the engine's read of the last CLOSED candle has changed since,
+  the last judged read with ✓/✗ and why, the record here vs a coin flip; read-only, no Claude call;
+  hidden with the engine's read, on past bars and in labelling). Order: box, my call, verdict, record,
+  cautions, chart, explanation; the four info panels and paper trading under **More details**.
+- Backend: `report.py` `summary`, `misses_in_common`, `market_box`; 4 new tests. Snapshot untouched.
+- Browser-checked at 1400px and 400px on a scratch DB with judged reads (no horizontal scroll).
 
 ### D4 prep — archiving the economic calendar (user request "2a")
 - **Done:** 2026-10-04 · on `main` · **merged.**

@@ -342,7 +342,28 @@ export interface MorningReport {
   caution_split?: { rows: CautionSplitRow[]; not_recorded: number }
   caution_labels?: Record<string, string>
   caution_status?: Record<string, string>     // R3: what held-back history said per condition
+  summary?: MorningSummary
+  misses_in_common?: MissInCommon[]
 }
+// Simplification pass 1: the whole record in one line, and what the misses had in common
+export interface MorningSummary {
+  rule_version: number
+  directional: { engine: ScoreSide; baseline: ScoreSide | null }
+  range: ScoreSide
+}
+export interface MissInCommon {
+  code: string; label: string; misses_flagged: number; misses: number; hits_flagged: number; hits: number; enough: boolean
+}
+// The same record for ONE market + timeframe (the box on Analysis). `now` = the engine's read of the
+// last CLOSED candle (null if it couldn't be computed), so "changed since the morning" can't flicker.
+export interface MarketBox {
+  symbol: string; timeframe: string; latest: ForwardRead | null; last_judged: ForwardRead | null
+  summary: MorningSummary; pending: number
+  caution_labels: Record<string, string>; caution_status: Record<string, string>
+  now: { bar_time: number; tier: string; bias: string; read_kind: string; direction: string | null; price: number; new_candles: number } | null
+}
+export const getMorningMarket = (symbol: string, timeframe: string) =>
+  get<MarketBox>(`/morning/market?symbol=${encodeURIComponent(symbol)}&timeframe=${encodeURIComponent(timeframe)}`)
 export const getMorning = (date?: string) => get<MorningReport>(`/morning${date ? `?date=${date}` : ''}`)
 export const runMorning = () => send<{ started: boolean }>('POST', '/morning/run')
 

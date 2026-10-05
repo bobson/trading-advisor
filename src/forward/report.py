@@ -8,6 +8,13 @@ only with 20+ cases (the app-wide rule); below that, counts.
 ROADMAP R2: each read also carries the caution conditions frozen at the read, and the CAUTION SPLIT
 compares, per condition, the reads it flagged with the reads it didn't. That's the forward test of
 Phase R: on data nobody could fit to, did flagged reads really go worse?
+
+Simplification pass 1: the page leads with a plain SUMMARY (directional reads that followed through
+vs the coin flip on the same reads; range reads), and MISSES IN COMMON — the caution split re-read
+as "of the reads that went wrong, how many had this condition flagged — and of the ones that went
+right?". Misses are `invalidated` reads only (expired / ambiguous are neither). Only the caution
+conditions are compared — slicing by timeframe or pattern after the fact would be fishing.
+`market_box` is the same record narrowed to one market + timeframe, for the Analysis page.
 """
 
 from __future__ import annotations
@@ -17,7 +24,8 @@ from collections import defaultdict
 from datetime import datetime, timezone
 
 from src.config import Config
-from src.forward.rule import DIRECTIONAL_OUTCOMES, FOLLOWED, RANGE_OUTCOMES, RULE_TEXT, RULE_VERSION, CORRECT
+from src.forward.rule import (CORRECT, DIRECTIONAL_OUTCOMES, FOLLOWED, INVALIDATED, RANGE_OUTCOMES, RULE_TEXT,
+                              RULE_VERSION)
 from src.forward.schedule import next_run
 
 MIN_N = 20
@@ -101,6 +109,49 @@ def caution_split(resolved: list[dict]) -> dict:
     return {"rows": rows, "not_recorded": len(resolved) - len(recorded)}
 
 
+def summary(resolved: list[dict], version: int = RULE_VERSION) -> dict:
+    """The whole record under one rule version, scored exactly like the scoreboard (N includes
+    expired / ambiguous), directional beside the coin flip on the same reads."""
+    rows = [r for r in resolved if r["rule_version"] == version]
+    return {"rule_version": version,
+            "directional": _side([r for r in rows if r["read_kind"] == "directional"], "directional"),
+            "range": _side([r for r in rows if r["read_kind"] == "range"], "range")["engine"]}
+
+
+def misses_in_common(split_rows: list[dict], version: int = RULE_VERSION) -> list[dict]:
+    """Per caution condition (directional reads, one rule version): how many of the MISSES
+    (invalidated) had it flagged, beside how many of the HITS (followed through) had it. Each side's
+    denominator is the reads where the condition could be judged. `enough` = 20+ on both sides."""
+    out = []
+    for c in split_rows:
+        if c["rule_version"] != version or c["read_kind"] != "directional":
+            continue
+        f, nf = c["flagged"]["engine"]["counts"], c["not_flagged"]["engine"]["counts"]
+        misses, hits = f[INVALIDATED] + nf[INVALIDATED], f[FOLLOWED] + nf[FOLLOWED]
+        if not misses and not hits:
+            continue
+        out.append({"code": c["code"], "label": c["label"], "misses_flagged": f[INVALIDATED], "misses": misses,
+                    "hits_flagged": f[FOLLOWED], "hits": hits, "enough": misses >= MIN_N and hits >= MIN_N})
+    return sorted(out, key=lambda x: (-x["misses_flagged"], x["label"]))
+
+
+def market_box(conn, symbol: str, timeframe: str) -> dict:
+    """One market + timeframe: its latest frozen read, its last judged read, and its record."""
+    one = lambda sql: (lambda r: _read(r) if r else None)(conn.execute(sql, (symbol, timeframe)).fetchone())  # noqa: E731
+    resolved = [_read(r) for r in conn.execute(
+        "SELECT * FROM forward_reads WHERE symbol=? AND timeframe=? AND outcome IS NOT NULL", (symbol, timeframe))]
+    pending = conn.execute("SELECT COUNT(*) FROM forward_reads WHERE symbol=? AND timeframe=? AND outcome IS NULL",
+                           (symbol, timeframe)).fetchone()[0]
+    return {
+        "symbol": symbol, "timeframe": timeframe,
+        "latest": one("SELECT * FROM forward_reads WHERE symbol=? AND timeframe=? ORDER BY run_date DESC, id DESC LIMIT 1"),
+        "last_judged": one("SELECT * FROM forward_reads WHERE symbol=? AND timeframe=? AND outcome IS NOT NULL "
+                           "ORDER BY resolved_run_date DESC, run_date DESC, id DESC LIMIT 1"),
+        "summary": summary(resolved), "pending": pending,
+        "caution_labels": _labels(), "caution_status": _statuses(conn),
+    }
+
+
 def build_report(conn, cfg: Config, run_date: str | None = None, now: datetime | None = None) -> dict:
     mr = cfg.morning_report
     now = now or datetime.now(timezone.utc)
@@ -124,12 +175,14 @@ def build_report(conn, cfg: Config, run_date: str | None = None, now: datetime |
     synth = [dict(r) for r in conn.execute("SELECT symbol, text, model FROM forward_syntheses WHERE run_date=? "
                                            "ORDER BY symbol", (day,))] if day else []
     first = conn.execute("SELECT MIN(run_date) FROM forward_runs WHERE status != 'gap'").fetchone()[0]
+    split = caution_split(resolved)
     return {
         "run_date": day, "run": run, "runs": runs,
         "gaps": [r["run_date"] for r in runs if r["status"] == "gap"],
         "first_run": first,
         "review": review, "grid": grid, "syntheses": synth,
-        "pending": pending, "scoreboard": scoreboard(resolved), "caution_split": caution_split(resolved),
+        "pending": pending, "scoreboard": scoreboard(resolved), "caution_split": split,
+        "summary": summary(resolved), "misses_in_common": misses_in_common(split["rows"]),
         "watchlist": {"symbols": mr.symbols, "timeframes": mr.timeframes, "horizons": mr.horizons},
         "next_run": next_run(now, mr.timezone, mr.run_at).isoformat(),
         "schedule": f"{mr.run_at} {mr.timezone}",

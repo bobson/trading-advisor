@@ -20,7 +20,7 @@ from src.forward.record import (
     freeze_read,
     run_morning,
 )
-from src.forward.report import build_report, caution_split, scoreboard
+from src.forward.report import build_report, caution_split, market_box, misses_in_common, scoreboard, summary
 from src.forward.schedule import next_run, run_date
 
 FIXTURE = Path(__file__).parent / "fixtures" / "btc_1h_sample.csv"
@@ -457,3 +457,71 @@ def test_the_calendar_freezes_news_soon_on_new_reads_and_none_leaves_it_unjudged
     # the facts hash doesn't depend on the calendar
     h = lambda c: {r["symbol"]: r["facts_hash"] for r in c.execute("SELECT * FROM forward_reads")}  # noqa: E731
     assert h(conn) == h(quiet) == h(none)
+
+
+# --- simplification pass 1: summary, misses in common, the per-market box -------------------------------
+
+def test_summary_scores_like_the_scoreboard_on_the_current_rule_only():
+    rows = ([_judged("directional", R.FOLLOWED, R.INVALIDATED, {})] * 3
+            + [_judged("directional", R.INVALIDATED, R.FOLLOWED, {})] * 2
+            + [_judged("directional", R.EXPIRED, R.EXPIRED, {})]
+            + [_judged("range", R.MISSED, None, {})] * 4
+            + [{**_judged("directional", R.FOLLOWED, R.FOLLOWED, {}), "rule_version": 0}])  # another rule: left out
+    s = summary(rows)
+    d = s["directional"]
+    assert d["engine"]["n"] == 6 and d["engine"]["counts"][R.FOLLOWED] == 3     # N includes expired, like the scoreboard
+    assert d["baseline"]["counts"][R.FOLLOWED] == 2 and d["engine"]["rate"] is None   # < 20: counts only
+    assert s["range"]["n"] == 4 and s["range"]["counts"][R.MISSED] == 4
+    many = summary([_judged("directional", R.FOLLOWED, R.FOLLOWED, {})] * 20)
+    assert many["directional"]["engine"]["rate"] == 1.0
+
+
+def test_misses_in_common_pairs_the_misses_with_the_hits_and_ignores_unjudged():
+    rows = ([_judged("directional", R.INVALIDATED, R.FOLLOWED, {"stop_in_noise": True})] * 3
+            + [_judged("directional", R.INVALIDATED, R.FOLLOWED, {"stop_in_noise": False})]
+            + [_judged("directional", R.FOLLOWED, R.FOLLOWED, {"stop_in_noise": True})]
+            + [_judged("directional", R.FOLLOWED, R.FOLLOWED, {"stop_in_noise": False})] * 3
+            + [_judged("directional", R.EXPIRED, R.EXPIRED, {"stop_in_noise": True})]      # neither hit nor miss
+            + [_judged("directional", R.INVALIDATED, R.FOLLOWED, {"stop_in_noise": None})]  # can't judge
+            + [_judged("range", R.MISSED, None, {"stretched": True})]                       # range: not a miss here
+            + [_judged("directional", R.INVALIDATED, R.FOLLOWED, None)])                    # pre-R2: not recorded
+    out = misses_in_common(caution_split(rows)["rows"])
+    assert [m["code"] for m in out] == ["stop_in_noise"]
+    m = out[0]
+    assert (m["misses_flagged"], m["misses"], m["hits_flagged"], m["hits"]) == (3, 4, 1, 4)
+    assert m["enough"] is False
+
+
+def test_market_box_narrows_the_record_to_one_market(cfg, candles):
+    conn, feed = connect(":memory:"), Feed(candles, 300)
+    _run(cfg, conn, feed)
+    feed.k.update({"BTC/USDT": 324, "EUR/USD": 324})
+    _run(cfg, conn, feed)
+    box = market_box(conn, "BTC/USDT", "1h")
+    assert box["latest"]["bar_time"] == int(candles.index[323].timestamp())
+    assert box["last_judged"]["bar_time"] == int(candles.index[299].timestamp()) and box["last_judged"]["outcome"]
+    assert box["pending"] == 1
+    n = box["summary"]["directional"]["engine"]["n"] + box["summary"]["range"]["n"]
+    assert n <= 1
+    empty = market_box(conn, "SOL/USDT", "1h")
+    assert empty["latest"] is None and empty["last_judged"] is None
+
+
+def test_api_market_box_is_read_only_and_reads_the_closed_candle_now(cfg, candles, monkeypatch, tmp_path):
+    from fastapi.testclient import TestClient
+
+    import src.api.app as api
+    db = str(tmp_path / "m.db")
+    conn = connect(db)
+    _run(cfg, conn, Feed(candles, 300))
+    conn.close()
+    monkeypatch.setattr(api, "_MORNING_DB", db)
+    monkeypatch.setattr("src.data.registry.get_candles", lambda *a, **k: candles.iloc[:305])
+    api._HITS.clear()
+    started = []
+    monkeypatch.setattr("subprocess.Popen", lambda args, **kw: started.append(args))
+    body = TestClient(api.app).get("/morning/market", params={"symbol": "BTC/USDT", "timeframe": "1h"}).json()
+    assert body["latest"]["symbol"] == "BTC/USDT" and body["last_judged"] is None
+    assert body["now"]["new_candles"] == 5 and body["now"]["tier"]
+    assert started == []
+    assert "summary" in TestClient(api.app).get("/morning").json()

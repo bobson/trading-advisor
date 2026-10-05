@@ -12,6 +12,7 @@
   import Discipline from './lib/Discipline.svelte'
   import Macro from './lib/Macro.svelte'
   import JournalForm from './lib/JournalForm.svelte'
+  import MarketRecord from './lib/MarketRecord.svelte'
   import {
     getPairs, getTimeframes, getAnalysis, getTrades, getPosition, postTrade, deleteTrade,
     getTradesBaseline, qualityText, recordText, CAUTION_STATUSES, CAUTION_TAG,
@@ -30,6 +31,18 @@
     : location.hash.startsWith('#/morning') ? 'morning'
     : location.hash.startsWith('#/encyclopedia') ? 'encyclopedia'
     : location.hash.startsWith('#/scanner') ? 'scanner' : 'analysis')
+  type View = typeof view
+  const MORE: [View, string, string][] = [
+    ['risk', 'Risk calculator', ''], ['macro', 'Macro', '#/macro'], ['discipline', 'Discipline', '#/discipline'],
+    ['scanner', 'Scanner', '#/scanner'], ['encyclopedia', 'Encyclopedia', '#/encyclopedia'],
+    ['experiments', 'Experiments', '#/experiments'],
+  ]
+  let moreOpen = $state(false)
+  const moreView = $derived(MORE.find(([v]) => v === view))
+  function go(v: View, hash: string) {
+    view = v; moreOpen = false
+    if (hash) location.hash = hash
+  }
   let pairs = $state<Pair[]>([])
   let timeframes = $state<string[]>([])
   let symbol = $state('BTC/USDT')
@@ -303,17 +316,20 @@
     </div>
   </details>
 
+  <!-- Simplification pass 1: the four pages used most, the rest under More. Every #/ link still works. -->
   <nav class="views">
-    <button class:active={view === 'analysis'} onclick={() => (view = 'analysis')}>Analysis</button>
-    <button class:active={view === 'risk'} onclick={() => (view = 'risk')}>Risk calculator</button>
-    <button class:active={view === 'morning'} onclick={() => { view = 'morning'; location.hash = '#/morning' }}>Morning report</button>
-    <button class:active={view === 'journal'} onclick={() => { view = 'journal'; location.hash = '#/journal' }}>Journal</button>
-    <button class:active={view === 'training'} onclick={() => { view = 'training'; location.hash = '#/training' }}>Training</button>
-    <button class:active={view === 'macro'} onclick={() => { view = 'macro'; location.hash = '#/macro' }}>Macro</button>
-    <button class:active={view === 'discipline'} onclick={() => { view = 'discipline'; location.hash = '#/discipline' }}>Discipline</button>
-    <button class:active={view === 'experiments'} onclick={() => { view = 'experiments'; location.hash = '#/experiments' }}>Experiments</button>
-    <button class:active={view === 'scanner'} onclick={() => { view = 'scanner'; location.hash = '#/scanner' }}>Scanner</button>
-    <button class:active={view === 'encyclopedia'} onclick={() => { view = 'encyclopedia'; location.hash = '#/encyclopedia' }}>Encyclopedia</button>
+    <button class:active={view === 'analysis'} onclick={() => go('analysis', '')}>Analysis</button>
+    <button class:active={view === 'journal'} onclick={() => go('journal', '#/journal')}>Journal</button>
+    <button class:active={view === 'training'} onclick={() => go('training', '#/training')}>Training</button>
+    <button class:active={view === 'morning'} onclick={() => go('morning', '#/morning')}>Morning report</button>
+    <details class="morenav" bind:open={moreOpen}>
+      <summary class:active={!!moreView}>{moreView ? moreView[1] : 'More'} ▾</summary>
+      <div class="menu">
+        {#each MORE as [v, label, hash]}
+          <button class:active={view === v} onclick={() => go(v, hash)}>{label}</button>
+        {/each}
+      </div>
+    </details>
   </nav>
 
   {#if view === 'analysis'}
@@ -338,6 +354,9 @@
   {#if error}<p class="error">{error}</p>{/if}
 
   {#if result}
+    {#if !labelMode && asOfBar == null && !engineHidden}
+      <MarketRecord symbol={result.market.symbol} timeframe={result.market.timeframe} refreshKey={chartKey} onOpenMorning={() => go('morning', '#/morning')} />
+    {/if}
     {#if !labelMode}
     <!-- D1: my call first. The form is live-chart only (practice on past bars is D6's blind mode). -->
     <section class="journal panel">
@@ -422,6 +441,159 @@
 
     {/if}
 
+    {/if}
+
+    <!-- Research controls: scrub back through history + choose which overlays/panes to draw. -->
+    <div class="research">
+      <div class="scrub">
+        <button class="mini" onclick={() => stepScrub(-1)} title="step back (←)">‹</button>
+        <input type="range" min="0" max={scrubMax} value={scrubValue}
+               oninput={(e) => scrubTo(+e.currentTarget.value)} onkeydown={onScrubKey}
+               aria-label="scrub through history" />
+        <button class="mini" onclick={() => stepScrub(1)} title="step forward (→)">›</button>
+        <span class="scrub-label">
+          {#if asOfBar == null}bar {scrubMax} · <b>live</b>{:else}bar {asOfBar} / {scrubMax}{/if}
+        </span>
+        {#if asOfBar != null}<button class="mini live" onclick={goLive}>⤒ live</button>{/if}
+        <button class="mini label-btn" class:on={labelMode} onclick={toggleLabelMode}
+                title="mark what your eye sees at this bar (detector overlays hidden)">
+          {labelMode ? '✓ Labelling — exit' : '🏷 Label this bar'}</button>
+      </div>
+      <details class="toggles">
+        <summary>overlays &amp; panes</summary>
+        <div class="toggle-grid">
+          <div><span class="grp">overlays</span>
+            {#each OVERLAY_KEYS as k}
+              <label><input type="checkbox" bind:checked={toggles[k]} /> {TOGGLE_LABELS[k] ?? k}</label>
+            {/each}
+          </div>
+          <div><span class="grp">panes</span>
+            {#each PANE_KEYS as k}
+              <label><input type="checkbox" bind:checked={toggles[k]} /> {k}</label>
+            {/each}
+          </div>
+        </div>
+      </details>
+    </div>
+
+    {#if !labelMode && result.chart.overlays.patterns.length}
+      <div class="patterns">
+        {#each result.chart.overlays.patterns as p}
+          <span class="pchip {p.state} {p.lifecycle}" title={`History of ${p.type} on ${timeframe}: ${recordText(p.record)}`}>{p.type} · {LIFE_CHIP[p.lifecycle ?? p.state] ?? p.state}</span>
+        {/each}
+      </div>
+      <!-- The measured history beside every CURRENT pattern (history-stage ones don't need it). -->
+      {#each result.chart.overlays.patterns.filter((p) => ['forming', 'fresh', 'in_play'].includes(p.lifecycle ?? '')) as p}
+        <p class="phist">{p.type} ({timeframe}) — history after a breakout: {recordText(p.record)}
+          <br /><span class="pqual">This one's {qualityText(p.quality_band)}{p.quality_band ? `; ${p.quality_band.meaning}` : ''}</span></p>
+      {/each}
+    {/if}
+
+    <PriceChart data={result.chart} toggles={chartToggles} {trades} {labelMode} {draft} {pending}
+                onChartClick={(t, p) => labelPanel?.handleClick(t, p)} />
+
+    {#if labelMode}
+      <LabelPanel bind:this={labelPanel} {symbol} {timeframe} bar={labelBar} barTime={labelBarTime}
+                  candles={result.chart.candles} bind:draft bind:pending onJump={jumpToLabel} />
+    {:else}
+    {#if result.explanation && !engineHidden}
+      <section class="panel"><h2>Explanation</h2>
+        {#if result.verification}
+          {@const v = result.verification}
+          {#if v.fallback}
+            <p class="vcheck bad">⚠ {v.notice}</p>
+          {:else}
+            <p class="vcheck ok">✓ Checked against the computed facts{v.retried
+              ? ` — rewritten once to fix: ${v.first_attempt_hard.map((h) => h.check.replace(/_/g, ' ')).join(', ')}` : ''}</p>
+          {/if}
+          {#if v.soft.length}
+            <details class="vsoft"><summary>⚠ {v.soft.length} note{v.soft.length > 1 ? 's' : ''} from the check</summary>
+              <ul>{#each v.soft as n}<li>{n.check.replace(/_/g, ' ')}: {n.detail}</li>{/each}</ul>
+            </details>
+          {/if}
+        {/if}
+        <pre>{result.explanation}</pre></section>
+    {:else}
+      <p class="hint">Tick “explain” and Analyze again for Claude’s plain-language write-up.</p>
+    {/if}
+    <!-- Simplification pass 1: the info panels and paper trading, folded away. -->
+    <details class="moredetails">
+      <summary>More details — categories, levels, momentum, market context, paper trading</summary>
+    {#if !engineHidden}
+    <div class="panels">
+      <section class="panel">
+        <h3>Confluence by category</h3>
+        {#each Object.entries(result.confluence.categories ?? {}) as [cat, dir]}
+          <div class="row"><span>{cat}</span><b class={dir}>{dir}</b></div>
+        {/each}
+      </section>
+
+      <section class="panel">
+        <h3>Key levels</h3>
+        <div class="row"><span>Resistance</span><b>{fmtLevel(result.support_resistance?.nearest_resistance)}</b></div>
+        <div class="row"><span>Price</span><b>{result.market.last_close.toLocaleString()}</b></div>
+        <div class="row"><span>Support</span><b>{fmtLevel(result.support_resistance?.nearest_support)}</b></div>
+        {#if result.round_number}
+          <div class="row"><span>Round #</span><b>{result.round_number.nearest.toLocaleString()}{result.round_number.is_near ? ' · at it' : ''}</b></div>
+        {/if}
+        {#if result.fibonacci}
+          <div class="row"><span>Fib ({result.fibonacci.direction})</span><b>{Object.entries(result.fibonacci.key_levels).map(([k, v]) => `${(+k * 100).toFixed(0)}%:${v}`).join('  ')}</b></div>
+        {/if}
+      </section>
+
+      <section class="panel">
+        <h3>Momentum & volatility</h3>
+        <div class="row"><span>RSI</span><b>{result.momentum.rsi ?? '—'} ({result.momentum.rsi_zone})</b></div>
+        <div class="row"><span>MACD</span><b>{result.momentum.macd_state}</b></div>
+        {#if result.momentum.stochastic_zone}
+          <div class="row"><span>Stochastic</span><b>{result.momentum.stochastic_k} ({result.momentum.stochastic_zone})</b></div>
+        {/if}
+        {#if result.volatility}
+          <div class="row"><span>ADX</span><b>{result.volatility.adx ?? '—'} ({result.volatility.regime ?? '—'})</b></div>
+          <div class="row"><span>Bollinger</span><b>{result.volatility.bollinger_position ?? '—'}</b></div>
+          <div class="row"><span>ATR</span><b>{result.volatility.atr_pct ?? '—'}%</b></div>
+        {/if}
+        {#if result.divergence}<div class="row"><span>Divergence</span><b class={result.divergence.kind}>{result.divergence.kind}</b></div>{/if}
+        {#if result.candlestick}<div class="row"><span>Candlestick</span><b class={result.candlestick.direction}>{result.candlestick.pattern}</b></div>{/if}
+      </section>
+
+      <section class="panel">
+        <h3>Market context</h3>
+        {#if result.market_adaptation}
+          <div class="row"><span>Type</span><b>{result.market_adaptation.asset_class} · {result.market_adaptation.volume_type} vol</b></div>
+          {#if result.market_adaptation.active_session}<div class="row"><span>Session</span><b>{result.market_adaptation.active_session}</b></div>{/if}
+          {#if result.market_adaptation.weekend_gap}<div class="row"><span>Gap</span><b>weekend gap</b></div>{/if}
+        {/if}
+        {#if result.context?.fear_greed}
+          <div class="row"><span>Fear &amp; Greed</span><b>{result.context.fear_greed.value} ({result.context.fear_greed.label})</b></div>
+        {/if}
+        {#if result.context?.fundamentals}
+          <div class="row"><span>Market cap</span><b>${(result.context.fundamentals.market_cap / 1e9).toFixed(1)}B</b></div>
+          <div class="row"><span>24h change</span><b>{result.context.fundamentals.change_24h_pct}%</b></div>
+          <div class="row"><span>From ATH</span><b>{result.context.fundamentals.ath_change_pct}%</b></div>
+        {/if}
+        {#if result.context?.economic_calendar?.length}
+          <div class="row"><span>Next event</span><b>{result.context.economic_calendar[0].country} {result.context.economic_calendar[0].event}</b></div>
+        {/if}
+        {#if result.context?.drivers?.hypothesis?.strongest}
+          <div class="row"><span>Moves with</span><b>{result.context.drivers.hypothesis.strongest.proxy} ({result.context.drivers.hypothesis.strongest.rho > 0 ? '+' : ''}{result.context.drivers.hypothesis.strongest.rho.toFixed(2)})</b></div>
+        {/if}
+        {#if result.context?.drivers?.correlation_warnings?.length}
+          <div class="row"><span>One bet with</span><b>{result.context.drivers.correlation_warnings.map((w: any) => (w.a === result?.market.symbol ? w.b : w.a)).join(', ')}</b></div>
+        {/if}
+        {#if result.derivatives?.funding}
+          <div class="row"><span>Funding</span><b>{result.derivatives.funding.state}</b></div>
+        {/if}
+        {#if result.derivatives?.open_interest}
+          <div class="row"><span>Open interest</span><b>{result.derivatives.open_interest.amount.toLocaleString()}</b></div>
+        {/if}
+        {#if !result.context?.fear_greed && !result.context?.fundamentals && !result.derivatives}
+          <div class="row"><span class="muted">no extra context (crypto-only / needs keys)</span></div>
+        {/if}
+      </section>
+    </div>
+
+    {/if}
     <!-- Paper-trading simulator: log a simulated Buy/Sell, see the position + PnL. Fills are live
          spot prices but no slippage/fees are modelled — it's your discipline, not a real account. -->
     <section class="trade panel">
@@ -514,156 +686,7 @@
         </div>
       {/if}
     </section>
-    {/if}
-
-    <!-- Research controls: scrub back through history + choose which overlays/panes to draw. -->
-    <div class="research">
-      <div class="scrub">
-        <button class="mini" onclick={() => stepScrub(-1)} title="step back (←)">‹</button>
-        <input type="range" min="0" max={scrubMax} value={scrubValue}
-               oninput={(e) => scrubTo(+e.currentTarget.value)} onkeydown={onScrubKey}
-               aria-label="scrub through history" />
-        <button class="mini" onclick={() => stepScrub(1)} title="step forward (→)">›</button>
-        <span class="scrub-label">
-          {#if asOfBar == null}bar {scrubMax} · <b>live</b>{:else}bar {asOfBar} / {scrubMax}{/if}
-        </span>
-        {#if asOfBar != null}<button class="mini live" onclick={goLive}>⤒ live</button>{/if}
-        <button class="mini label-btn" class:on={labelMode} onclick={toggleLabelMode}
-                title="mark what your eye sees at this bar (detector overlays hidden)">
-          {labelMode ? '✓ Labelling — exit' : '🏷 Label this bar'}</button>
-      </div>
-      <details class="toggles">
-        <summary>overlays &amp; panes</summary>
-        <div class="toggle-grid">
-          <div><span class="grp">overlays</span>
-            {#each OVERLAY_KEYS as k}
-              <label><input type="checkbox" bind:checked={toggles[k]} /> {TOGGLE_LABELS[k] ?? k}</label>
-            {/each}
-          </div>
-          <div><span class="grp">panes</span>
-            {#each PANE_KEYS as k}
-              <label><input type="checkbox" bind:checked={toggles[k]} /> {k}</label>
-            {/each}
-          </div>
-        </div>
-      </details>
-    </div>
-
-    {#if !labelMode && result.chart.overlays.patterns.length}
-      <div class="patterns">
-        {#each result.chart.overlays.patterns as p}
-          <span class="pchip {p.state} {p.lifecycle}" title={`History of ${p.type} on ${timeframe}: ${recordText(p.record)}`}>{p.type} · {LIFE_CHIP[p.lifecycle ?? p.state] ?? p.state}</span>
-        {/each}
-      </div>
-      <!-- The measured history beside every CURRENT pattern (history-stage ones don't need it). -->
-      {#each result.chart.overlays.patterns.filter((p) => ['forming', 'fresh', 'in_play'].includes(p.lifecycle ?? '')) as p}
-        <p class="phist">{p.type} ({timeframe}) — history after a breakout: {recordText(p.record)}
-          <br /><span class="pqual">This one's {qualityText(p.quality_band)}{p.quality_band ? `; ${p.quality_band.meaning}` : ''}</span></p>
-      {/each}
-    {/if}
-
-    <PriceChart data={result.chart} toggles={chartToggles} {trades} {labelMode} {draft} {pending}
-                onChartClick={(t, p) => labelPanel?.handleClick(t, p)} />
-
-    {#if labelMode}
-      <LabelPanel bind:this={labelPanel} {symbol} {timeframe} bar={labelBar} barTime={labelBarTime}
-                  candles={result.chart.candles} bind:draft bind:pending onJump={jumpToLabel} />
-    {:else}
-    {#if !engineHidden}
-    <div class="panels">
-      <section class="panel">
-        <h3>Confluence by category</h3>
-        {#each Object.entries(result.confluence.categories ?? {}) as [cat, dir]}
-          <div class="row"><span>{cat}</span><b class={dir}>{dir}</b></div>
-        {/each}
-      </section>
-
-      <section class="panel">
-        <h3>Key levels</h3>
-        <div class="row"><span>Resistance</span><b>{fmtLevel(result.support_resistance?.nearest_resistance)}</b></div>
-        <div class="row"><span>Price</span><b>{result.market.last_close.toLocaleString()}</b></div>
-        <div class="row"><span>Support</span><b>{fmtLevel(result.support_resistance?.nearest_support)}</b></div>
-        {#if result.round_number}
-          <div class="row"><span>Round #</span><b>{result.round_number.nearest.toLocaleString()}{result.round_number.is_near ? ' · at it' : ''}</b></div>
-        {/if}
-        {#if result.fibonacci}
-          <div class="row"><span>Fib ({result.fibonacci.direction})</span><b>{Object.entries(result.fibonacci.key_levels).map(([k, v]) => `${(+k * 100).toFixed(0)}%:${v}`).join('  ')}</b></div>
-        {/if}
-      </section>
-
-      <section class="panel">
-        <h3>Momentum & volatility</h3>
-        <div class="row"><span>RSI</span><b>{result.momentum.rsi ?? '—'} ({result.momentum.rsi_zone})</b></div>
-        <div class="row"><span>MACD</span><b>{result.momentum.macd_state}</b></div>
-        {#if result.momentum.stochastic_zone}
-          <div class="row"><span>Stochastic</span><b>{result.momentum.stochastic_k} ({result.momentum.stochastic_zone})</b></div>
-        {/if}
-        {#if result.volatility}
-          <div class="row"><span>ADX</span><b>{result.volatility.adx ?? '—'} ({result.volatility.regime ?? '—'})</b></div>
-          <div class="row"><span>Bollinger</span><b>{result.volatility.bollinger_position ?? '—'}</b></div>
-          <div class="row"><span>ATR</span><b>{result.volatility.atr_pct ?? '—'}%</b></div>
-        {/if}
-        {#if result.divergence}<div class="row"><span>Divergence</span><b class={result.divergence.kind}>{result.divergence.kind}</b></div>{/if}
-        {#if result.candlestick}<div class="row"><span>Candlestick</span><b class={result.candlestick.direction}>{result.candlestick.pattern}</b></div>{/if}
-      </section>
-
-      <section class="panel">
-        <h3>Market context</h3>
-        {#if result.market_adaptation}
-          <div class="row"><span>Type</span><b>{result.market_adaptation.asset_class} · {result.market_adaptation.volume_type} vol</b></div>
-          {#if result.market_adaptation.active_session}<div class="row"><span>Session</span><b>{result.market_adaptation.active_session}</b></div>{/if}
-          {#if result.market_adaptation.weekend_gap}<div class="row"><span>Gap</span><b>weekend gap</b></div>{/if}
-        {/if}
-        {#if result.context?.fear_greed}
-          <div class="row"><span>Fear &amp; Greed</span><b>{result.context.fear_greed.value} ({result.context.fear_greed.label})</b></div>
-        {/if}
-        {#if result.context?.fundamentals}
-          <div class="row"><span>Market cap</span><b>${(result.context.fundamentals.market_cap / 1e9).toFixed(1)}B</b></div>
-          <div class="row"><span>24h change</span><b>{result.context.fundamentals.change_24h_pct}%</b></div>
-          <div class="row"><span>From ATH</span><b>{result.context.fundamentals.ath_change_pct}%</b></div>
-        {/if}
-        {#if result.context?.economic_calendar?.length}
-          <div class="row"><span>Next event</span><b>{result.context.economic_calendar[0].country} {result.context.economic_calendar[0].event}</b></div>
-        {/if}
-        {#if result.context?.drivers?.hypothesis?.strongest}
-          <div class="row"><span>Moves with</span><b>{result.context.drivers.hypothesis.strongest.proxy} ({result.context.drivers.hypothesis.strongest.rho > 0 ? '+' : ''}{result.context.drivers.hypothesis.strongest.rho.toFixed(2)})</b></div>
-        {/if}
-        {#if result.context?.drivers?.correlation_warnings?.length}
-          <div class="row"><span>One bet with</span><b>{result.context.drivers.correlation_warnings.map((w: any) => (w.a === result?.market.symbol ? w.b : w.a)).join(', ')}</b></div>
-        {/if}
-        {#if result.derivatives?.funding}
-          <div class="row"><span>Funding</span><b>{result.derivatives.funding.state}</b></div>
-        {/if}
-        {#if result.derivatives?.open_interest}
-          <div class="row"><span>Open interest</span><b>{result.derivatives.open_interest.amount.toLocaleString()}</b></div>
-        {/if}
-        {#if !result.context?.fear_greed && !result.context?.fundamentals && !result.derivatives}
-          <div class="row"><span class="muted">no extra context (crypto-only / needs keys)</span></div>
-        {/if}
-      </section>
-    </div>
-
-    {/if}
-    {#if result.explanation && !engineHidden}
-      <section class="panel"><h2>Explanation</h2>
-        {#if result.verification}
-          {@const v = result.verification}
-          {#if v.fallback}
-            <p class="vcheck bad">⚠ {v.notice}</p>
-          {:else}
-            <p class="vcheck ok">✓ Checked against the computed facts{v.retried
-              ? ` — rewritten once to fix: ${v.first_attempt_hard.map((h) => h.check.replace(/_/g, ' ')).join(', ')}` : ''}</p>
-          {/if}
-          {#if v.soft.length}
-            <details class="vsoft"><summary>⚠ {v.soft.length} note{v.soft.length > 1 ? 's' : ''} from the check</summary>
-              <ul>{#each v.soft as n}<li>{n.check.replace(/_/g, ' ')}: {n.detail}</li>{/each}</ul>
-            </details>
-          {/if}
-        {/if}
-        <pre>{result.explanation}</pre></section>
-    {:else}
-      <p class="hint">Tick “explain” and Analyze again for Claude’s plain-language write-up.</p>
-    {/if}
+    </details>
     {/if}
   {:else if !error}
     <p class="hint">Pick a pair and timeframe, then press Analyze.</p>
@@ -707,6 +730,14 @@
   .views { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 18px; }
   .views button { background: #161b22; border: 1px solid #30363d; font-weight: 500; }
   .views button.active { background: #238636; border-color: #238636; }
+  .morenav { position: relative; }
+  .morenav summary { list-style: none; cursor: pointer; background: #161b22; border: 1px solid #30363d; border-radius: 6px;
+    padding: 8px 14px; font-weight: 500; color: #c9d1d9; }
+  .morenav summary::-webkit-details-marker { display: none; }
+  .morenav summary.active { background: #238636; border-color: #238636; }
+  .morenav .menu { position: absolute; z-index: 20; top: calc(100% + 4px); left: 0; display: flex; flex-direction: column;
+    gap: 4px; min-width: 180px; background: #0e1117; border: 1px solid #30363d; border-radius: 8px; padding: 6px; }
+  .morenav .menu button { text-align: left; }
   .controls { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; margin-bottom: 16px; }
   select, button { background: #161b22; color: #c9d1d9; border: 1px solid #30363d;
     border-radius: 6px; padding: 8px 12px; font-size: 14px; }
@@ -767,6 +798,8 @@
   .panel h2 { margin: 0 0 8px; font-size: 16px; }
   pre { white-space: pre-wrap; margin: 0; color: #c9d1d9; }
 
+  .moredetails { margin-top: 16px; }
+  .moredetails > summary { cursor: pointer; color: #8b949e; padding: 6px 0; }
   /* Paper-trading simulator */
   .trade .muted { text-transform: none; letter-spacing: 0; color: #6e7681; font-weight: 400; }
   .trade-head { display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; }
