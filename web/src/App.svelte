@@ -570,10 +570,16 @@
         <div class="row"><span>Resistance</span><b>{fmtLevel(result.support_resistance?.nearest_resistance)}</b></div>
         <div class="row"><span>Price</span><b>{result.market.last_close.toLocaleString()}</b></div>
         <div class="row"><span>Support</span><b>{fmtLevel(result.support_resistance?.nearest_support)}</b></div>
+        {#each ['support', 'resistance'] as k}
+          {@const t = result.trendlines?.[k]}
+          {#if t}<div class="row"><span>{k === 'support' ? 'Support line' : 'Resistance line'}</span><b>{t.price_now.toLocaleString()} ({t.direction}, {t.touches} touches)</b></div>{/if}
+        {/each}
         {#if result.round_number}
           <div class="row"><span>Round #</span><b>{result.round_number.nearest.toLocaleString()}{result.round_number.is_near ? ' · at it' : ''}</b></div>
         {/if}
-        {#if result.fibonacci}
+        {#if result.fibonacci?.superseded}
+          <div class="row"><span>Fib</span><b class="muted">outdated — {result.fibonacci.superseded_by}</b></div>
+        {:else if result.fibonacci}
           <div class="row"><span>Fib ({result.fibonacci.direction})</span><b>{Object.entries(result.fibonacci.key_levels).map(([k, v]) => `${(+k * 100).toFixed(0)}%:${v}`).join('  ')}</b></div>
         {/if}
       </section>

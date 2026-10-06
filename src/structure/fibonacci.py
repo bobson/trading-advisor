@@ -15,6 +15,12 @@ is the older anchor's — the invariant that actually pins the direction branch.
 A degenerate leg (high <= low) can only arise from a non-alternating swing sequence
 (two same-kind swings in a row reaching back past a farther extreme); we return None
 rather than emit inverted levels.
+
+OUTDATED LEG: a swing is only confirmed `sensitivity` bars after it, so the latest confirmed leg can
+already be history — price may have traded beyond either end of it since (a new high above an up-leg's
+end or a down-leg's start, a new low below…). Given the candles, `fib_retracement(..., df=)` marks such a
+leg `superseded` (with the price that broke it): its levels are not current, so it casts no vote and is
+not offered as a level. Look-ahead-safe — only bars after the leg's end and up to the frame's last row.
 """
 
 from __future__ import annotations
@@ -40,6 +46,8 @@ class FibRetracement:
     low_bar: int
     low_price: float
     levels: dict[float, float]  # ratio -> price
+    superseded: bool = False    # price has traded beyond the leg since it ended (see module docstring)
+    superseded_by: str | None = None
 
     @property
     def start_bar(self) -> int:
@@ -48,9 +56,10 @@ class FibRetracement:
 
 
 def fib_retracement(
-    swings: pd.DataFrame, ratios: list[float] = FIB_RATIOS
+    swings: pd.DataFrame, ratios: list[float] = FIB_RATIOS, df: pd.DataFrame | None = None
 ) -> FibRetracement | None:
-    """Compute retracement levels for the latest leg, or None if it can't be formed."""
+    """Compute retracement levels for the latest leg, or None if it can't be formed. With the candles
+    (`df`, row-aligned with the swings' bars) the leg is also checked for being outdated."""
     if len(swings) < 2:
         return None
 
@@ -77,7 +86,7 @@ def fib_retracement(
     else:
         levels = {r: L + r * span for r in ratios}
 
-    return FibRetracement(
+    fib = FibRetracement(
         direction=direction,
         high_bar=int(high["bar"]),
         high_price=H,
@@ -85,3 +94,12 @@ def fib_retracement(
         low_price=L,
         levels=levels,
     )
+    if df is not None:
+        after = df.iloc[max(fib.high_bar, fib.low_bar) + 1:]
+        if len(after):
+            hi, lo = float(after["high"].max()), float(after["low"].min())
+            if hi > H:
+                fib.superseded, fib.superseded_by = True, f"price traded above the leg's high {H:.10g} since (to {hi:.10g})"
+            elif lo < L:
+                fib.superseded, fib.superseded_by = True, f"price traded below the leg's low {L:.10g} since (to {lo:.10g})"
+    return fib

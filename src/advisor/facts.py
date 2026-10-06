@@ -183,8 +183,8 @@ def _harden(facts: dict, featured_df: pd.DataFrame, zones: pd.DataFrame, conflue
     facts["moving_averages"] = mas
 
     facts["nearest_levels"] = nearest_structural_levels(
-        last_close, atr, zones=zones, fib_levels=fib["key_levels"] if fib else None,
-        patterns=facts["chart_patterns"])
+        last_close, atr, zones=zones, fib_levels=fib["key_levels"] if fib and not fib.get("superseded") else None,
+        patterns=facts["chart_patterns"], trendlines=facts.get("trendlines"))
     facts["strongest_opposing_fact"] = strongest_opposing_fact(facts["confluence"], cfg)
     facts["mtf_signals"] = mtf_signal_alignment(
         featured_df, {s.name: s.direction for s in confluence.signals}, cfg)
@@ -210,6 +210,11 @@ def _harden(facts: dict, featured_df: pd.DataFrame, zones: pd.DataFrame, conflue
         absent.append("no resistance zone above price")
     if facts["fibonacci"] is None:
         absent.append("no clean price leg for Fibonacci")
+    elif facts["fibonacci"].get("superseded"):
+        absent.append("no current Fibonacci levels (the latest confirmed leg is outdated)")
+    for kind in ("support", "resistance"):
+        if not (facts.get("trendlines") or {}).get(kind):
+            absent.append(f"no unbroken {kind} trendline")
     if facts["volume"] is None:
         absent.append("no volume data")
     if not facts["confluence"].get("mtf_trends"):
@@ -221,6 +226,33 @@ def _harden(facts: dict, featured_df: pd.DataFrame, zones: pd.DataFrame, conflue
     if facts["nearest_levels"]["below"] is None:
         absent.append("no structural level below price")
     facts["absences"] = absent
+
+
+def _trendline_facts(featured_df: pd.DataFrame, swings: pd.DataFrame, cfg: Config, last_close: float) -> dict:
+    """The two-point trendlines the chart draws (one per side, unbroken by a close), as FACTS: where the
+    line is now, its two anchors, how many swing pivots touch it, how long it has held. Not a vote."""
+    from src.structure.swings import SWING_HIGH, SWING_LOW
+    from src.structure.trendlines import find_two_point_trendlines
+    st = cfg.structure
+    lines = find_two_point_trendlines(featured_df, swings, atr_col=COL_ATR, break_atr_mult=st.trendline_break_atr_mult,
+                                      max_anchors=st.trendline_max_anchors)
+    atr = current_atr(featured_df)
+    n, idx = len(featured_df), featured_df.index
+    tol = (atr if atr and atr > 0 else last_close * 0.01) * st.trendline_touch_atr_mult
+    out = {}
+    for kind, t in lines.items():
+        (b1, p1), (b2, p2) = t.anchors
+        now = t.value_at(n - 1)
+        pivots = swings[(swings["kind"] == (SWING_LOW if kind == "support" else SWING_HIGH)) & (swings["bar"] >= b1)]
+        touches = int(sum(abs(float(r["price"]) - t.value_at(int(r["bar"]))) <= tol for _, r in pivots.iterrows()))
+        out[kind] = {
+            "direction": t.direction, "price_now": round_price(now, last_close),
+            "from": {"time": str(idx[b1]), "price": round_price(p1, last_close)},
+            "to": {"time": str(idx[b2]), "price": round_price(p2, last_close)},
+            "touches": touches, "held_bars": int(n - 1 - b1),
+            **(distance(now, last_close, atr) or {}),
+        }
+    return out
 
 
 def build_facts(featured_df: pd.DataFrame, swings: pd.DataFrame, cfg: Config) -> dict:
@@ -238,7 +270,7 @@ def build_facts(featured_df: pd.DataFrame, swings: pd.DataFrame, cfg: Config) ->
     # --- detectors: compute ONCE, share with both confluence and display ---
     trend = classify_trend(featured_df, swings)
     levels = sr_zones(featured_df, swings, cfg)          # A4: zones (centre in `price`)
-    fib = fib_retracement(swings)
+    fib = fib_retracement(swings, df=featured_df)
 
     signals = [
         signal_from_trend(trend),
@@ -325,7 +357,7 @@ def build_facts(featured_df: pd.DataFrame, swings: pd.DataFrame, cfg: Config) ->
             featured_df, swings, cfg,
             higher_tf_trend=htf_trend,
             structure_levels=(levels["price"].tolist() if not levels.empty else None),
-            fib=fib, round_number=rn,
+            fib=fib if fib is not None and not fib.superseded else None, round_number=rn,
         )
     ]
 
@@ -340,6 +372,9 @@ def build_facts(featured_df: pd.DataFrame, swings: pd.DataFrame, cfg: Config) ->
                 for r in _DISPLAY_FIB_RATIOS
                 if r in fib.levels
             },
+            # price has traded beyond the leg since it ended: not current levels (no vote, not a level)
+            "superseded": fib.superseded,
+            "superseded_by": fib.superseded_by,
         }
 
     facts = {
@@ -379,6 +414,7 @@ def build_facts(featured_df: pd.DataFrame, swings: pd.DataFrame, cfg: Config) ->
         "support_resistance": _nearest_levels(levels, last_close),
         "chart_patterns": chart_patterns,
         "fibonacci": fib_facts,
+        "trendlines": _trendline_facts(featured_df, swings, cfg, last_close),
         "confluence": {
             "bias": confluence.bias,
             "triggered": confluence.triggered,
@@ -576,8 +612,18 @@ def facts_to_prompt(facts: dict) -> str:
     add("  - Support/resistance ZONES (bands, not exact lines):")
     add(f"      support: {_zone(sup)}" if (sup := sr["nearest_support"]) else "      support: no support zone below price")
     add(f"      resistance: {_zone(res)}" if (res := sr["nearest_resistance"]) else "      resistance: no resistance zone above price")
+    tls = facts.get("trendlines") or {}
+    add("  - TRENDLINES (straight lines through two swing pivots, not broken by a close since; facts, NOT a vote):")
+    for kind in ("support", "resistance"):
+        t = tls.get(kind)
+        add(f"      {kind} ({t['direction']}): now {t['price_now']} ({_d(t)}); from {t['from']['price']} "
+            f"({t['from']['time']}) to {t['to']['price']} ({t['to']['time']}); {t['touches']} swing touches; "
+            f"unbroken for {_bars(t['held_bars'])}" if t else f"      {kind}: no unbroken {kind} trendline")
     fib = facts["fibonacci"]
-    if fib:
+    if fib and fib.get("superseded"):
+        add(f"  - Fibonacci: the latest confirmed {fib['direction']}-leg ({fib['impulse_low']} to {fib['impulse_high']}) "
+            f"is OUTDATED — {fib['superseded_by']}. No current Fibonacci levels; do not cite this leg's levels.")
+    elif fib:
         add(f"  - Fibonacci (latest {fib['direction']}-leg, {fib['impulse_low']} to {fib['impulse_high']}):")
         dists = fib.get("key_level_distances") or {}
         for ratio, price in fib["key_levels"].items():

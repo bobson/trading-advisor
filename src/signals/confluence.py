@@ -256,6 +256,8 @@ def signal_from_fibonacci(
     """
     if fib is None:
         return Signal("fibonacci", NEUTRAL, "No clean price leg to draw Fibonacci on.")
+    if fib.superseded:
+        return Signal("fibonacci", NEUTRAL, f"The latest Fibonacci leg is outdated: {fib.superseded_by}.")
 
     hits = [
         (r, price)
@@ -342,7 +344,7 @@ def gather_signals(featured_df: pd.DataFrame, swings: pd.DataFrame, cfg: Config)
 
     trend = classify_trend(featured_df, swings)
     zones = sr_zones(featured_df, swings, cfg)
-    fib = fib_retracement(swings)
+    fib = fib_retracement(swings, df=featured_df)
 
     return [
         signal_from_trend(trend),

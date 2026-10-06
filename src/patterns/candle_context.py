@@ -84,8 +84,9 @@ def _levels_at(featured: pd.DataFrame, swings: pd.DataFrame, i: int, cfg, atr: f
             if z is not None:
                 out.append({"kind": kind, "lo": float(z["lower"]), "hi": float(z["upper"]),
                             "name": f"{kind} zone {fmt_price(z['lower'], close)}–{fmt_price(z['upper'], close)}"})
-    fib = fib_retracement(known.sort_values(["bar", "kind"]))
-    if fib is not None:
+    # the leg as it stood BEFORE this candle; an outdated leg (price went past it since) is no level
+    fib = fib_retracement(known.sort_values(["bar", "kind"]), df=featured.iloc[:i])
+    if fib is not None and not fib.superseded:
         kind = SUPPORT if fib.direction == UP else RESISTANCE
         for r in _KEY_FIB:
             if r in fib.levels:

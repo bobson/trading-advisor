@@ -59,7 +59,7 @@ def round_levels_around(price: float) -> tuple[float, float] | None:
 
 def nearest_structural_levels(
     price: float, atr: float | None, *, zones: pd.DataFrame, fib_levels: dict | None,
-    patterns: list[dict],
+    patterns: list[dict], trendlines: dict | None = None,
 ) -> dict:
     """The nearest STRUCTURAL level above and below price, from: support/resistance zone edges,
     key Fibonacci levels, the round numbers either side, and the breakout/invalidation levels of
@@ -76,6 +76,8 @@ def nearest_structural_levels(
     rl = round_levels_around(price)
     if rl:
         cands += [(rl[0], "round number"), (rl[1], "round number")]
+    for kind, t in (trendlines or {}).items():
+        cands.append((float(t["price_now"]), f"{t['direction']} {kind} trendline ({t['touches']} swing touches)"))
     for p in patterns:
         for key, label in (("breakout_level", "breakout"), ("invalidation_level", "invalidation")):
             if p.get(key) is not None:

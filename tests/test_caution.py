@@ -184,7 +184,7 @@ def test_caution_is_look_ahead_safe(cfg, candles):
 def test_caution_reaches_the_facts_text_without_touching_the_verdict(cfg, candles):
     from src.service.analyze import advise
     r = advise("BTC/USDT", "1h", cfg, df=candles, explain_enabled=False)
-    assert len(r.facts["caution"]) == 8
+    assert len(r.facts["caution"]) == 9
     assert "CAUTION CONDITIONS" in r.facts_text and "UNMEASURED" in r.facts_text
     assert r.facts_text.index("CAUTION CONDITIONS") < r.facts_text.index("CONFLUENCE VERDICT")
 

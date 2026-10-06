@@ -1,6 +1,8 @@
 {
   "absences": [
     "no RSI divergence detected",
+    "no current Fibonacci levels (the latest confirmed leg is outdated)",
+    "no unbroken support trendline",
     "no category votes against the read"
   ],
   "candlestick": {
@@ -83,6 +85,14 @@
       "code": "thin_market",
       "detail": "not applicable: crypto trades around the clock",
       "label": "Thin market",
+      "status": "unmeasured",
+      "value": null
+    },
+    {
+      "active": false,
+      "code": "trendline_against",
+      "detail": "no unbroken support trendline",
+      "label": "Trendline right against the read",
       "status": "unmeasured",
       "value": null
     }
@@ -314,7 +324,7 @@
         "category": "structure",
         "direction": "neutral",
         "name": "fibonacci",
-        "reason": "Price is not near a key Fibonacci level."
+        "reason": "The latest Fibonacci leg is outdated: price traded below the leg's low 64214 since (to 63866.66)."
       },
       {
         "category": "volume",
@@ -405,7 +415,9 @@
       "0.5": 64439.0,
       "0.618": 64385.9,
       "0.786": 64310.3
-    }
+    },
+    "superseded": true,
+    "superseded_by": "price traded below the leg's low 64214 since (to 63866.66)"
   },
   "market": {
     "exchange": "binance",
@@ -545,6 +557,24 @@
     "reasons": [
       "Swing highs and lows are not consistently rising or falling."
     ]
+  },
+  "trendlines": {
+    "resistance": {
+      "direction": "rising",
+      "distance_atr": 3.43,
+      "distance_pct": 1.24,
+      "from": {
+        "price": 63933.02,
+        "time": "2026-06-11 19:00:00+00:00"
+      },
+      "held_bars": 69,
+      "price_now": 64733.62,
+      "to": {
+        "price": 64664.0,
+        "time": "2026-06-14 10:00:00+00:00"
+      },
+      "touches": 3
+    }
   },
   "volatility": {
     "adx": 30.1,

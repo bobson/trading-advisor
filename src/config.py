@@ -49,6 +49,8 @@ class StructureConfig(_Strict):
     sr_stale_bars: int = 120             # untouched for this many bars -> stale
     sr_strength_halflife_bars: int = 60  # a touch's weight halves every this many bars
     trendline_max_anchors: int = 6
+    # A swing pivot within this × ATR of a two-point trendline counts as a touch of it (facts only).
+    trendline_touch_atr_mult: float = 0.5
 
 
 class IndicatorsConfig(_Strict):
@@ -187,6 +189,7 @@ class CautionConfig(_Strict):
     event_hours: float = 6.0              # a high-impact event within this many hours
     breakout_volume_expand: float = 1.2   # breakout-bar volume ≥ this × its MA = expansion
     atr_expand_lookback: int = 5          # breakout-bar ATR vs this many bars earlier
+    trendline_near_atr: float = 1.0       # an opposing trendline closer than this many ATR = right on top of it
 
 
 class MorningReportConfig(_Strict):

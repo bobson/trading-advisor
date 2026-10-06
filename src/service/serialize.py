@@ -66,7 +66,8 @@ def _serialize_patterns(result: AnalysisResult, df: pd.DataFrame, rp) -> list[di
               if result.levels is not None and not result.levels.empty else None)
     out: list[dict] = []
     for pat in find_patterns(result.featured, result.swings, result.cfg,
-                             higher_tf_trend=htf, structure_levels=levels, fib=result.fib):
+                             higher_tf_trend=htf, structure_levels=levels,
+                             fib=result.fib if result.fib is not None and not result.fib.superseded else None):
         points = [{"time": _epoch(df.index[bar]), "price": rp(price)}
                   for bar, price in pat.points if 0 <= bar < n]
         if len(points) < 2:
@@ -222,7 +223,7 @@ def serialize_chart(result: AnalysisResult, limit: int = 500, levels_per_side: i
                 })
 
     fib = None
-    if result.fib is not None:
+    if result.fib is not None and not result.fib.superseded:      # an outdated leg isn't drawn as current levels
         fib = {"direction": result.fib.direction,
                "levels": {str(r): rp(p) for r, p in result.fib.levels.items()}}
 

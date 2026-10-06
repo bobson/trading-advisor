@@ -222,7 +222,7 @@ def advise(
     # Same swings + params as build_facts used internally -> byte-identical geometry.
     levels = sr_zones(featured, swings, req)      # A4: the same zones that voted
     trendlines = find_trendlines(swings)
-    fib = fib_retracement(swings)
+    fib = fib_retracement(swings, df=featured)
 
     explanation: Optional[str] = None
     verification: Optional[dict] = None

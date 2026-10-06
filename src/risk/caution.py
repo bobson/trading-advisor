@@ -12,6 +12,8 @@ clusters) and COSTS. These conditions describe the risk around a read, never its
   htf_against        the highest directional higher-timeframe trend opposes the read
   event_risk         a high-impact economic event within N hours (needs the calendar; never guessed)
   thin_market        forex / gold just after a weekend gap, or (intraday) in the thin Sydney hours
+  trendline_against  an unbroken trendline against the read lies closer than `trendline_near_atr` ATR
+                     (a bearish read right on top of a support line, a bullish one right under resistance)
 
 Each entry: {code, label, active (True / False / None), detail, value, status}. `active` None means the
 condition can't be judged here (`detail` says why: not applicable to a no-setup read, or its input is
@@ -42,6 +44,7 @@ LABELS = {
     "htf_against": "Higher timeframe against the read",
     "event_risk": "High-impact news soon",
     "thin_market": "Thin market",
+    "trendline_against": "Trendline right against the read",
 }
 
 
@@ -228,13 +231,30 @@ def _thin_market(facts: dict, feat: pd.DataFrame) -> dict:
     return _entry("thin_market", False, f"session: {ma.get('active_session') or 'daily bars'}")
 
 
+def _trendline_against(facts: dict, direction: str | None, cfg: Config) -> dict:
+    if direction is None:
+        return _entry("trendline_against", None, "not applicable: no directional read")
+    kind = "support" if direction == "bearish" else "resistance"
+    t = (facts.get("trendlines") or {}).get(kind)
+    if t is None:
+        return _entry("trendline_against", False, f"no unbroken {kind} trendline")
+    d = t.get("distance_atr")
+    if d is None:
+        return _entry("trendline_against", None, "unavailable: no ATR")
+    active = abs(d) < cfg.caution.trendline_near_atr
+    return _entry("trendline_against", active,
+                  f"{t['direction']} {kind} trendline at {t['price_now']} is {abs(d):.2f} ATR "
+                  f"{'below' if kind == 'support' else 'above'} price ({t['touches']} swing touches; flag under "
+                  f"{cfg.caution.trendline_near_atr:g} ATR)", {"distance_atr": d, "price": t["price_now"]})
+
+
 def _atr(facts: dict) -> float | None:
     a = (facts.get("volatility") or {}).get("atr")
     return float(a) if a else None
 
 
 def caution_conditions(facts: dict, featured: pd.DataFrame, cfg: Config) -> list[dict]:
-    """All eight conditions for the last bar, in a fixed order (absences stay explicit)."""
+    """All conditions for the last bar, in a fixed order (absences stay explicit)."""
     direction = read_direction(facts)
     return [
         _no_expansion(facts, featured, cfg),
@@ -245,6 +265,7 @@ def caution_conditions(facts: dict, featured: pd.DataFrame, cfg: Config) -> list
         _htf_against(facts, direction),
         _event_risk(facts, cfg),
         _thin_market(facts, featured),
+        _trendline_against(facts, direction, cfg),
     ]
 
 
