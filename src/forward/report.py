@@ -152,6 +152,27 @@ def market_box(conn, symbol: str, timeframe: str) -> dict:
     }
 
 
+def entry_forward(conn, version: int = RULE_VERSION) -> list[dict]:
+    """Entry points in the forward record, per type: judged textbook side vs its mirror (rule v1, first
+    touch; same candles, same distances). Rates only with 20+ judged; `pending` = still waiting."""
+    rows = {}
+    for r in conn.execute("SELECT type, outcome, mirror_outcome FROM forward_entries WHERE rule_version=?", (version,)):
+        d = rows.setdefault(r["type"], {"type": r["type"], "judged": 0, "pending": 0, "target": 0, "invalidated": 0,
+                                        "mirror_target": 0})
+        if r["outcome"] is None:
+            d["pending"] += 1
+            continue
+        d["judged"] += 1
+        d["target"] += r["outcome"] == FOLLOWED
+        d["invalidated"] += r["outcome"] == INVALIDATED
+        d["mirror_target"] += r["mirror_outcome"] == FOLLOWED
+    for d in rows.values():
+        n = d["judged"]
+        d["target_rate"] = round(d["target"] / n, 3) if n >= MIN_N else None
+        d["mirror_rate"] = round(d["mirror_target"] / n, 3) if n >= MIN_N else None
+    return sorted(rows.values(), key=lambda d: (-d["judged"], d["type"]))
+
+
 def build_report(conn, cfg: Config, run_date: str | None = None, now: datetime | None = None) -> dict:
     mr = cfg.morning_report
     now = now or datetime.now(timezone.utc)
@@ -176,6 +197,9 @@ def build_report(conn, cfg: Config, run_date: str | None = None, now: datetime |
                                            "ORDER BY symbol", (day,))] if day else []
     first = conn.execute("SELECT MIN(run_date) FROM forward_runs WHERE status != 'gap'").fetchone()[0]
     split = caution_split(resolved)
+    entries_today = [dict(r) for r in conn.execute(
+        "SELECT symbol, timeframe, type, direction, level, next_level, invalidation FROM forward_entries "
+        "WHERE run_date=? ORDER BY symbol, timeframe, type", (day,))] if day else []
     return {
         "run_date": day, "run": run, "runs": runs,
         "gaps": [r["run_date"] for r in runs if r["status"] == "gap"],
@@ -183,6 +207,7 @@ def build_report(conn, cfg: Config, run_date: str | None = None, now: datetime |
         "review": review, "grid": grid, "syntheses": synth,
         "pending": pending, "scoreboard": scoreboard(resolved), "caution_split": split,
         "summary": summary(resolved), "misses_in_common": misses_in_common(split["rows"]),
+        "entries_today": entries_today, "entry_forward": entry_forward(conn),
         "watchlist": {"symbols": mr.symbols, "timeframes": mr.timeframes, "horizons": mr.horizons},
         "next_run": next_run(now, mr.timezone, mr.run_at).isoformat(),
         "schedule": f"{mr.run_at} {mr.timezone}",

@@ -525,3 +525,46 @@ def test_api_market_box_is_read_only_and_reads_the_closed_candle_now(cfg, candle
     assert body["now"]["new_candles"] == 5 and body["now"]["tier"]
     assert started == []
     assert "summary" in TestClient(api.app).get("/morning").json()
+
+
+# --- entry points: frozen with each read, judged both ways ----------------------------------------------
+
+def test_entry_points_are_frozen_with_reads_and_judged_textbook_and_mirror(cfg, candles, monkeypatch):
+    from src.forward.report import entry_forward
+    fake = [{"type": "support bounce", "direction": "bullish", "level": 1.0, "next_level": 1e9, "invalidation": 0.0,
+             "mirror_next": -1e9, "mirror_invalidation": 2e9}]
+    monkeypatch.setattr("src.research.entries.entries_now", lambda *a, **k: [dict(e) for e in fake])
+    conn, feed = connect(":memory:"), Feed(candles, 300)
+    _run(cfg, conn, feed)
+    rows = [dict(r) for r in conn.execute("SELECT * FROM forward_entries")]
+    assert len(rows) == 2 and {r["symbol"] for r in rows} == {"BTC/USDT", "EUR/USD"}
+    read_ids = {r[0] for r in conn.execute("SELECT id FROM forward_reads")}
+    assert {r["read_id"] for r in rows} == read_ids and all(r["outcome"] is None for r in rows)
+    assert entry_forward(conn)[0]["pending"] == 2
+    feed.k.update({"BTC/USDT": 324, "EUR/USD": 324})
+    _run(cfg, conn, feed)                                          # the horizon has passed: judged both ways
+    judged = [dict(r) for r in conn.execute("SELECT * FROM forward_entries WHERE outcome IS NOT NULL")]
+    assert len(judged) == 2 and all(r["outcome"] == R.EXPIRED and r["mirror_outcome"] == R.EXPIRED for r in judged)
+    ef = {d["type"]: d for d in entry_forward(conn)}["support bounce"]
+    assert ef["judged"] == 2 and ef["target"] == 0 and ef["target_rate"] is None       # < 20: counts only
+    rep = build_report(conn, cfg, now=feed.now())
+    assert rep["entry_forward"] and "entries_today" in rep
+
+
+def test_the_live_read_carries_the_entry_points_of_its_last_candle(cfg, candles):
+    from src.research.entries import ENTRY_TYPES
+    from src.service.analyze import advise
+    seen = 0
+    for n in range(250, 350, 3):
+        r = advise("BTC/USDT", "1h", cfg, df=candles.iloc[:n], explain_enabled=False,
+                   entry_records={"support bounce": {"n": 5, "target": 3, "mirror_target": 2, "timeframe": "1h",
+                                                     "target_rate": None, "mirror_rate": None}})
+        assert isinstance(r.facts["entries"], list) and "ENTRY POINTS on the last closed candle" in r.facts_text
+        for e in r.facts["entries"]:
+            seen += 1
+            assert e["type"] in ENTRY_TYPES and e["direction"] in ("bullish", "bearish")
+            assert (e["next_level"] > e["invalidation"]) == (e["direction"] == "bullish")
+            assert e["mirror_next"] == pytest.approx(2 * r.facts["market"]["last_close"] - e["next_level"], abs=0.02)
+            if e["type"] == "support bounce":
+                assert e["record"]["n"] == 5 and "its mirror (same distances" in r.facts_text
+    assert seen, "some candle in the fixture is an entry point"

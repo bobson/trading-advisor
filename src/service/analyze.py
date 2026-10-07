@@ -136,6 +136,7 @@ def advise(
     as_of_bar: Optional[int] = None,
     explanation_style: Optional[str] = None,
     closed_only: bool = False,
+    entry_records: Optional[dict] = None,
 ) -> AnalysisResult:
     """Run the full pipeline for one market/timeframe and return a JSON-able result.
 
@@ -213,6 +214,14 @@ def advise(
         for p in facts["chart_patterns"]:
             p["record"] = pattern_record(pattern_records, p["type"], m.timeframe)
             p["quality_band"] = pattern_quality(pattern_records, p["type"], m.timeframe, p["quality"])
+    # Entry points on the last candle (textbook definitions, src/research/entries.py) — here, not in
+    # build_facts, so the backtest / snapshot are untouched; every live read and every morning freeze gets
+    # them. `entry_records` (the training pool, textbook side vs mirror per type) is injected by the API.
+    from src.research.entries import entries_now
+    entries = entries_now(featured, swings, req)
+    for e in entries:
+        e["record"] = (entry_records or {}).get(e["type"])
+    facts = {**facts, "entries": entries}
     if base_rate is not None:
         entry = base_rate_entry(base_rate, facts["confluence"]["bias"])
         if entry:

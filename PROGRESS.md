@@ -6,7 +6,7 @@ A state file for the "learning instrument" build. Source of truth for what's nex
 **ROADMAP progress:** A1 ✓ (merged, `645231c`), A2 ✓ (merged, `800e12a`; docs `1003735`), A3 ✓ (merged), A4 ✓ (merged), A5 ✓ (merged), A6 ✓ (merged), A7 ✓ (merged), B1 ✓ (merged — labelling mode
 built; the ≥30 labelled charts are the user's ongoing work), B2 tooling ✓ (merged — `eval_detectors.py`;
 its measurement + tuning run as soon as ≥30 charts are labelled — the user has decided NOT to label, so
-it stays unmeasured). B3 ✓ (merged), B4 ✓ (merged), B5 ✓ (merged), A8 ✓ (merged — forward record live since 2026-09-25 on wizard.bosfoot.com), R1 ✓ (merged), R2 ✓ (merged), R3 ✓ (merged — no condition changed the coin flip; ~80% of reads have a stop inside noise and no room after costs), R4 ✓ (merged — noise floor ~1 ATR, stable; Phase R complete), C1 slim ✓ (merged), D1 ✓ (merged), D6 ✓ (merged), D2 ✓ (merged), D5 ✓ (merged), D3 ✓ (merged), calendar archive for D4 started (merged), simplification pass 1 ✓ (merged — menu, morning report in plain words, shorter Analysis), pass 2 ✓ (merged — read memory: same candle free, continuations, Start fresh), Fibonacci + trendline fixes ✓ (merged). Remaining on demand: D4 (event study — once months of events are archived); small idea: a measured "no prior trend to reverse" fact on reversal patterns.
+it stays unmeasured). B3 ✓ (merged), B4 ✓ (merged), B5 ✓ (merged), A8 ✓ (merged — forward record live since 2026-09-25 on wizard.bosfoot.com), R1 ✓ (merged), R2 ✓ (merged), R3 ✓ (merged — no condition changed the coin flip; ~80% of reads have a stop inside noise and no room after costs), R4 ✓ (merged — noise floor ~1 ATR, stable; Phase R complete), C1 slim ✓ (merged), D1 ✓ (merged), D6 ✓ (merged), D2 ✓ (merged), D5 ✓ (merged), D3 ✓ (merged), calendar archive for D4 started (merged), simplification pass 1 ✓ (merged — menu, morning report in plain words, shorter Analysis), pass 2 ✓ (merged — read memory: same candle free, continuations, Start fresh), Fibonacci + trendline fixes ✓ (merged), training on entry types ✓ (merged), entry points live + forward-recorded ✓ (merged). Remaining on demand: D4 (event study — once months of events are archived); small idea: a measured "no prior trend to reverse" fact on reversal patterns.
 Order from here: user's choice. Drawing tools: deferred.
 
 ## Current state
@@ -63,6 +63,39 @@ apply if `config.yaml` omits them.
 ---
 
 ## Log (newest first)
+
+### Entry points live and in the forward record (the honest route to a prediction)
+
+- `entries_now` (src/research/entries.py) runs the same six detectors on the LAST closed candle;
+  `advise()` adds `facts["entries"]` (not `build_facts` → backtest + snapshot untouched), each with its
+  textbook levels (rule v1) and mirror levels, and — injected by the API from the training pool — the
+  type's record on that timeframe (textbook side vs mirror). Rendered in the facts text ("NOT votes, NOT
+  predictions") and as an Entry points panel on Analysis (neutral colours, behind "hide the engine's read").
+- Morning run: every read freezes its entry points in a new `forward_entries` table; `review()` judges each
+  once its horizon has passed, textbook side AND mirror (`judge_both`, first touch). Morning report: the
+  entries in today's grid and a per-type forward scorecard ("prediction" only after 20+ judged entries
+  beat their mirror on more than one market).
+- 2 new tests (frozen + judged both ways; live read carries the last candle's entries with records).
+
+### Training on entry types (user request: "find different points of entry, not just patterns")
+
+Direction set by the user on 2026-10-06: the app should *slowly become a prediction app — we are
+learning together*. The honest form: predictions are earned one tested idea at a time; nothing is shown
+as predictive until it beats a fair baseline out of sample. This step gives that loop its raw material.
+- `src/research/entries.py`: six textbook entry points found on THE look-ahead-safe walk — support
+  bounce, resistance rejection, zone breakout, trendline touch, MA pullback (in a trend), RSI divergence;
+  one setup per touch (5-bar cooldown per type + direction).
+- Each is judged by the forward record's rule v1 (next level vs invalidation from the nearest zones, first
+  touch over the morning horizon) AND as its **mirror** — the same distances in the other direction on the
+  same candles (a fair coin flip; the opposite side's own levels were tried first and were biased).
+- `training_setups` gained `family` (pattern / entry) and `outcome_opp` (migrated in place); the build
+  script takes `--family entry` → `data/training_entries.json` (~35k setups, ~45 min; droplet: copy the
+  file up and `--from-file`).
+- Training page: "practise" picks entry points / patterns / one type / everything; the reveal explains the
+  entry, the textbook trade and how the type did vs its mirror; a **scorecard** per type: your blind calls
+  (right, Brier) beside the textbook side and its mirror (rates only with 20+).
+- First look (BTC 4h, 1,690 setups): no entry type beats its mirror (e.g. resistance rejection 59% vs
+  mirror 68%; support bounce 61% vs 61%) — consistent with every earlier test. 7 new tests.
 
 ### Fibonacci + trendline fixes (user found both on a live BTC 1h read)
 

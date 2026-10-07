@@ -41,7 +41,7 @@ def test_setups_are_confirmed_judged_breakouts_keyed_by_time(cfg, candles):
 def _db(tmp_path, candles, n=3):
     from src.journal.store import connect as jconnect
     conn = jconnect(str(tmp_path / "t.db"))
-    conn.executescript(T.SCHEMA)
+    T.ensure_schema(conn)
     rows = [{"symbol": "BTC/USDT", "timeframe": "1h", "bar_time": int(candles.index[200 + 20 * k].timestamp()),
              "type": "double top", "direction": "bearish", "regime": "ranging", "outcome": "failed", "move_atr": -0.4,
              "breakout": 1.0, "invalidation": 2.0, "target": 0.5} for k in range(n)]

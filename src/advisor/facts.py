@@ -640,6 +640,24 @@ def facts_to_prompt(facts: dict) -> str:
         add("  - ROUND NUMBER: none")
     add("")
 
+    # Entry points on the last candle (live reads only — injected by advise, never in build_facts)
+    if "entries" in facts:
+        ents = facts["entries"] or []
+        add("  - ENTRY POINTS on the last closed candle (textbook definitions; NOT votes, NOT predictions):")
+        if not ents:
+            add("      none — no textbook entry point on this candle")
+        for e in ents:
+            rec = e.get("record")
+            hist = ""
+            if rec:
+                rate = lambda k, r: f"{k} of {rec['n']}" + (f" ({r * 100:.0f}%)" if r is not None else "")  # noqa: E731
+                hist = (f"; history on {rec['timeframe']} (all markets): the textbook side reached its next level "
+                        f"first {rate(rec['target'], rec['target_rate'])}, its mirror (same distances, other "
+                        f"direction) {rate(rec['mirror_target'], rec['mirror_rate'])}")
+            add(f"      {e['type']} ({e['direction']}) at {e['level']}: textbook next level {e['next_level']}, "
+                f"wrong at {e['invalidation']}{hist}")
+        add("")
+
     # --- (3) PATTERNS ---------------------------------------------------------------------
     patterns = facts.get("chart_patterns", [])
     add("3. PATTERNS — CHART PATTERNS (best-effort geometry — approximate; NOT part of the confluence "

@@ -89,6 +89,7 @@ export interface Analysis {
     hard: { check: string; detail: string }[]; soft: { check: string; detail: string }[]
     first_attempt_hard: { check: string; detail: string }[]
   } | null
+  entries?: LiveEntry[]          // entry points on the last closed candle (textbook definitions, not predictions)
   exits?: { noise_floor_atr: number | null; typical_run_atr: number | null; noise_floor_price: number | null
             typical_run_price: number | null; n: number; winners: number; text: string } | null
   confluence: Confluence
@@ -353,7 +354,17 @@ export interface MorningReport {
   caution_status?: Record<string, string>     // R3: what held-back history said per condition
   summary?: MorningSummary
   misses_in_common?: MissInCommon[]
+  entries_today?: { symbol: string; timeframe: string; type: string; direction: string; level: number
+                    next_level: number; invalidation: number }[]
+  entry_forward?: EntryForward[]
 }
+// Entry points: on the live candle, frozen in the morning record, judged textbook side vs mirror
+export interface EntryRecord { n: number; target: number; mirror_target: number; timeframe: string
+  target_rate: number | null; mirror_rate: number | null }
+export interface LiveEntry { type: string; direction: string; level: number; next_level: number; invalidation: number
+  mirror_next: number; mirror_invalidation: number; record: EntryRecord | null }
+export interface EntryForward { type: string; judged: number; pending: number; target: number; invalidated: number
+  mirror_target: number; target_rate: number | null; mirror_rate: number | null }
 // Simplification pass 1: the whole record in one line, and what the misses had in common
 export interface MorningSummary {
   rule_version: number
@@ -411,7 +422,8 @@ export const postJournal = (body: JournalIn) => send<JournalEntry>('POST', '/jou
 export const deleteJournal = (id: number) => send<{ deleted: number }>('DELETE', `/journal/${id}`)
 
 // --- ROADMAP D6: blind training ---
-export interface TrainingOptions { types: Record<string, number>; regimes: Record<string, number>; timeframes: Record<string, number>; total: number }
+export interface TrainingOptions { types: Record<string, number>; regimes: Record<string, number>; timeframes: Record<string, number>; total: number
+  families?: Record<string, 'pattern' | 'entry'> }
 export interface TrainingSetup { id: number; symbol: string; timeframe: string; as_of_bar: number; bar_time: number; price: number; horizon_bars: number }
 export interface TrainingReveal {
   entry: JournalEntry; reveal_bar: number; end_time: number
@@ -420,11 +432,18 @@ export interface TrainingReveal {
   engine: { bias: string; tier: string; agreeing: number; total: number; cautions: string[]
             patterns: { type: string; state: string; lifecycle: string | null }[] }
   record: PatternRecord | null
+  pool?: TrainingPool | null       // entry types: the textbook side vs its mirror across the pool
 }
+// Training on entry types: per type, the pool (textbook side vs mirror, rule v1) and your blind calls
+export interface TrainingPool { family: string; n: number; target: number; failed: number; target_rate: number | null
+  opposite_target: number | null; opposite_rate: number | null }
+export interface TrainingScoreRow { type: string; family: 'pattern' | 'entry'; pool: TrainingPool | null
+  you: { n: number; correct: number; incorrect: number; invalidated: number; rate: number | null; brier: number; mean_confidence: number } | null }
+export const getTrainingScorecard = () => get<{ rows: TrainingScoreRow[]; min_n: number }>('/training/scorecard')
 const qs = (o: Record<string, string | undefined>) =>
   Object.entries(o).filter(([, v]) => v).map(([k, v]) => `${k}=${encodeURIComponent(v as string)}`).join('&')
 export const getTrainingOptions = () => get<TrainingOptions>('/training/options')
-export const getTrainingNext = (f: { type?: string; regime?: string; timeframe?: string }) =>
+export const getTrainingNext = (f: { type?: string; regime?: string; timeframe?: string; family?: string }) =>
   get<{ setup: TrainingSetup | null }>(`/training/next?${qs(f)}`)
 export const postTrainingAnswer = (body: { setup_id: number; direction: 'up' | 'down'; confidence: number; invalidation: number; note: string }) =>
   send<TrainingReveal>('POST', '/training/answer', body)

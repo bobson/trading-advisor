@@ -1,6 +1,8 @@
-"""ROADMAP D6 — build the blind-training pool (`training_setups`): past moments where a pattern confirmed.
+"""ROADMAP D6 — build the blind-training pool (`training_setups`): past moments where a pattern confirmed,
+and (training on entry types) textbook entry points — support bounce, zone breakout, trendline touch, …
 
-    python scripts/build_training_setups.py                           # research pairs + gold, 1h/4h/1d
+    python scripts/build_training_setups.py                           # patterns, research pairs + gold, 1h/4h/1d
+    python scripts/build_training_setups.py --family entry            # entry points only
     python scripts/build_training_setups.py --from-file data/training_setups.json   # import only (seconds)
 
 Uses the encyclopedia's look-ahead-safe walk (every bar), cache-first candles. About 30 minutes; run it
@@ -20,6 +22,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from src.config import load_config  # noqa: E402
 from src.data.registry import get_candles, list_pairs  # noqa: E402
+from src.research.entries import collect_entries  # noqa: E402
 from src.research.training import collect_setups, connect, export, options, save  # noqa: E402
 from src.service.analyze import _request_config  # noqa: E402
 
@@ -29,8 +32,10 @@ def main() -> None:
     ap.add_argument("--symbols", default=None)
     ap.add_argument("--timeframes", default="1h,4h,1d")
     ap.add_argument("--db", default="data/wizard.db")
-    ap.add_argument("--file", default="data/training_setups.json")
+    ap.add_argument("--file", default=None, help="default data/training_setups.json (patterns) or "
+                                                 "data/training_entries.json (entries)")
     ap.add_argument("--from-file", default=None)
+    ap.add_argument("--family", choices=["pattern", "entry"], default="pattern")
     args = ap.parse_args()
 
     cfg0 = load_config()
@@ -48,10 +53,11 @@ def main() -> None:
                 except Exception as exc:
                     print(f"  skip {sym} {tf}: {exc}", flush=True)
                     continue
-                got = collect_setups(df, _request_config(cfg0, sym, tf), sym, tf, horizon=horizon)
+                collect = collect_entries if args.family == "entry" else collect_setups
+                got = collect(df, _request_config(cfg0, sym, tf), sym, tf, horizon=horizon)
                 setups += got
-                print(f"  {sym:9} {tf:3} → {len(got):4} confirmed setups ({time.time() - t0:.0f}s)", flush=True)
-        export(setups, args.file)
+                print(f"  {sym:9} {tf:3} → {len(got):4} {args.family} setups ({time.time() - t0:.0f}s)", flush=True)
+        export(setups, args.file or f"data/training_{'entries' if args.family == 'entry' else 'setups'}.json")
     conn = connect(args.db)
     added = save(conn, setups)
     print(f"\n{added} new setups ({len(setups)} in the file) → {args.db}; pool now: {options(conn)}")

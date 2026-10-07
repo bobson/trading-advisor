@@ -104,6 +104,19 @@ def timeframes() -> list[str]:
     return list(cfg.timeframes.selectable)
 
 
+def _entry_records(timeframe: str) -> dict:
+    """Entry points: each type's record on this timeframe in the training pool (textbook side vs mirror)."""
+    from src.research.entries import pool_records
+    try:
+        conn = _training_conn()
+    except Exception:
+        return {}
+    try:
+        return pool_records(conn, timeframe)
+    finally:
+        conn.close()
+
+
 _READ_LOCKS: dict[tuple, threading.Lock] = {}
 _READ_LOCKS_GUARD = threading.Lock()
 
@@ -146,7 +159,7 @@ def analysis(
                             reliability=RELIABILITY.get("table"),
                             verdict_records=_verdict_rows(), pattern_records=_encyclopedia_top_rows(),
                             caution_stats=_caution_stats(), exit_stats=_exit_stats(),
-                            as_of_bar=as_of_bar)
+                            as_of_bar=as_of_bar, entry_records=_entry_records(timeframe))
         except NotImplementedError as exc:  # e.g. forex before Phase 26
             raise HTTPException(status_code=501, detail=str(exc))
         except Exception as exc:  # data fetch / analysis failure
@@ -722,9 +735,9 @@ class TrainingAnswer(BaseModel):
 
 def _training_conn():
     from src.journal.store import connect as jconnect
-    from src.research.training import SCHEMA
+    from src.research.training import ensure_schema
     conn = jconnect(_TRADES_DB or "data/wizard.db")      # journal + training tables in one DB
-    conn.executescript(SCHEMA)
+    ensure_schema(conn)
     return conn
 
 
@@ -750,14 +763,15 @@ def training_options() -> dict:
 
 
 @app.get("/training/next", dependencies=_GUARDS)
-def training_next(type: str | None = None, regime: str | None = None, timeframe: str | None = None) -> dict:
+def training_next(type: str | None = None, regime: str | None = None, timeframe: str | None = None,
+                  family: str | None = None) -> dict:
     """A random unanswered setup: where the chart should END (as_of_bar) and the price at that candle.
     The pattern, its direction and outcome are NOT sent until the call is logged."""
     from src.research.training import pick
     conn = _training_conn()
     try:
         for _ in range(25):                                   # skip setups the cache no longer covers
-            s = pick(conn, type_=type, regime=regime, timeframe=timeframe)
+            s = pick(conn, type_=type, regime=regime, timeframe=timeframe, family=family)
             if s is None:
                 return {"setup": None}
             horizon = cfg.morning_report.horizons.get(s["timeframe"], 24)
@@ -777,7 +791,7 @@ def training_answer(body: TrainingAnswer) -> dict:
     from src.journal.resolve import judge
     from src.journal.store import JournalError, log_call
     from src.research.scanner import pattern_record
-    from src.research.training import get
+    from src.research.training import get, scorecard
     from src.risk.caution import is_caution
     conn = _training_conn()
     try:
@@ -810,8 +824,22 @@ def training_answer(body: TrainingAnswer) -> dict:
                        "cautions": [x["label"] for x in facts.get("caution") or [] if is_caution(x)],
                        "patterns": [{"type": p["type"], "state": p["state"], "lifecycle": p.get("lifecycle")}
                                     for p in facts.get("chart_patterns") or []]},
-            "record": pattern_record(_encyclopedia_top_rows(), s["type"], s["timeframe"]),
+            "record": (pattern_record(_encyclopedia_top_rows(), s["type"], s["timeframe"])
+                       if s.get("family", "pattern") == "pattern" else None),
+            # entry types: how this type did across the whole pool, textbook side vs its mirror
+            "pool": next((r["pool"] for r in scorecard(conn)["rows"] if r["type"] == s["type"]), None),
         }
+    finally:
+        conn.close()
+
+
+@app.get("/training/scorecard", dependencies=_GUARDS)
+def training_scorecard() -> dict:
+    """Per setup type: your blind calls beside the pool's textbook side and its mirror (training on entry types)."""
+    from src.research.training import scorecard
+    conn = _training_conn()
+    try:
+        return scorecard(conn)
     finally:
         conn.close()
 

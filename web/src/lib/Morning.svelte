@@ -70,6 +70,7 @@
   const judgedRange = $derived((report?.review ?? []).filter((r) => r.read_kind === 'range'))
   const whyText = (r: ForwardRead) => whySentence(r, report?.caution_labels ?? {}, report?.caution_status ?? {})
   const totals = $derived(report?.summary?.directional.engine.counts)
+  const entriesAt = (sym: string, tf: string) => (report?.entries_today ?? []).filter((e) => e.symbol === sym && e.timeframe === tf)
   const BENIGN = ['already read today', 'no new closed candle since the last read']
   const clock = (t: number) => new Date(t * 1000).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
   const attemptText = (a: { trigger: string; status: string; new_reads: number; resolved: number; skipped: { reason: string }[] }) => {
@@ -163,6 +164,22 @@
       <p class="muted small">No judged directional read with recorded cautions yet.</p>
     {/if}
 
+    <!-- ENTRY POINTS: frozen with the reads, judged both ways (the honest route to a prediction) -->
+    <h3>Entry points <span class="muted small">— textbook entries frozen with the reads, judged against their mirror</span></h3>
+    {#if report.entry_forward?.length}
+      <ul class="common">
+        {#each report.entry_forward as e}
+          <li><b>{e.type}</b>:
+            {#if e.judged}textbook side reached its next level first {e.target} of {e.judged}{e.target_rate != null ? ` (${Math.round(e.target_rate * 100)}%)` : ''},
+              the mirror {e.mirror_target} of {e.judged}{e.mirror_rate != null ? ` (${Math.round(e.mirror_rate * 100)}%)` : ''}{:else}none judged yet{/if}{e.pending ? ` · ${e.pending} waiting` : ''}.</li>
+        {/each}
+      </ul>
+      <p class="muted small">An entry type earns the name "prediction" only if its side beats its mirror over 20+ judged
+        entries, on more than one market. Until then these are counts.</p>
+    {:else}
+      <p class="muted small">No entry point recorded yet — they are frozen from the next 08:00 run on.</p>
+    {/if}
+
     <!-- 2. TODAY'S READS -->
     <h3>Today's reads <span class="muted small">— frozen on {report.run_date}, judged later</span></h3>
     {#if isLatest}
@@ -189,6 +206,7 @@
                     {#if r.read_kind === 'directional'}<span class="dir {r.direction}">{arrow(r.direction)} {r.direction}</span>{/if}
                     <span class="small muted">{fmt(r.price)}</span>
                     {#if flagsOn(r).length}<span class="warn small" title={flagsOn(r).join('\n')}>⚠ {flagsOn(r).length} caution{flagsOn(r).length > 1 ? 's' : ''}</span>{/if}
+                    {#each entriesAt(sym, tf) as e}<span class="small ent {e.direction}">⤷ {e.type}</span>{/each}
                   </button>
                 {:else}
                   {@const why = skipped.find((s) => s.symbol === sym && s.timeframe === tf)?.reason}
@@ -329,6 +347,7 @@
   .rlist { margin: 6px 0; padding-left: 20px; }
   .details { margin-top: 24px; border-top: 1px solid #21262d; padding-top: 10px; }
   .details > summary { cursor: pointer; color: #8b949e; }
+  .ent.bullish { color: #3fb950; } .ent.bearish { color: #f85149; }
   .synth { border: 1px solid #30363d; border-radius: 8px; padding: 8px 12px; margin-bottom: 8px; }
   .synth p { margin: 4px 0 0; white-space: pre-wrap; }
   details { margin-top: 12px; }

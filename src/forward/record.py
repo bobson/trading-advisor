@@ -84,6 +84,17 @@ CREATE TABLE IF NOT EXISTS forward_reads (
     UNIQUE (run_date, symbol, timeframe),
     UNIQUE (symbol, timeframe, bar_time)
 );
+CREATE TABLE IF NOT EXISTS forward_entries (       -- entry points frozen with a read, judged both ways
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    read_id INTEGER NOT NULL, run_date TEXT NOT NULL,
+    symbol TEXT NOT NULL, timeframe TEXT NOT NULL, bar_time INTEGER NOT NULL, price REAL NOT NULL,
+    type TEXT NOT NULL, direction TEXT NOT NULL, level REAL,
+    next_level REAL NOT NULL, invalidation REAL NOT NULL,          -- the textbook trade (rule v1 levels)
+    mirror_next REAL NOT NULL, mirror_invalidation REAL NOT NULL,  -- same distances, other direction
+    horizon INTEGER NOT NULL, rule_version INTEGER NOT NULL,
+    outcome TEXT, mirror_outcome TEXT, resolved_run_date TEXT,
+    UNIQUE (read_id, type, direction)
+);
 CREATE TABLE IF NOT EXISTS forward_syntheses (
     run_date TEXT NOT NULL, symbol TEXT NOT NULL, text TEXT NOT NULL, model TEXT, created_at INTEGER,
     PRIMARY KEY (run_date, symbol)
@@ -201,6 +212,9 @@ def freeze_read(df: pd.DataFrame, symbol: str, timeframe: str, cfg: Config) -> t
         "caution": json.dumps({c["code"]: c["active"] for c in f.get("caution") or []}),
         "facts_hash": facts_hash(f),
         "horizon": cfg.morning_report.horizons[timeframe], "rule_version": RULE_VERSION,
+        # entry points on this candle (not a column: run_morning stores them in forward_entries)
+        "_entries": [{k: e[k] for k in ("type", "direction", "level", "next_level", "invalidation", "mirror_next",
+                                        "mirror_invalidation")} for e in f.get("entries") or []],
     }
     return row, res.facts_text
 
@@ -226,6 +240,17 @@ def review(conn, df: pd.DataFrame, symbol: str, timeframe: str, run_date: str, n
                            "baseline_direction=?, baseline_outcome=? WHERE id=? AND outcome IS NULL",
                            (outcome, run_date, int(now.timestamp()), b_dir, b_out, r["id"]))
         n += cur.rowcount
+    from src.research.entries import judge_both
+    for e in conn.execute("SELECT * FROM forward_entries WHERE symbol=? AND timeframe=? AND outcome IS NULL",
+                          (symbol, timeframe)).fetchall():
+        e = dict(e)
+        after = df[df.index > pd.Timestamp(e["bar_time"], unit="s", tz="UTC")]
+        if len(after) < e["horizon"]:
+            continue
+        win = after.iloc[: e["horizon"]]
+        own, mirror = judge_both(e["direction"], e, list(zip(win["high"].astype(float), win["low"].astype(float))))
+        conn.execute("UPDATE forward_entries SET outcome=?, mirror_outcome=?, resolved_run_date=? WHERE id=?",
+                     (own, mirror, run_date, e["id"]))
     conn.commit()
     return n
 
@@ -320,10 +345,18 @@ def run_morning(cfg: Config, conn, *, now: datetime | None = None, trigger: str 
             row["caution"] = json.dumps(flags)
         row.update(run_date=rd, created_at=int(now.timestamp()), engine_commit=engine["commit"],
                    engine_dirty=int(engine["dirty"]), config_hash=engine["config_hash"])
+        entries = row.pop("_entries", [])
         cols = ", ".join(row)
         cur = conn.execute(f"INSERT OR IGNORE INTO forward_reads ({cols}) VALUES ({', '.join('?' * len(row))})",
                            tuple(row.values()))
         new_reads += cur.rowcount
+        for e in entries if cur.rowcount else []:
+            conn.execute("INSERT OR IGNORE INTO forward_entries (read_id, run_date, symbol, timeframe, bar_time, price, "
+                         "type, direction, level, next_level, invalidation, mirror_next, mirror_invalidation, horizon, "
+                         "rule_version) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+                         (cur.lastrowid, rd, sym, tf, row["bar_time"], row["price"], e["type"], e["direction"],
+                          e["level"], e["next_level"], e["invalidation"], e["mirror_next"], e["mirror_invalidation"],
+                          row["horizon"], row["rule_version"]))
         if cur.rowcount:
             texts.setdefault(sym, []).append((tf, text))
     conn.commit()

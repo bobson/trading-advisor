@@ -432,6 +432,27 @@
       </p>
     {/if}
 
+    <!-- Entry points on the last closed candle: textbook definitions with their measured history vs the
+         mirror (same distances, other direction). Information, never a vote or a prediction. -->
+    {#if result.entries}
+      <section class="entries panel">
+        <h3>Entry points <span class="cnote">on the last closed candle — textbook definitions, not predictions</span></h3>
+        {#if result.entries.length}
+          <ul>
+            {#each result.entries as e}
+              <li><b>{e.type}</b> <span class="edir {e.direction}">{e.direction === 'bullish' ? '▲' : '▼'} {e.direction}</span>
+                at {e.level.toLocaleString()} — textbook trade: next level {e.next_level.toLocaleString()}, wrong at {e.invalidation.toLocaleString()}
+                {#if e.record}<br /><span class="crec">History on {e.record.timeframe} (all markets): the textbook side reached its next level first
+                  in {e.record.target} of {e.record.n}{e.record.target_rate != null ? ` (${Math.round(e.record.target_rate * 100)}%)` : ''};
+                  its mirror (same distances, other direction) in {e.record.mirror_target}{e.record.mirror_rate != null ? ` (${Math.round(e.record.mirror_rate * 100)}%)` : ''}.</span>{/if}</li>
+            {/each}
+          </ul>
+        {:else}
+          <p class="none">No textbook entry point on this candle.</p>
+        {/if}
+      </section>
+    {/if}
+
     {#if result.caution?.length}
       <!-- ROADMAP R1 + R3: the risk around the read (never its direction). Active conditions that history
            backs (or that are arithmetic / sizing facts) are cautions; the rest are information only. -->
@@ -819,6 +840,13 @@
   }
   .panel { border: 1px solid #30363d; border-radius: 8px; padding: 14px; margin-top: 14px; }
   .caution.has { border-color: #9e6a03; }
+  .entries h3 { margin: 0 0 6px; font-size: 13px; text-transform: uppercase; letter-spacing: .04em; color: #8b949e; }
+  .entries .cnote { text-transform: none; letter-spacing: 0; font-weight: 400; font-size: 12px; margin-left: 6px; }
+  .entries ul { margin: 0; padding-left: 18px; font-size: 14px; }
+  .entries li { margin-bottom: 4px; }
+  .entries .edir { color: #c9d1d9; }   /* neutral on purpose: green/red beside a % reads as odds (A2) */
+  .entries .crec { color: #8b949e; font-size: 12px; }
+  .entries .none { color: #8b949e; font-size: 13px; margin: 0; }
   .caution h3 { margin: 0 0 6px; font-size: 13px; color: #d29922; text-transform: uppercase; letter-spacing: .04em; }
   .caution .cnote { text-transform: none; letter-spacing: 0; color: #8b949e; font-weight: 400; font-size: 12px; margin-left: 6px; }
   .caution ul { margin: 0; padding-left: 18px; }
