@@ -173,6 +173,11 @@ def entry_forward(conn, version: int = RULE_VERSION) -> list[dict]:
     return sorted(rows.values(), key=lambda d: (-d["judged"], d["type"]))
 
 
+def _experiments_live(conn) -> list[dict]:
+    from src.research.entry_fade import live
+    return live(conn)
+
+
 def build_report(conn, cfg: Config, run_date: str | None = None, now: datetime | None = None) -> dict:
     mr = cfg.morning_report
     now = now or datetime.now(timezone.utc)
@@ -208,6 +213,7 @@ def build_report(conn, cfg: Config, run_date: str | None = None, now: datetime |
         "pending": pending, "scoreboard": scoreboard(resolved), "caution_split": split,
         "summary": summary(resolved), "misses_in_common": misses_in_common(split["rows"]),
         "entries_today": entries_today, "entry_forward": entry_forward(conn),
+        "experiments_live": _experiments_live(conn),
         "watchlist": {"symbols": mr.symbols, "timeframes": mr.timeframes, "horizons": mr.horizons},
         "next_run": next_run(now, mr.timezone, mr.run_at).isoformat(),
         "schedule": f"{mr.run_at} {mr.timezone}",

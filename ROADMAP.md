@@ -99,7 +99,8 @@ instructing it better. So **the guide shrinks as Layer 1 grows.**
 | Fibonacci + trendline fixes | ✅ Done (merged, 2026-10-06) — outdated fib leg flagged (no vote), trendlines as facts, `trendline_against` caution |
 | Training on entry types | ✅ Done (merged, 2026-10-06) — 6 entry types + mirror baseline, per-type scorecard; direction: prediction earned by scored calls |
 | Entry points live + forward record | ✅ Done (merged, 2026-10-06) — entries on Analysis with history vs mirror; frozen at 08:00 and judged both ways |
-| Tests | 641 green, ruff + svelte-check clean |
+| Experiment: fade the textbook entry (1d) | ✅ Built (merged, 2026-10-07) — forward-only, auto-recorded at 100 decisive entries |
+| Tests | 644 green, ruff + svelte-check clean |
 
 **Remaining, in order:**
 

@@ -62,10 +62,24 @@ def main() -> int:
             n_journal = resolve_due(jc, live_candles(cfg))
         finally:
             jc.close()
+        # pre-registered forward experiments (entry_fade): recorded the morning they reach their sample size
+        from src.research.entry_fade import auto_record
+        from src.research.prereg import connect as pconnect
+        pc = pconnect(args.db)
+        recorded = []
+        try:
+            recorded = auto_record(pc, engine_commit=out["engine"]["commit"])
+        except Exception as exc:                     # never fails the morning run
+            print(f"  experiments: check failed ({exc})")
+        finally:
+            pc.close()
     print(f"Morning run {out['run_date']}: {out['status']} — {out['new_reads']} new reads, "
           f"{out['resolved']} resolved, engine {out['engine']['commit']}{' (dirty)' if out['engine']['dirty'] else ''}")
     print(f"  journal: {n_journal} call(s) resolved")
     print(f"  calendar archive: {arch['new']} new event(s) of {arch['seen']} this week")
+    for r in recorded:
+        print(f"  experiment {r['id']} recorded: {r['metric']} = {r['value']} (n {r['n']}) — "
+              f"{'passed' if r['passed'] else 'did not pass'}")
     for g in out["gaps"]:
         print(f"  gap recorded: {g}")
     for s in out["skipped"]:

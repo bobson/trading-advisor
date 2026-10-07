@@ -36,7 +36,12 @@ SCRIPT_METRICS = {           # script -> {metric: "rate" | "value"}; a rate carr
     "exit_lab": {"spread_across_exits": "value", "spread_across_entries": "value", "best_exit_mean_return": "value"},
     "measure_caution": {"helps_count": "value"},
     "measure_exits": {"noise_floor_1h": "value", "noise_floor_4h": "value", "noise_floor_1d": "value"},
+    "entry_fade": {"mirror_win_rate": "rate"},     # forward-only, recorded by the morning job (src/research/entry_fade.py)
 }
+
+# experiments that aren't run by hand: what to tell the user after registering
+RUN_HINT = {"entry_fade": "Forward-only: the morning job records it by itself once it has its sample "
+                          "(check with scripts/entry_fade_study.py --progress)."}
 
 SCHEMA = """
 CREATE TABLE IF NOT EXISTS experiments (
@@ -211,8 +216,8 @@ def gate(args: argparse.Namespace, script: str, params: dict):
                            metric=args.metric, direction=args.direction, threshold=args.threshold,
                            baseline=args.baseline, predicted_pass=args.predict == "pass",
                            predicted_value=args.predicted_value, supersedes=args.supersedes)
-            print(f"Registered experiment {exp['id']} (hash {exp['hash']}). Run it with the same arguments and "
-                  f"--experiment {exp['id']}.")
+            how = (RUN_HINT.get(script) or f"Run it with the same arguments and --experiment {exp['id']}.")
+            print(f"Registered experiment {exp['id']} (hash {exp['hash']}). {how}")
             sys.exit(0)
         return conn, check_runnable(conn, args.experiment, script, params)
     except PreregError as exc:

@@ -357,6 +357,8 @@ export interface MorningReport {
   entries_today?: { symbol: string; timeframe: string; type: string; direction: string; level: number
                     next_level: number; invalidation: number }[]
   entry_forward?: EntryForward[]
+  experiments_live?: { id: number; hypothesis: string; threshold: number; min_n: number; timeframe: string
+                       n: number; mirror: number; value: number | null; judged: number }[]
 }
 // Entry points: on the live candle, frozen in the morning record, judged textbook side vs mirror
 export interface EntryRecord { n: number; target: number; mirror_target: number; timeframe: string

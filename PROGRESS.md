@@ -6,7 +6,7 @@ A state file for the "learning instrument" build. Source of truth for what's nex
 **ROADMAP progress:** A1 ✓ (merged, `645231c`), A2 ✓ (merged, `800e12a`; docs `1003735`), A3 ✓ (merged), A4 ✓ (merged), A5 ✓ (merged), A6 ✓ (merged), A7 ✓ (merged), B1 ✓ (merged — labelling mode
 built; the ≥30 labelled charts are the user's ongoing work), B2 tooling ✓ (merged — `eval_detectors.py`;
 its measurement + tuning run as soon as ≥30 charts are labelled — the user has decided NOT to label, so
-it stays unmeasured). B3 ✓ (merged), B4 ✓ (merged), B5 ✓ (merged), A8 ✓ (merged — forward record live since 2026-09-25 on wizard.bosfoot.com), R1 ✓ (merged), R2 ✓ (merged), R3 ✓ (merged — no condition changed the coin flip; ~80% of reads have a stop inside noise and no room after costs), R4 ✓ (merged — noise floor ~1 ATR, stable; Phase R complete), C1 slim ✓ (merged), D1 ✓ (merged), D6 ✓ (merged), D2 ✓ (merged), D5 ✓ (merged), D3 ✓ (merged), calendar archive for D4 started (merged), simplification pass 1 ✓ (merged — menu, morning report in plain words, shorter Analysis), pass 2 ✓ (merged — read memory: same candle free, continuations, Start fresh), Fibonacci + trendline fixes ✓ (merged), training on entry types ✓ (merged), entry points live + forward-recorded ✓ (merged). Remaining on demand: D4 (event study — once months of events are archived); small idea: a measured "no prior trend to reverse" fact on reversal patterns.
+it stays unmeasured). B3 ✓ (merged), B4 ✓ (merged), B5 ✓ (merged), A8 ✓ (merged — forward record live since 2026-09-25 on wizard.bosfoot.com), R1 ✓ (merged), R2 ✓ (merged), R3 ✓ (merged — no condition changed the coin flip; ~80% of reads have a stop inside noise and no room after costs), R4 ✓ (merged — noise floor ~1 ATR, stable; Phase R complete), C1 slim ✓ (merged), D1 ✓ (merged), D6 ✓ (merged), D2 ✓ (merged), D5 ✓ (merged), D3 ✓ (merged), calendar archive for D4 started (merged), simplification pass 1 ✓ (merged — menu, morning report in plain words, shorter Analysis), pass 2 ✓ (merged — read memory: same candle free, continuations, Start fresh), Fibonacci + trendline fixes ✓ (merged), training on entry types ✓ (merged), entry points live + forward-recorded ✓ (merged), "fade the textbook entry" experiment registered-ready ✓ (merged). Remaining on demand: D4 (event study — once months of events are archived); small idea: a measured "no prior trend to reverse" fact on reversal patterns.
 Order from here: user's choice. Drawing tools: deferred.
 
 ## Current state
@@ -63,6 +63,18 @@ apply if `config.yaml` omits them.
 ---
 
 ## Log (newest first)
+
+### Experiment: on the daily chart, fade the textbook entry? (forward-only, D2)
+
+The full training pool (32,515 entry setups) showed no textbook entry beating its mirror — and on 1d the
+mirror won clearly (decisive cases, 4 types: 2,110 of 3,632 = 58%). Found by looking, so it is tested
+ONLY on new data: `src/research/entry_fade.py` measures `mirror_win_rate` on `forward_entries` (1d;
+trendline touch, MA pullback, resistance rejection, support bounce; decisive = exactly one side reached
+its next level first). Registered with D2 (`scripts/entry_fade_study.py --register …`, script
+`entry_fade`, threshold 0.55 vs baseline 0.5, predicted 0.58); the morning job's `auto_record` writes
+the result the morning it reaches `min_n` = 100 decisive entries (~3 months) — nobody picks the moment.
+Progress shows in the morning report and `--progress`. 3 new tests. Must be registered on the DROPLET
+(where the forward record lives), after deploy.
 
 ### Entry points live and in the forward record (the honest route to a prediction)
 

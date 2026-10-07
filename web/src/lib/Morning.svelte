@@ -179,6 +179,11 @@
     {:else}
       <p class="muted small">No entry point recorded yet — they are frozen from the next 08:00 run on.</p>
     {/if}
+    {#each report.experiments_live ?? [] as x}
+      <div class="summary small"><b>🧪 Experiment {x.id}</b> (pre-registered, forward only): {x.hypothesis}<br />
+        Progress: <b>{x.n} of {x.min_n}</b> decisive {x.timeframe} entries — the mirror won {x.mirror}{x.value != null ? ` (${Math.round(x.value * 100)}%)` : ''}.
+        <span class="muted">Recorded automatically the morning it reaches {x.min_n}; nobody picks the moment.</span></div>
+    {/each}
 
     <!-- 2. TODAY'S READS -->
     <h3>Today's reads <span class="muted small">— frozen on {report.run_date}, judged later</span></h3>
