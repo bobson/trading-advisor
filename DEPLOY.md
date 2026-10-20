@@ -73,7 +73,10 @@ curl -s localhost:8010/health          # -> {"status":"ok"}
 
 ## 4. Caddy
 
-Add this block to the existing Caddyfile (next to the bosfoot one, which stays untouched):
+Put this block in its own file, `/etc/caddy/wizard.caddy`. Don't add it to the bosfoot Caddyfile:
+that file is `/srv/bosfoot/Caddyfile`, part of the bosfoot repo, and every bosfoot deploy can
+overwrite it. That happened once (Oct 2026): the wizard block disappeared, the next Caddy restart
+dropped the site, and Cloudflare showed **525 SSL handshake failed**.
 
 ```caddyfile
 wizard.bosfoot.com {
@@ -96,8 +99,17 @@ wizard.bosfoot.com {
 }
 ```
 
+`/etc/caddy/Caddyfile` must be a small file of its own (not a symlink to bosfoot's) that loads both sites:
+
+```caddyfile
+import /srv/bosfoot/Caddyfile
+import /etc/caddy/wizard.caddy
+```
+
 ```bash
 caddy hash-password                     # type a password; paste the output into the block
+sudo rm /etc/caddy/Caddyfile            # only if it is still the symlink to /srv/bosfoot/Caddyfile
+printf 'import /srv/bosfoot/Caddyfile\nimport /etc/caddy/wizard.caddy\n' | sudo tee /etc/caddy/Caddyfile
 sudo caddy validate --config /etc/caddy/Caddyfile
 sudo systemctl reload caddy
 ```
